@@ -132,7 +132,7 @@ make help
 <RateEngine version="0.7.0" >
  <System>
     <param name="DIR" value="/usr/local/RateEngine/" />
-    <param name="PIDFile" value="logs/rate_engine_6.pid" />
+    <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
  <LoadModules>
     <param name="module" value="pgsql.so" />
@@ -144,9 +144,9 @@ make help
  <DB>
     <param name="dbtype" value="pgsql" />
     <param name="dbhost" value="127.0.0.1" />
-    <param name="dbname" value="rate_engine" />
-    <param name="dbuser" value="global" />
-    <param name="dbpass" value="_cfg.access" />
+    <param name="dbname" value="dbname" />
+    <param name="dbuser" value="dbuser" />
+    <param name="dbpass" value="dbpassword" />
     <!-- 3306,5432,6379 -->
     <param name="dbport" value="5432" />
 
@@ -196,8 +196,7 @@ make help
     <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
  </CDRMediator>
  <Logs>
-    <!-- <param name="active" value="yes" /> -->
-    <param name="LogFile" value="logs/rate_engine_6.log" />
+    <param name="LogFile" value="logs/rate_engine.log" />
     <param name="LogMaxFileSize" value="40960000" />
     <param name="LogSeparator" value="|" />
     <param name="LogDateFormat" value="" />
@@ -206,9 +205,6 @@ make help
  </Logs>
 </RateEngine>
 ```
-
-
-
 
 ## RateEngine console commands:
 
