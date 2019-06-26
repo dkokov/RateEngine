@@ -128,7 +128,8 @@ make help
 
 **The main RateEngine config file is RateEngine.xml :**
 
-*<RateEngine version="0.7.0" >
+``` XML
+<RateEngine version="0.7.0" >
  <System>
     <param name="DIR" value="/usr/local/RateEngine/" />
     <param name="PIDFile" value="logs/rate_engine_6.pid" />
@@ -203,8 +204,8 @@ make help
     <!-- 1,INFO ; 2,WARN ; 3,DEBUG ; 4,DEBUG + TIMING ;-->
     <param name="LogDebugLevel" value="3" />
  </Logs>
-</RateEngine>*
-
+</RateEngine>
+```
 
 
 
