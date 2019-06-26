@@ -83,12 +83,20 @@ Steps are follow:
 git clone https://github.com/dkokov/RateEngine.git
 ```
 
+``` python
 cd src/
+```
 
+``` vim
 edit file 'config.md' and comment/uncomment modules
+```
 
+``` bash
 make
 
-make install
+```
 
+``` bash
+make install
+```
 
