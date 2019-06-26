@@ -89,19 +89,17 @@ Steps are follow:
 git clone https://github.com/dkokov/RateEngine.git
 ```
 
+main source directory:
 ```
 cd src/
 ```
 
+edit 'config.md' file - comment/uncomment names by modules:
 ```
-edit file 'config.md' and comment/uncomment modules
-```
-
-```
-make
-
+vim config.md
 ```
 
+compile core and modules,install in default path(/usr/local/RateEngine/)
 ```
 make install
 ```
@@ -117,4 +115,19 @@ make help
 
 #### Main config file
 
+## RateEngine commands:
 
+Go to default directory:
+```
+cd /use/local/RateEngine
+```
+
+List console commands and arguments:
+```
+./bin/RateEngine -h
+```
+
+Start as daemon(background):
+```
+./bin/RateEngine -d
+```
