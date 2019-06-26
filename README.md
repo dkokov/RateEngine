@@ -7,6 +7,9 @@ For example: TCP support - tcp module (tcp.so) or pgsql support - pgsql module(p
 Main modules are: CDRMediator (cdrm.so),Rating (rt.so) and CallControl (cc.so).
 
 
+![](RateEngine_v2.png)
+
+
 ## RateEngine core (libre7core.so)
 
 #### mem
