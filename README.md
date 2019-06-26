@@ -46,7 +46,7 @@ You can see example topology for RateEngine using in follow picture:
 <div alight="center"
 ![](RateEngine_v2.png)
 <div alight="center">Fig.1</div>
-/>
+/div>
 
 ## RateEngine components
 
@@ -79,7 +79,7 @@ In the RateEngine core are defined few system interfaces:
 
 Steps are follow:
 
-git clone https://github.com/dkokov/RateEngine.git
+```git clone https://github.com/dkokov/RateEngine.git```
 
 cd src/
 
