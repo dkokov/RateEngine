@@ -79,24 +79,24 @@ In the RateEngine core are defined few system interfaces:
 
 Steps are follow:
 
-``` bash
+``` 
 git clone https://github.com/dkokov/RateEngine.git
 ```
 
-``` python
+```
 cd src/
 ```
 
-``` vim
+```
 edit file 'config.md' and comment/uncomment modules
 ```
 
-``` bash
+```
 make
 
 ```
 
-``` bash
+```
 make install
 ```
 
