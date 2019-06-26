@@ -39,8 +39,9 @@ Main modules are: CDRMediator (cdrm.so),Rating (rt.so) and CallControl (cc.so).
 
 ![](RateEngine_v2.png)
 
+## RateEngine components
 
-## RateEngine core (libre7core.so)
+### RateEngine core (libre7core.so)
 
 In the RateEngine core are defined few system interfaces:
 
@@ -59,10 +60,24 @@ In the RateEngine core are defined few system interfaces:
 #### **log**
 
 
-## CDRMediator module (cdrm.so)
+### CDRMediator module (cdrm.so)
 
-## Rating module (rt.so)
+### Rating module (rt.so)
 
-## CallControl (cc.so)
+### CallControl (cc.so)
+
+## RateEngine installation
+
+Steps are follow:
+
+git clone https://github.com/dkokov/RateEngine.git
+
+cd src/
+
+edit file 'config.md' and comment/uncomment modules
+
+make
+
+make install
 
 
