@@ -1,7 +1,11 @@
 # RateEngine
 
-  A **RateEngine(RE)** is engine for calls calculate and online call control.
-Can be started as server(daemon) or to use from the console(one time).
+  A **RateEngine(RE)** is engine for calls/messages calculate and online call control.
+Can be started as server(daemon) or to use from the console.
+
+
+* [3.2. Прости проверки – изпитни задачи](chapter-03-simple-conditions-exam-problems.md)
+
 
 
   Намира кой разговор на кой потребител е. 
@@ -15,27 +19,23 @@ Can be started as server(daemon) or to use from the console(one time).
 Това дава възможност за промоции с определен период на действие,след който влиза в действие друг план или тарифа .
 
   A **RE** get need records from definited servers as files or from databases.
-
 Determine her **BillPlan** and **Tariff** is current call.
 
  In more cases,the rating engine is part by billing system.
-Sometimes is released as module,sometimes is different application.
+Sometimes is released as module,sometimes is released as different application.
 But the rating engine is part of entire billing system architecture.
  
 
   Why **RE** is different apllication ?
 
+
 The last years appear different billing sistems.
 
  Последните години се появиха различни билинг системи. 
 
-Много от фирмите в телекомуника-циите започнаха сами да пишат или надграждат съществуващи системи. 
-
+Много от фирмите в телекомуникациите започнаха сами да пишат или надграждат съществуващи системи. 
 В самите билинг системи вече са включени много услуги - не само гласови, като освен това тези приложения вече са интегрирани със самите услуги. 
 Те предлагат нещо повече от плащания и справки.Билинг приложенията вече управляват услугите. 
-
-Starting,stoping and settings.
-
 Пускат, спират и правят настройки по тях. На практика те се превърнаха в интерфейс към много други приложения, 
 работещи за различни услуги и функционалностти . 
 
@@ -52,12 +52,12 @@ RateEngine ще работи на заден план като част от ц�
 Ако това не е необходимо може да се използва собственият интерфейс на машината и тя да се настройва като самостоятелно приложение  извън дадената билинг система .
 
 
-   RE може да обслужва няколко сървъра едновременно, но не може един акаунт(потребител) да се използва на няколко сървъра т.е. потребителят е обвързан с конкретен CDR сървър!!!
+RE може да обслужва няколко сървъра едновременно, но не може един акаунт(потребител) да се използва на няколко сървъра т.е. потребителят е обвързан с конкретен CDR сървър!!!
 
 
 You can see example topology for RateEngine using in follow picture:
 
-![](RateEngine_v2.png)
+![](doc/png/RateEngine_v2.png)
 
 
 ## RateEngine components
@@ -206,7 +206,7 @@ make help
 </RateEngine>
 ```
 
-## RateEngine console commands:
+## RateEngine commands:
 
 Go to default directory:
 ```
@@ -218,7 +218,7 @@ List commands and arguments:
 ./bin/RateEngine -h
 ```
 
-Start as daemon(background):
+Start as daemon(in background):
 ```
 ./bin/RateEngine -d
 ```
@@ -238,4 +238,4 @@ Start CallControl,without daemonization:
 ./bin/RateEngine -2c
 ```
 
-
+## 
