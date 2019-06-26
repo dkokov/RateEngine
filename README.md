@@ -79,7 +79,9 @@ In the RateEngine core are defined few system interfaces:
 
 Steps are follow:
 
-```git clone https://github.com/dkokov/RateEngine.git```
+``` bash
+git clone https://github.com/dkokov/RateEngine.git
+```
 
 cd src/
 
