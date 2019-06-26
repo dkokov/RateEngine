@@ -1,4 +1,4 @@
-# [ RateEngine ]
+# RateEngine
 
 A **RateEngine(RE)** is engine for calls calculate and online call control.
 Can be started as server(daemon) or to use from the console(one time).
