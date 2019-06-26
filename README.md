@@ -1,4 +1,4 @@
-# [ RateEngine ]
+# RateEngine
 
   A **RateEngine(RE)** is engine for calls calculate and online call control.
 Can be started as server(daemon) or to use from the console(one time).
@@ -133,7 +133,7 @@ Go to default directory:
 cd /use/local/RateEngine
 ```
 
-List console commands and arguments:
+List commands and arguments:
 ```
 ./bin/RateEngine -h
 ```
@@ -142,3 +142,20 @@ Start as daemon(background):
 ```
 ./bin/RateEngine -d
 ```
+
+Start CDR gettings,without daemonization:
+```
+./bin/RateEngine -g
+```
+
+Start Rating,Leg a(incomming calls),without daemonization:
+```
+./bin/RateEngine -r a
+```
+
+Start CallControl,without daemonization:
+```
+./bin/RateEngine -2c
+```
+
+
