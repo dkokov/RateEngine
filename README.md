@@ -19,3 +19,6 @@ Main modules are: CDRMediator (cdrm.so),Rating (rt.so) and CallControl (cc.so).
 
 ## CallControl (cc.so)
 
+
+
+![](/assets/chapter-1-images/PyCharm-IDE-in-action.png)
