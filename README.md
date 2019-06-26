@@ -12,6 +12,12 @@ Can be started as server(daemon) or to use from the console.
 
 * [RateEngine configurations](doc/config.md)
 
+* [FreeSWITCH CallControl Integration](doc/fs_cc.md)
+
+* [Asterisk CallControl Integration](doc/ast_cc.md)
+
+
+
 
 ## Introduction
 

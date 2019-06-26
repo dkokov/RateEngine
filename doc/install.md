@@ -8,7 +8,7 @@ git clone https://github.com/dkokov/RateEngine.git
 
 main source directory:
 ```
-cd src/
+cd RateEngine/src/
 ```
 
 edit 'config.md' file - comment/uncomment names by modules:
