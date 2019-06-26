@@ -1,10 +1,17 @@
 # RateEngine
 
+* [RateEngine introduction](README.md#Introduction)
+
+* [RateEngine software architecture](doc/arch.md)
+
+* [RateEngine installation](doc/installation.md)
+
+
+## Introduction
   A **RateEngine(RE)** is engine for calls/messages calculate and online call control.
 Can be started as server(daemon) or to use from the console.
 
 
-* [RateEngine software architecture](doc/arch.md)
 
 
 
