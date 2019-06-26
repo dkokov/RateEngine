@@ -1,15 +1,15 @@
-# RateEngine
+# [RateEngine]
 
-The RateEngine is based of few modules: CDRMediator,Rating,CallControl.
+The RateEngine is based of few modules: **CDRMediator,Rating,CallControl**.
 As core are released follow: mem,log,db,net,proc.
 Main functions for the rating are: store acounts,plans,tariffs,prefixes,rates and calculate calls/messages.
 
-## RECore (libre7core.so)
+### RECore (libre7core.so)
 
-## CDRMediator (cdrm.so)
+### CDRMediator (cdrm.so)
 
-## Rating (rt.so)
+### Rating (rt.so)
 
-## CallControl (cc.so)
+### CallControl (cc.so)
 
 
