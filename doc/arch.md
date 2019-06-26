@@ -4,7 +4,7 @@
 Can be started as server(daemon) or to use from the console.
 
 
-* [RateEngine software architecture](doc/arch.md)
+* [3.2. Прости проверки – изпитни задачи](chapter-03-simple-conditions-exam-problems.md)
 
 
 
