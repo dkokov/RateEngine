@@ -43,10 +43,9 @@ Main modules are: CDRMediator (cdrm.so),Rating (rt.so) and CallControl (cc.so).
 
 You can see example topology for RateEngine using in follow picture:
 
-<div alight="center">
 ![](RateEngine_v2.png)
 <div alight="center">Fig.1</div>
-/div>
+
 
 ## RateEngine components
 
