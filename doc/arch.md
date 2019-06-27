@@ -7,9 +7,14 @@ If you want to use PGSQL,then should use 'pgsql.so'.And you want to use MSQL,the
 
 ### RateEngine core (libre7core.so)
 
+![](png/RateEngine-v07-19122018.png)
+
 In the RateEngine core are defined few system interfaces:
 
 #### **mod**
+All is start with this interface,because it has to get defined modules in the main config.
+Load every module,check for init function,check for depends and push in the modules list.
+Main C struct in this interface is 'mod_t':
 
 ```C
 typedef struct mod {
@@ -36,6 +41,8 @@ typedef struct mod {
 } mod_t;
 ```
 
+After stop,the interface check for destroy function,call it and close the dynamic library (.so),
+who is opened before (in starting).
 
 #### **db**
 
@@ -63,4 +70,9 @@ It's realy rating model.
   This module is depended by the CDRMediator,because should get CDRs from the db.
 
 ### CallControl (cc.so)
+  The **CallControl** module is real time communication between the RE and same SoftSWITCH/SIP Proxy/etc voice solution.
+Depends by CDRMediator,Rating modules.The **CallControl server** keeps all currently connections as status.
+When a call is finished,then a **CallControl** delete this connection status and call rating function will calculate a call.
+Last to update a current balance.
+
 
