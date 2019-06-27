@@ -1,6 +1,6 @@
 # RateEngine installation
 
-A RateEngine use follow libs:
+#### [A RateEngine use follow libs:]
 
 |lib|using|
 |---|---|
@@ -9,7 +9,8 @@ A RateEngine use follow libs:
 |libpq|if you want to use PGSQL/compile pgsql.so|
 |libmysqlc|if you want to use MYSQL/compile mysql.so|
 
-Installation steps are follow:
+
+#### [Installation steps are follow:]
 
 ``` 
 git clone https://github.com/dkokov/RateEngine.git
