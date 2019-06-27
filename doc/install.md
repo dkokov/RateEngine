@@ -1,5 +1,14 @@
 # RateEngine installation
 
+A RateEngine use follow libs:
+
+|lib|using|
+|---|---|
+|json-c|always|
+|libxml2|always|
+|libpq|if you want to use PGSQL/compile pgsql.so|
+|libmysqlc|if you want to use MYSQL/compile mysql.so|
+
 Installation steps are follow:
 
 ``` 

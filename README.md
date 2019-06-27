@@ -7,15 +7,13 @@ Can be started as server(daemon) or to use from the console.
 
 * [Introduction](#Introduction)
 
-* [RateEngine software architecture](doc/arch.md)
+* [Software Architecture](doc/arch.md)
 
-* [RateEngine installation](doc/install.md)
+* [Installation](doc/install.md)
 
-* [RateEngine configurations](doc/config.md)
+* [Configurations](doc/config.md)
 
-* [FreeSWITCH CallControl Integration](doc/fs_cc.md)
-
-* [Asterisk CallControl Integration](doc/ast_cc.md)
+* [CallControl Integration](doc/integ.md)
 
 
 ## Introduction
@@ -28,12 +26,12 @@ Always the rating engine is part of entire billing system architecture.
 The last years appear different billing systems.A lot of telecommunication companies start to develop
 own billing system or upgrade exact billing systems.In the same billing system still include not only voice service.
 The billing system is not only application for money collecting,payment statistics and reports.
-Make more from this - manage same services.Starta and stop the service,modify settings,etc.
+Make more from this - manage same services.Start and stop the service,modify settings,etc.
 This system is interface into different services,servers,platforms.
 For example: Internet,IPTV,VOIP are different services. Usualy are released over different platforms.
 No problem to use one billing system and general interface from this system.
 But call/message rating is specific action.Should have learning and experience.
-Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,the call control.
+Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
 
 You can see example topology for RateEngine using in the follow picture:
 
