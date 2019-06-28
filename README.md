@@ -54,14 +54,14 @@ There are short list in a table with RateEngine features:
 |cdr formating|in the CDRMediator module|
 |prefix filter|in the CDRMediator module|
 |scheduler|in the CDRMediator module|
-|--- |---|
+|||
 |Rate Searching|in the Rating module|
 |Calc Functions|in the Rating module|
 |Time Conditions|in the Rating module|
 |Free Billsec|in the Rating module|
 |Rating|in the Rating module|
 |Payment Card Managment|in the Rating module|
-|---|---|
+|||
 |CallControl|in the CallControl module|
 
 
