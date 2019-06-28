@@ -47,12 +47,27 @@ Can be used 'maxsec' as RTP timeout or other param in you call managment.
 
 There are short list in a table with RateEngine features:
 
-|features|module|
+|Feature:|Release:|
 |---|---|
-|get CDRs from DB|CDRMediator|
-|get CDRs from csv file|CDRMediator|
-|cdr formating|CDRMediator|
-|prefix filter|CDRMediator|
-|scheduler|CDRMediator|
+|get CDRs from DB|in the CDRMediator module|
+|get CDRs from csv file|in the CDRMediator module|
+|cdr formating|in the CDRMediator module|
+|prefix filter|in the CDRMediator module|
+|scheduler|in the CDRMediator module|
+|--- |---|
+|Rate Searching|in the Rating module|
+|Calc Functions|in the Rating module|
+|Time Conditions|in the Rating module|
+|Free Billsec|in the Rating module|
+|Rating|in the Rating module|
+|Payment Card Managment|in the Rating module|
+|---|---|
+|CallControl|in the CallControl module|
+
+
+
+
+
+
 
 
