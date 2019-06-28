@@ -12,7 +12,7 @@ The 'System' part is defined main application path and pid file name.
 ```
 
 The 'LoadModules' part is defined modules list for loading after app start.
-If you want to use same module,should define first here!
+If you want to use same module,should be define first here!
 
 ``` XML
  <LoadModules>
@@ -42,7 +42,10 @@ The 'DB' part is defined a local storage params(pgsql,mysql,redis,etc).
 ```
 
 The 'CallControl' part is defined all params for this module.
-
+Very importment params are 'SimCalls','CallMaxsecLimit','IntConfigDIR'.
+First (sim calls number) define recerved dymanic memory for this task.
+Second (maximum maxsec) define when auto stop a current call(different for every call).
+Last is the path to CallControl interface profiles.
 
 ``` XML
  <CallControl>
@@ -61,6 +64,9 @@ The 'CallControl' part is defined all params for this module.
     <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
  </CallControl>
 ```
+
+* [CallControl Interface Profile Example](cc_int_prof.md) 
+
 
 The 'Rating' part is defined all params for this module.
 
