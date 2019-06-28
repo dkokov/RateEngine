@@ -1,6 +1,7 @@
 # Software architecture
 
   The **RE** is released as moduler software - every functionality is different module.
+The modules are share library(.so) files. Use dynamic load(dl) conception of Linux.
 For example: TCP support - tcp module (tcp.so) or pgsql support - pgsql module(pgsql.so).
 Main modules are: CDRMediator (cdrm.so),Rating (rt.so) and CallControl (cc.so).
 If you want to use PGSQL,then should use 'pgsql.so'.And you want to use MSQL,then should use 'mysql.so'. 
