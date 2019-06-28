@@ -1,15 +1,20 @@
 ## RateEngine configurations
 
-#### Main config file
+**The main RateEngine config file is 'RateEngine.xml'**
 
-**The main RateEngine config file is RateEngine.xml :**
+The 'System' part is defined main application path and pid file name.
 
 ``` XML
-<RateEngine version="0.7.0" >
  <System>
     <param name="DIR" value="/usr/local/RateEngine/" />
     <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
+```
+
+The 'LoadModules' part is defined modules list for loading after app start.
+If you want to use same module,should define first here!
+
+``` XML
  <LoadModules>
     <param name="module" value="pgsql.so" />
     <param name="module" value="mysql.so" />
@@ -17,6 +22,11 @@
     <param name="module" value="cdrm.so" />
     <param name="module" value="rt.so" />
  </LoadModules>
+```
+
+The 'DB' part is defined a local storage params(pgsql,mysql,redis,etc).
+
+``` XML
  <DB>
     <param name="dbtype" value="pgsql" />
     <param name="dbhost" value="127.0.0.1" />
@@ -29,6 +39,12 @@
     <param name="NumberRetries" value="10" />
     <param name="IntervalRetries" value="2" />
  </DB>
+```
+
+The 'CallControl' part is defined all params for this module.
+
+
+``` XML
  <CallControl>
     <param name="active" value="yes" />
 
@@ -44,6 +60,11 @@
     <!-- Interface Configuration Directory - config per protocol/interface -->
     <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
  </CallControl>
+```
+
+The 'Rating' part is defined all params for this module.
+
+``` XML 
  <Rating>
     <param name="active" value="no" />
     <param name="leg" value="a" />
@@ -68,9 +89,23 @@
     <!-- k limit min = (limit/amount) when have more from 1 rating account per billing account -->
     <param name="KLimitMin" value="0.05" />
  </Rating>
+```
+
+In 'CDRMediator' part has only path to cdr profiles.Same module will read and load all profiles.
+
+``` XML
  <CDRMediator>
     <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
  </CDRMediator>
+```
+
+* [CDR Profile Example](cdr_profile.md) 
+
+The 'Logs' part is defined all params for logging.
+Can be defined log file name,log file size - after that rolling log files,
+level for logging(NONE,INFO,DEBUG,...),separator in the file,etc.
+
+``` XML
  <Logs>
     <param name="LogFile" value="logs/rate_engine.log" />
     <param name="LogMaxFileSize" value="40960000" />
@@ -79,5 +114,4 @@
     <!-- 1,INFO ; 2,WARN ; 3,DEBUG ; 4,DEBUG + TIMING ;-->
     <param name="LogDebugLevel" value="3" />
  </Logs>
-</RateEngine>
 ```
