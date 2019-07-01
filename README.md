@@ -47,7 +47,7 @@ There is short list in a table with RateEngine features:
 
 |Feature:|Release:|
 |---|---|
-|![get cdr sched](doc/features.md#get_cdr_sched)|in the **CDRMediator** module|
+|[get cdr sched](doc/features.md#get_cdr_sched)|in the **CDRMediator** module|
 |get CDRs from DB|in the **CDRMediator** module|
 |get CDRs from csv file|in the **CDRMediator** module|
 |prefix filter|in the **CDRMediator** module|

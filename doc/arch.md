@@ -8,7 +8,7 @@ If you want to use PGSQL,then should use 'pgsql.so'.And you want to use MSQL,the
 
 Simple block schem of the RateEngine core.
 
-![Simple block schem of the RateEngine core](png/RateEngine-v07-19122018.png)
+![](png/RateEngine-v07-19122018.png)
 
 
 ### RateEngine core (libre7core.so)
