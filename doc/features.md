@@ -27,7 +27,7 @@ There is a list in a table with **'Main RateEngine features'**:
 
 
 
-## [Features desctiptions] :
+## Features desctiptions :
 
 #### getCDRsSched
 
