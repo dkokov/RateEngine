@@ -3,17 +3,17 @@
   In this page,you can be read information for RateEngine's features.
 Include features from the main modules - CDRMediator,Rating,CallControl.
 
-#### get cdr sched
+#### get_cdr_sched
 
   This feature response for time interval calling of the 'getCDRs'.
 If you set to be,for example: 600sec,after 600sec the 'getCDRs' will be call again.
 
 
-#### get CDRs from DB
+#### get_CDRs_from_DB
 
-#### get CDRs from csv file
+#### get_CDRs_from_csv_file
 
-#### prefix filter
+#### prefix_filter
 
 #### cdr mediating
 
