@@ -1,9 +1,7 @@
 # RateEngine
 
   A **RateEngine(RE)** is engine for calls/messages calculate and 
-online call control - prepaid or postpaid credit limit.
-Can be started as server(daemon) or to use from the console.
-
+online call control (prepaid or postpaid).Can be started as server(daemon) or to use from the console.
 
 * [Introduction](#Introduction)
 
@@ -18,7 +16,7 @@ Can be started as server(daemon) or to use from the console.
 
 ## Introduction
 
-  In more cases,the rating engine is part by billing system.
+  In more cases,the rating engine is part by the billing system.
 Sometimes is released as module,sometimes is released as different application.
 Always the rating engine is part of entire billing system architecture.
  
@@ -30,7 +28,7 @@ Make more from this - manage same services.Start and stop the service,modify set
 This system is interface into different services,servers,platforms.
 For example: Internet,IPTV,VOIP are different services. Usualy are released over different platforms.
 No problem to use one billing system and general interface from this system.
-But call/message rating is specific action.Should have learning and experience.
+But call/message rating is specific action.Should be have learning and experience.
 Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
 
 You can see example topology for RateEngine using in the follow picture:
@@ -49,7 +47,7 @@ There is short list in a table with RateEngine features:
 
 |Feature:|Release:|
 |---|---|
-|get cdr sched|in the **CDRMediator** module|
+|![get cdr sched](doc/get_cdr_sched.md)|in the **CDRMediator** module|
 |get CDRs from DB|in the **CDRMediator** module|
 |get CDRs from csv file|in the **CDRMediator** module|
 |prefix filter|in the **CDRMediator** module|
