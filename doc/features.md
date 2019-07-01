@@ -3,30 +3,57 @@
   In this page,you can be read information for RateEngine's features.
 Include features from the main modules - CDRMediator,Rating,CallControl.
 
-#### get_cdr_sched
+There is a list in a table with **'Main RateEngine features'**:
+
+|Feature:|Release:|
+|---|---|
+|[getCDRsSched](#getCDRsSched)|in the **CDRMediator** module|
+|[getCDRsFromDB](#getCDRsFromDB)|in the **CDRMediator** module|
+|[getCDRsFromCSVfile](#getCDRsFromCSVfile)|in the **CDRMediator** module|
+|[PrefixFilter](#PrefixFilter)|in the **CDRMediator** module|
+|[CDRMediating](#CDRMediating)|in the **CDRMediator** module|
+|||
+|[Prerating](#Prerating)|in the **Rating** module|
+|[Payment Card Managment](#PaymentCardManagment)|in the **Rating** module|
+|[Rate Searching](doc/features.md#Rate_Searching)|in the **Rating** module|
+|[Calc Functions](doc/features.md#Calc_Functions)|in the **Rating** module|
+|[Time Conditions](doc/features.md#Time_Conditions)|in the **Rating** module|
+|[Free Billsec](doc/features.md#Free_Billsec)|in the **Rating** module|
+|[Rating](doc/features.md#Rating)|in the **Rating** module|
+|||
+|[Call Control Server](#Call_Control_Server)|in the **CallControl** module|
+|[myCC Support](#myCC_Support)|in the **myCC** module|
+|[JSON-RPC Support](#JSON-RPC_Support)|in the **JSON-RPC** module|
+
+
+
+## [Features desctiptions]()] :
+
+#### getCDRsSched
 
   This feature response for time interval calling of the 'getCDRs'.
 If you set to be,for example: 600sec,after 600sec the 'getCDRs' will be call again.
 
 
-#### get_CDRs_from_DB
+#### getCDRsFromDB
 
-#### get_CDRs_from_csv_file
+#### getCDRsFromCSVfile
 
-#### prefix_filter
+#### PrefixFilter
 
-#### cdr mediating
+#### CDRMediating
 
 #### Prerating
 
-#### Payment Card Managment
+#### PaymentCardManagment
 
-#### Rate Searching
+#### RateSearching
 
-#### Calc Functions
+#### CalcFunctions
 
-#### Time Conditions
+#### TimeConditions
 
-#### Free Billsec
+#### FreeBillsec
 
 #### Rating
+
