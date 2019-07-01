@@ -45,30 +45,3 @@ The **RE** to be managed by external **BillingSystem** with APIs or other extern
 If you want to use CallControl - prepaid or credit limit(postpaid),then the RE will return 'maxsec'.
 Can be used 'maxsec' as RTP timeout or other param in you call managment.
 
-There is short list in a table with RateEngine features:
-
-|Feature:|Release:|
-|---|---|
-|[get_cdr_sched](doc/features.md#get_cdr_sched)|in the **CDRMediator** module|
-|get CDRs from DB|in the **CDRMediator** module|
-|get CDRs from csv file|in the **CDRMediator** module|
-|prefix filter|in the **CDRMediator** module|
-|cdr mediating|in the **CDRMediator** module|
-|||
-|Prerating|in the **Rating** module|
-|Payment Card Managment|in the **Rating** module|
-|Rate Searching|in the **Rating** module|
-|Calc Functions|in the **Rating** module|
-|Time Conditions|in the **Rating** module|
-|Free Billsec|in the **Rating** module|
-|Rating|in the **Rating** module|
-|||
-|CallControl|in the **CallControl** module|
-
-
-
-
-
-
-
-
