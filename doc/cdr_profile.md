@@ -4,9 +4,9 @@
 
 * [General](#General) - between XML tags **'<General>'** and **'</General>'**
 
-* [CDR Format](#CDR Format) - between XML tags **'<CDRFormat>'** and **'</CDRFormat>'**
+* [CDR Format](#CDRFormat) - between XML tags **'<CDRFormat>'** and **'</CDRFormat>'**
 
-* [Prefix Filtering](#Prefix Filtering) - between XML tags **'<PrefixFiltering>'** and **'</PrefixFiltering'**
+* [Prefix Filtering](#PrefixFiltering) - between XML tags **'<PrefixFiltering>'** and **'</PrefixFiltering'**
 
 
 The **Prefix Filtering** is optional.Can be removed by the CDR Profile file.
@@ -49,7 +49,7 @@ The **Prefix Filtering** is optional.Can be removed by the CDR Profile file.
   </General>
 ```
 
-#### CDR Format
+#### CDRFormat
 
 ``` XML
   <!-- CDR fields in the DB (matching in the DB cols ) -->
@@ -84,7 +84,7 @@ The **Prefix Filtering** is optional.Can be removed by the CDR Profile file.
 ```
 
 
-#### Prefix Filtering
+#### PrefixFiltering
 
 ``` XML
   <PrefixFiltering>
