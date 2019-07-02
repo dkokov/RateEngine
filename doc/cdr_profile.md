@@ -26,7 +26,6 @@ There is a part top.
     <param name="getCDRsReplies" value="2" />
     <!-- Filtering -->
     <param name="CalledNumberFiltering" value="yes" />
-<!--    <param name="PrefixFilterNumber" value="25" /> -->
     <!-- file,db -->
     <param name="cdr-type" value="db" />
 ```
