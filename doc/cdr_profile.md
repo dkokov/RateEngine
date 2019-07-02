@@ -119,7 +119,7 @@ There is CSV file variant:
 There is DB variant:
 
 ``` XML
-    <param name="duration" value="duration" />
+    <param name="call_uid" value="call-uuid" />
 ```
 
 If don't have a value in tag 'value' - that mean 'value=""',then this param is not use by the CDRMediator.
