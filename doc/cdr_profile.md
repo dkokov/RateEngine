@@ -20,6 +20,7 @@ There is a part top.
   <General>
     <param name="profile-version" value="1" />
     <param name="profile-name" value="fs" />
+    <!-- yes/no , demonization flag -->
     <param name="active" value="no" />
     <!-- Thread parameters -->
     <param name="getCDRsInterval" value="60" />
@@ -52,7 +53,9 @@ There are params only for DB.
     <param name="SchedTS" value="2018-12-01 00:00:00" />
 ```
 
-There are params only for CSV file.
+There are params only for CSV file.Vary importment param is 'file-field-num'.
+Gets files for CDR mediating from 'src-dir' and move to 'dst-dir' after that.
+The features 'getCDRsSched' is not working here.
 
 ``` XML
     <param name="src-dir" value="/usr/local/RateEngine/src-cdrs/" />
