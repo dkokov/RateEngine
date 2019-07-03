@@ -2,6 +2,7 @@
 
   A **RateEngine(RE)** is engine for calls/messages calculate and 
 online call control (prepaid or postpaid).Can be started as server(daemon) or to use from the console.
+The software packet is free and open source solution under GPLv3 license .
 
 * [Introduction](#Introduction)
 
@@ -30,7 +31,7 @@ Make more from this - manage same services.Start and stop the service,modify set
 This system is interface into different services,servers,platforms.
 For example: Internet,IPTV,VOIP are different services. Usualy are released over different platforms.
 No problem to use one billing system and general interface from this system.
-But call/message rating is specific action.Should be have learning and experience.
+But call/message rating is specific action.Should be had learning and experience.
 Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
 
 You can see example topology for RateEngine using in the follow picture:
