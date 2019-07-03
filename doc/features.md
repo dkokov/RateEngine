@@ -1,12 +1,19 @@
-# Main RateEngine features
+# RateEngine features
 
   In this page,you can be read information for RateEngine's features.
 Include features from the main modules - CDRMediator,Rating,CallControl.
 
-There is a list in a table with **'Main RateEngine features'**:
+There is a list in a table with **'RateEngine features'**:
 
 |Feature:|Release:|
 |---|---|
+|[UDPSupport](#UDPSupport)|in the **udp** module|
+|[TCPSupport](#TCPSupport)|in the **tcp** module|
+|[TLSSupport](#TLSSupport)|in the **tls** module|
+|[PostgreSQLSupport](#PostgreSQLSupport)|in the **pgsql** module|
+|[MySQLSupport](#MySQLSupport)|in the **mysql** module|
+|[REDISSupport](#REDISSupport)|in the **redis** module|
+|||
 |[getCDRsSched](#getCDRsSched)|in the **CDRMediator** module|
 |[getCDRsFromDB](#getCDRsFromDB)|in the **CDRMediator** module|
 |[getCDRsFromCSVfile](#getCDRsFromCSVfile)|in the **CDRMediator** module|
@@ -27,7 +34,20 @@ There is a list in a table with **'Main RateEngine features'**:
 
 
 
+
 ## Features desctiptions :
+
+#### UDPSupport
+
+#### TCPSupport
+
+#### TLSSupport
+
+#### PostgreSQLSupport
+
+#### MySQKSupport
+
+#### REDISSupport
 
 #### getCDRsSched
 
@@ -57,3 +77,8 @@ If you set to be,for example: 600sec,after 600sec the 'getCDRs' will be call aga
 
 #### Rating
 
+#### Call_Control_Server
+
+#### myCC_Support
+
+#### JSON-RPC_Support
