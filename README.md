@@ -14,7 +14,7 @@ The software packet is free and open source solution under GPLv3 license .
 
 * [Configurations](doc/config.md)
 
-* [CallControl Integration](doc/integ.md)
+* [CallControl](doc/integ.md)
 
 
 ## Introduction
