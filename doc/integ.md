@@ -1,4 +1,4 @@
-## RateEngine CallControl Integrations
+## CallControl
 
 * [FreeSWITCH CallControl Integration](fs_cc.md)
 
