@@ -2,7 +2,9 @@
 
 **The main RateEngine config file is 'RateEngine.xml'**
 
-The 'System' part is defined main application path and pid file name.
+Examine different parts by this file.Step by step.
+
+The **'System'** part is defined main application path and pid file name.
 
 ``` XML
  <System>
@@ -11,8 +13,8 @@ The 'System' part is defined main application path and pid file name.
  </System>
 ```
 
-The 'LoadModules' part is defined modules list for loading after app start.
-If you want to use same module,should be define first here!
+The **'LoadModules'** part is defined modules list for loading after app start.
+If you want to use same module,should be defined first here!
 
 ``` XML
  <LoadModules>
@@ -24,7 +26,8 @@ If you want to use same module,should be define first here!
  </LoadModules>
 ```
 
-The 'DB' part is defined a local storage params(pgsql,mysql,redis,etc).
+The **'DB'** part is defined a local storage params(pgsql,mysql,redis,etc).
+Every 'dbtype' who is used here,have to load first as module - pgsql,mysql or redis.
 
 ``` XML
  <DB>
@@ -41,9 +44,9 @@ The 'DB' part is defined a local storage params(pgsql,mysql,redis,etc).
  </DB>
 ```
 
-The 'CallControl' part is defined all params for this module.
+The **'CallControl'** part is defined all params for this module.
 Very importment params are 'SimCalls','CallMaxsecLimit','IntConfigDIR'.
-First (sim calls number) define recerved dymanic memory for this task.
+First (sim calls number) define reserved dymanic memory for this task.
 Second (maximum maxsec) define when auto stop a current call(different for every call).
 Last is the path to CallControl interface profiles.
 
@@ -68,7 +71,7 @@ Last is the path to CallControl interface profiles.
 * [CallControl Interface Profile Example](cc_int_prof.md) 
 
 
-The 'Rating' part is defined all params for this module.
+The **'Rating'** part is defined all params for this module.
 
 ``` XML 
  <Rating>
@@ -97,7 +100,7 @@ The 'Rating' part is defined all params for this module.
  </Rating>
 ```
 
-In 'CDRMediator' part has only path to cdr profiles.Same module will read and load all profiles.
+In **'CDRMediator'** part has only path to cdr profiles.Same module will read and load all profiles.
 
 ``` XML
  <CDRMediator>
