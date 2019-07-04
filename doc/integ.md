@@ -1,7 +1,9 @@
 ## CallControl
 
   Very importment possibility in the RateEngine gives a CallControl.
-You can be released prepaid or postpaid in your voice platform. 
+You can be released prepaid or postpaid in your voice platform.In the RateEngine has a CallControl module,
+but as feature there is a process,not only module.In the same CallControl process are using functionalities by entire RateEngine
+- Rating,CDRMediators functions.
 
   When you are releasing prepaid,the CallControl is following whether a prepaid amount is reaching to defined amount per this subscriber.
 When this amount is reached,then the CallControl deny calls per this subscriber.
