@@ -40,6 +40,22 @@ edit 'config.md' file - comment/uncomment names by modules:
 vim config.md
 ```
 
+The same file examines such:
+```
+mod/CDRMediator
+mod/Rating
+#mod/CallControl
+mod/db_pgsql
+mod/db_mysql
+mod/db_redis
+#mod/tcp
+#mod/udp
+#mod/sctp
+#mod/tls
+mod/my_cc
+#mod/json_rpc[
+```
+
 compile core and modules,install in default path(/usr/local/RateEngine/)
 ```
 make install
