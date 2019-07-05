@@ -5,7 +5,6 @@ You can be released prepaid or postpaid in your voice platform.In the RateEngine
 but as feature there is a process,not only module.
 In the same CallControl process are using functionalities by entire RateEngine (Rating,CDRMediator,MyCC or JSON-RPC,UDP/TCP/TLS,etc).
 
-See CallControl topology in the follow picture.
 
 ![](png/CallControl.png)
 
