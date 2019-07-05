@@ -5,6 +5,11 @@ You can be released prepaid or postpaid in your voice platform.In the RateEngine
 but as feature there is a process,not only module.
 In the same CallControl process are using functionalities by entire RateEngine (Rating,CDRMediator,MyCC or JSON-RPC,UDP/TCP/TLS,etc).
 
+See CallControl topology in the follow picture.
+
+![](png/CallControl.png)
+
+
   When you are releasing prepaid,the CallControl is following whether a prepaid amount is reaching to defined amount per this subscriber.
 When this amount is reached,then the CallControl deny calls per this subscriber.
 
