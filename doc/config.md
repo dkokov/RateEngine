@@ -1,4 +1,4 @@
-## RateEngine configurations
+# Configurations
 
 **The main RateEngine config file is 'RateEngine.xml'**
 
