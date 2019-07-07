@@ -6,15 +6,19 @@ The software packet is free and open source solution under GPLv3 license .
 
 * [Introduction](#Introduction)
 
+* [Software Architecture](doc/arch.md)
+
 * [Features](doc/features.md)
 
 * [Installation](doc/install.md)
 
 * [Configurations](doc/config.md)
 
-* [CallControl](doc/integ.md)
+* [CDRMediator](doc/cdrm.md)
 
-* [Software Architecture](doc/arch.md)
+* [Rating](doc/rating.md)
+
+* [CallControl](doc/integ.md)
 
 
 ## Introduction
