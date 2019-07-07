@@ -1,4 +1,4 @@
-# RateEngine installation
+# Installation
 
 #### A RateEngine use follow external libs:
 
