@@ -1,4 +1,4 @@
-# RateEngine features
+# Features
 
   In this page,you can be read information for RateEngine's features.
 Include features from the main modules - CDRMediator,Rating,CallControl.
@@ -45,7 +45,7 @@ There is a list in a table with **'RateEngine features'**:
 
 #### PostgreSQLSupport
 
-#### MySQKSupport
+#### MySQLSupport
 
 #### REDISSupport
 
