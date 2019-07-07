@@ -6,8 +6,6 @@ The software packet is free and open source solution under GPLv3 license .
 
 * [Introduction](#Introduction)
 
-* [Software Architecture](doc/arch.md)
-
 * [Features](doc/features.md)
 
 * [Installation](doc/install.md)
@@ -15,6 +13,8 @@ The software packet is free and open source solution under GPLv3 license .
 * [Configurations](doc/config.md)
 
 * [CallControl](doc/integ.md)
+
+* [Software Architecture](doc/arch.md)
 
 
 ## Introduction
