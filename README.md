@@ -18,7 +18,7 @@ The software packet is free and open source solution under GPLv3 license .
 
 * [Rating](doc/rating.md)
 
-* [CallControl](doc/integ.md)
+* [CallControl](doc/call_control.md)
 
 
 ## Introduction
