@@ -2,7 +2,7 @@
 
   A **RateEngine(RE)** is engine for calls/messages calculate and 
 online call control (prepaid or postpaid).Can be started as server(daemon) or to use from the console.
-The software packet is free and open source solution under GPLv3 license .
+The software packet is free and open source solution under [GPLv3](https://opensource.org/licenses/GPL-3.0) license .
 
 * [Introduction](#Introduction)
 
