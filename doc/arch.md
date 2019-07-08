@@ -35,3 +35,5 @@ who is opened before (in starting).
 #### **misc**
 
 #### **log**
+
+[More details in the programming level ...](core_details.md)
