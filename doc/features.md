@@ -14,6 +14,7 @@ There is a list in a table with **'RateEngine features'**:
 |[PostgreSQLSupport](#PostgreSQLSupport)|in the **pgsql** module|
 |[MySQLSupport](#MySQLSupport)|in the **mysql** module|
 |[REDISSupport](#REDISSupport)|in the **redis** module|
+|[MongoDBSupport](#MongoDBSupport)|in the **mongodb** module|
 |||
 |[getCDRsSched](#getCDRsSched)|in the **CDRMediator** module|
 |[getCDRsFromDB](#getCDRsFromDB)|in the **CDRMediator** module|
@@ -51,6 +52,8 @@ There is a list in a table with **'RateEngine features'**:
 #### MySQLSupport
 
 #### REDISSupport
+
+#### MongoDBSupport
 
 #### getCDRsSched
 
