@@ -9,6 +9,7 @@ There is a list in a table with **'RateEngine features'**:
 |---|---|
 |[UDPSupport](#UDPSupport)|in the **udp** module|
 |[TCPSupport](#TCPSupport)|in the **tcp** module|
+|[SCTPSupport](#SCTPSupport)|in the **SCTP** module|
 |[TLSSupport](#TLSSupport)|in the **tls** module|
 |[PostgreSQLSupport](#PostgreSQLSupport)|in the **pgsql** module|
 |[MySQLSupport](#MySQLSupport)|in the **mysql** module|
@@ -40,6 +41,8 @@ There is a list in a table with **'RateEngine features'**:
 #### UDPSupport
 
 #### TCPSupport
+
+#### SCTPSupport
 
 #### TLSSupport
 
