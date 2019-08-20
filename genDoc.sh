@@ -7,13 +7,14 @@ CONV=`which pandoc`
 # contert from md files to pdf file
 genDoc_pdf()
 {
-    $CONV README.md LICENSE.md doc/*.md --toc --number-sections --top-level-division=part -o rt_v7.pdf
+#    $CONV README.md LICENSE.md doc/*.md --toc --number-sections --top-level-division=part -o rt_v7.pdf
+    $CONV README.md LICENSE.md doc/*.md -o rt_v7.pdf
 }
 
 # contert from md files to html file
 genDoc_html()
 {
-    $CONV README.md -o $tmp"/index.html"
+    $CONV README.md LICENSE.md doc/*.md -o rt_v7.html
 }
 
 if [ -f "$CONV" ];
