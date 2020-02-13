@@ -20,6 +20,7 @@ The software packet is free and open source solution under [GPLv3](https://opens
 
 * [CallControl](doc/call_control.md)
 
+* [Feedback](#Feedback)
 
 ## Introduction
 
@@ -49,4 +50,12 @@ Can be used **TimeConditions** per tariff - different prices in different time z
 The **RE** to be managed by external **BillingSystem** with APIs or other external interface.
 If you want to use CallControl - prepaid or credit limit(postpaid),then the RE will return 'maxsec'.
 Can be used 'maxsec' as RTP timeout or other param in you call managment.
+
+## Feedback
+
+  You have a question or issue with some script,you see errors with some document,
+can send request to me here: [ISSUES](https://github.com/dkokov/RateEngine/issues)
+
+You have need from different/private helping or consulting -
+this my personal e-mail address: dkokov75 at gmail dot com
 
