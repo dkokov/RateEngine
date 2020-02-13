@@ -53,7 +53,7 @@ Can be used 'maxsec' as RTP timeout or other param in you call managment.
 
 ## Feedback
 
-  You have a question or issue with some script,you see errors with some document,
+  You have a question or issue,you see errors,
 can send request to me here: [ISSUES](https://github.com/dkokov/RateEngine/issues)
 
 You have need from different/private helping or consulting -
