@@ -1,8 +1,0 @@
-; 'Time Condition' definitions
-;
-;t,"tc_name","hours","days_week","tc_date","year","month","day_month"
-;
-
-t,"pick-on-mobile","7-21","mon-fri","","","",""
-t,"pick-off-mobile","21-7","mon-fri","","","",""
-t,"weekend","","sat-sun"
