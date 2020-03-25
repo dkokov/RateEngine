@@ -1,0 +1,61 @@
+;
+; 'Time Condition' definitions
+;
+;t,"tc_name","hours","days_week","tc_date","year","month","day_month"
+;
+
+;
+; 'Free Billsec' definitions
+;f,free_billsec
+;
+
+; "start_date" and "end date" are in format "2020-02-27 12:00:00"
+;
+; 'Bill Plan' definitions
+;1,"BillPlan","start_date","end_date"
+;
+
+;
+; 'Prefix'/'Tariff'/'Calc Functions' => 'Rate' definitions 
+;2,prefix,"prefix_desc","tariff_name",free_billsec,"time_condition","start_date","end_period"
+;*,pos,fee,delta_time,iterations
+;
+; currency_id :
+;  1 => bg(лв.)
+;  2 => euro
+;
+; rating_mode :
+;   calling_number
+;   account_code
+;   src_context
+;   dst_context
+;   src_tgroup
+;   dst_tgroup
+;   calling_number_sms ???
+
+;
+; 'Billing Account'/'Rating Account' definitions
+;3,"billing_account",leg,currency_id,"rating_mode","rating_account",cdr_server_id,clg_nadi,cld_nadi
+;
+
+;
+; 'Payment Card' definitions
+;4,"pcard_type","pcard_status",amount,"start_date","end_date"
+;
+; pcard_type:
+;   debit
+;   credit
+;
+; pcard_status:
+;   active
+;   deactive
+;   block
+
+;
+; 'Bill Plan Tree' definitions
+;5,bill_plan_tree(name),bill_plan....
+;
+;
+
+
+
