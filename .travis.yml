@@ -1,0 +1,10 @@
+language: c
+compiler:
+    - gcc
+sudo: false
+addons:
+    apt:
+	packages:
+	    - libxml2-dev
+	    - libpq-dev
+script: make
