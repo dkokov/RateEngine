@@ -1,0 +1,8 @@
+#ifndef RELOAD_LOGFILE_H
+#define RELOAD_LOGFILE_H
+
+//void reload_logfile(int log,char *log_filename,unsigned int log_max_file_size);
+ssize_t reload_logfile_fd_read(int sock, void *buf, ssize_t bufsize, int *fd);
+ssize_t reload_logfile_fd_write(int sock, void *buf, ssize_t buflen, int fd);
+
+#endif

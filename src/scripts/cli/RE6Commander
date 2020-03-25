@@ -1,0 +1,94 @@
+#!/usr/bin/php -q
+<?php
+
+ include("config.app.php");
+
+function help()
+{
+	echo "\nChoise from follow options:\n\n";
+	echo "  -c  [filename]    ,create rating accounts in db and list to file;\n";
+	echo "  -cp               ,create test model 1 bill plans;\n";
+	echo "  -i  [filename]    ,importing new settings from file;\n";
+	echo "  -g  [rt_mode] [n] ,generate CDRs with follow options:\n";
+	echo "                     [rt_mode] can be used 'calling_number|account_code|src_context|dst_context|src_tgroup|dst_tgroup' and \n";
+	echo "                     [n] digit as CDRs number;\n";
+	echo "  -g1               ,generate CDRs with define test model(1):\n";
+	echo "                     clg:100000,acc:1000,src_ctx:10000,dst_ctx:10000,src_tgr:10000,dst_tgr:10000;\n";
+	echo "  -dp [billplan]    ,dumping 'bill_plan' definitions by db;\n";
+	echo "  -dt               ,dumping 'time_condition_deff' definitions by db;\n";
+	echo "  -df               ,dumping 'free_billsec' definitions by db;\n";
+	echo "  -cid [old] [new]  ,change old 'cdr_server_id' with new 'cdr_server_id'\n";
+	echo "  -l                ,list 'cdr_servers' definitions by db;\n";
+	echo "\n\n";
+}
+
+/* Main */
+
+ if(!empty($argv[1])) $opt = $argv[1];
+ else {
+	 help();
+	 exit;
+ }
+ 
+ switch($opt) {
+	case '-i':
+		/* Importing new settings in the DB */
+		if(!empty($argv[2])) {
+			re6_import_settings($argv[2]);
+		} else echo "\n\tYou havent't got a input file!\n\n";
+		break;
+	case '-g':
+		/* Generate CDRs with arguments 'rt_mode' and 'n' */
+		if(empty($argv[2])) $opt1 = NULL;
+		else $opt1 = $argv[2];
+		
+		if(empty($argv[3])) $opt2 = NULL;
+		else $opt2 = $argv[3];
+				
+		generate_cdrs($opt1,$opt2);
+		break;
+	case '-g1':
+		/* Generate CDRs with 'test model 1' */
+		generate_cdrs_model_1();
+		break;
+	case '-cid':
+		/* Update 'cdr_server_id' */
+		if(update_cdr_server_id($argv[2],$argv[3]) == FALSE) {
+			echo "Error!Cannot change 'cdr_server_id' in the 'billing_account' table!";
+		} else {
+			$count = get_bacc_count($argv[3]);
+			echo "\nSuccess. Updated accounts are: $count\n\n";
+		}
+		break;
+	case '-dp':
+		/* Dump define tariff plan(as argv[2]) from the DB */
+		if(!empty($argv[2])) {
+			re6_dump_bplan_settings($argv[2]);
+		} else echo "\n\tYou havent't got a input 'bill plan'!\n\n";
+		break;
+	case '-dt':
+		/* Dump define 'Time Conditions' from the DB */
+		re6_dump_time_condition_deff();
+		break;		
+	case '-df':
+		/* Dump define tariff plan(as argv[2]) from the DB */
+		re6_dump_free_billsec_settings();
+		break;
+	case '-c':
+		/* Create RatingAccounts(+settings) and CallingNumber's list to file */
+		create_test_model_1($argv[2]);
+		break;
+	case '-cp':
+		/* insert 'test model 1' bill plans */
+		create_test_model_1_bp();
+		break;
+	case '-l':
+		/* List CDR servers */
+		re6_dump_cdr_servers();
+		break;
+	default:
+		help();
+		exit;
+ }
+
+?>
