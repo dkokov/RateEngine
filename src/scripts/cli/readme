@@ -1,7 +1,0 @@
-
-I. Testing
-
-* създаване на база - rate_engine.sql
-* въвеждане на билинг планове - test_bp
-  ! не са въведени free_billsec ???!!!
-* създаване на 're' акаунти /billing_account,pcard,calling_number+deff/
