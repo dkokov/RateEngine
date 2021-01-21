@@ -1,0 +1,16 @@
+This is an example of how to create an ASN1_based plugin.
+
+Under Linux:
+1. replace each instance of "toyasn1" in Makefile.am to your plugin's name
+2. add your plugin's name to ../Makefile.am
+3. add your plugin's name to ../../configure.in
+4. run autoreconf at top level
+5. run make at top level (will automatically run configure)
+6. your plugin should be complete
+
+Under Windows:
+1. replace each instance of "toyasn1" in Makefile.common to your plugin's name
+2. replace each instance of "toyasn1" in moduleinfo.nmake to your plugin's name
+3. add your plugin's name to ../Makefile.nmake
+4. run make at top level 
+5. your plugin should be complete

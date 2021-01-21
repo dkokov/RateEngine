@@ -1,0 +1,3 @@
+cat /home/dimitar/Bulsatcom/Interconnects/Bulsatcom/bulsatcom_2.csv | awk -F" " '{printf "2,359"$1$2","$3",Булсатком-фиксирани,0,,\n"}'
+
+cat /home/dimitar/Bulsatcom/Interconnects/Bulsatcom/bulsatcom_2.csv | awk -F" " '{printf "2,359"$1$2",\042\042,\042Булсатком-фиксирани\042,0,,\n"}' 
