@@ -1,0 +1,68 @@
+<CDRProfile>
+  <General>
+    <param name="profile-version" value="1" />
+    <param name="profile-name" value="file1" />
+    <param name="active" value="yes" />
+    <!-- Thread parameters -->
+    <param name="getCDRsInterval" value="600" />
+    <param name="getCDRsReplies" value="2" />
+    <!-- Filtering -->
+    <param name="CalledNumberFiltering" value="yes" />
+<!--    <param name="PrefixFilterNumber" value="25" /> -->
+    <!-- file,db -->
+    <param name="cdr-type" value="file" />
+    <!-- Get CDR 'db' config -->
+    <param name="dbhost" value="your_hostname" />
+    <param name="dbuser" value="your_username" />
+    <param name="dbpass" value="your_password" />
+    <param name="dbname" value="your_dbname" />
+    <!-- DB type (pgsql,mysql,oracle,...) -->
+    <param name="dbtype" value="db_engine" />
+    <!-- SQL Query into the remote db server -->
+    <param name="cdr-table" value="cdrs" />
+    <!-- 'timestamp' or 'integer(epoch)' type -->
+    <param name="sql-col-where" value="ts" />
+    <!-- 'ts' or 'epoch' -->
+    <param name="sql-col-where-type" value="ts" />
+    <param name="sql-where-const" value="billsec > 0" />
+    <!-- Start scheduler timestamp (start date) -->
+    <param name="SchedTS" value="2017-10-19 15:00:00" />
+    <!-- unkn, isup, sms, voip-audio, voip-video ,voip-trunk -->
+    <param name="cdr-rec-type" value="voip-audio" />
+  </General>
+  <!-- CDR fields in the DB (matching in the DB cols ) -->
+  <CDRFormat>
+	<param name="call_uid" value="call_uid" />
+	<param name="start_ts" value="ts" />
+	<param name="answer_ts" value="" />
+	<param name="end_ts" value="" />
+	<param name="start_epoch" value="" />
+	<param name="answer_epoch" value="" />
+	<param name="end_epoch" value="" />
+	<param name="src" value="" />
+	<param name="dst" value="" />
+	<param name="calling_number" value="src" />
+	<param name="clg_nadi" value="" />
+	<param name="called_number" value="dst" />
+	<param name="cld_nadi" value="" />
+	<param name="rdnis" value="" />
+	<param name="rdnis_nadi" value="" />
+	<param name="ocn" value="" />
+	<param name="ocn_nadi" value="" />
+	<param name="account_code" value="" />
+	<param name="src_context" value="src_context" />
+	<param name="src_tgroup" value="src_tgroup" />
+	<param name="dst_context" value="dst_context" />
+	<param name="dst_tgroup" value="dst_tgroup" />
+	<param name="billsec" value="billsec" />
+	<param name="duration" value="duration" />
+	<param name="uduration" value="" />
+	<param name="billusec" value="" />
+  </CDRFormat>
+  <PrefixFiltering>
+    <filter prefix="2" num="1" replace="359429372" len="3" />
+    <filter prefix="4" num="1" replace="359241194" len="3" />
+    <filter prefix="6" num="1" replace="359241196" len="3" />
+    <filter prefix="9" num="1" replace="359241199" len="3" />
+  </PrefixFiltering>
+</CDRProfile>

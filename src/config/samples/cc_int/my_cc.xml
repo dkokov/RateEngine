@@ -1,0 +1,8 @@
+<Interface>
+ <config>
+    <!-- MyCC,Diameter Credit Control -->
+    <param name="proto" value="MyCC" />
+    <param name="ip" value="" />
+    <param name="port" value="9090" />
+ </config>
+</Interface>

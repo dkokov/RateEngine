@@ -1,0 +1,9 @@
+{
+	"username":"35924119998",
+	"currency":"лв.",
+	"billing_day":1,
+	"day_of_payment":14,
+	"round_mode":"ceil",
+	"pcard":[{"type":"credit","status":"active","start_date":"2019-02-01","end_date":"2019-03-01","amount":20.00,"sim_calls":1},
+			 {"type":"credit","status":"deactive","start_date":"2019-01-01","end_date":"2019-02-01","amount":2.15,"sim_calls":2}]
+}
