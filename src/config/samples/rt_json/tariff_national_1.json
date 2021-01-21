@@ -1,8 +1,0 @@
-{
-	"tariff":"national-1",
-	"start_period":0,
-	"end_period":0,
-	"free_billsec":600,
-	"calc_functions":[{"pos":1,"delta_time":30,"fee":0.0123,"iterations":1},
-					  {"pos":2,"delta_time":1,"fee":0.00063,"iterations":0}]
-}
