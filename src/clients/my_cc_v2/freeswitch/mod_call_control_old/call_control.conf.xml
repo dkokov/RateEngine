@@ -1,0 +1,19 @@
+<configuration name="call_control.conf.xml" description="Call Control,version 0.3.1(2015-03-17)">
+  <settings>
+    <param name="tcp-server-ip" value="localhost" />
+    <param name="tcp-server-port" value="9090" />
+    <param name="tcp-conn-mode" value="single" />
+    <param name="call-control-srv" value="3" />
+    <param name="get-uuid-mode" value="true" />
+    <param name="auto-command" value="maxsec" />
+    <!-- Audio files -->
+    <param name="af_err_state_0" value="/tmp/test_0.wav" />
+    <param name="af_err_state_1" value="/tmp/test_1.wav" />
+    <param name="af_err_state_2" value="/tmp/test_2.wav" />
+    <param name="af_err_state_3" value="/tmp/test_3.wav" />
+    <param name="af_err_state_4" value="/tmp/test_4.wav" />
+    <param name="af_err_state_5" value="/tmp/test_5.wav" />
+    <param name="af_err_state_6" value="/tmp/test_6.wav" />
+    <param name="af_err_state_7" value="/tmp/test_7.wav" />
+  </settings>
+</configuration>

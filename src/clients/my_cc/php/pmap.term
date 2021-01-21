@@ -1,0 +1,356 @@
+32487:   ./RateEngine -c /usr/local/RateEngine/config/RateEngine6.xml -2c
+Address           Kbytes     RSS   Dirty Mode  Mapping
+0000000000400000      12      12       0 r-x-- RateEngine
+0000000000400000       0       0       0 r-x-- RateEngine
+0000000000602000       4       4       4 r---- RateEngine
+0000000000602000       0       0       0 r---- RateEngine
+0000000000603000       4       4       4 rw--- RateEngine
+0000000000603000       0       0       0 rw--- RateEngine
+000000000203a000     176     100     100 rw---   [ anon ]
+000000000203a000       0       0       0 rw---   [ anon ]
+00007efd30000000     140     136     136 rw---   [ anon ]
+00007efd30000000       0       0       0 rw---   [ anon ]
+00007efd30023000   65396       0       0 -----   [ anon ]
+00007efd30023000       0       0       0 -----   [ anon ]
+00007efd377ff000       4       0       0 -----   [ anon ]
+00007efd377ff000       0       0       0 -----   [ anon ]
+00007efd37800000    8192      12      12 rw---   [ anon ]
+00007efd37800000       0       0       0 rw---   [ anon ]
+00007efd38000000     140     136     136 rw---   [ anon ]
+00007efd38000000       0       0       0 rw---   [ anon ]
+00007efd38023000   65396       0       0 -----   [ anon ]
+00007efd38023000       0       0       0 -----   [ anon ]
+00007efd3c08e000       4       0       0 -----   [ anon ]
+00007efd3c08e000       0       0       0 -----   [ anon ]
+00007efd3c08f000    8192      12      12 rw---   [ anon ]
+00007efd3c08f000       0       0       0 rw---   [ anon ]
+00007efd3c88f000       8       8       0 r-x-- libfreebl3.so
+00007efd3c88f000       0       0       0 r-x-- libfreebl3.so
+00007efd3c891000    2044       0       0 ----- libfreebl3.so
+00007efd3c891000       0       0       0 ----- libfreebl3.so
+00007efd3ca90000       4       4       4 r---- libfreebl3.so
+00007efd3ca90000       0       0       0 r---- libfreebl3.so
+00007efd3ca91000       4       4       4 rw--- libfreebl3.so
+00007efd3ca91000       0       0       0 rw--- libfreebl3.so
+00007efd3ca92000     516      64       0 r-x-- libpcre2-8.so.0.7.0
+00007efd3ca92000       0       0       0 r-x-- libpcre2-8.so.0.7.0
+00007efd3cb13000    2044       0       0 ----- libpcre2-8.so.0.7.0
+00007efd3cb13000       0       0       0 ----- libpcre2-8.so.0.7.0
+00007efd3cd12000       4       4       4 r---- libpcre2-8.so.0.7.0
+00007efd3cd12000       0       0       0 r---- libpcre2-8.so.0.7.0
+00007efd3cd13000       4       4       4 rw--- libpcre2-8.so.0.7.0
+00007efd3cd13000       0       0       0 rw--- libpcre2-8.so.0.7.0
+00007efd3cd14000      28      28       0 r-x-- librt-2.26.so
+00007efd3cd14000       0       0       0 r-x-- librt-2.26.so
+00007efd3cd1b000    2044       0       0 ----- librt-2.26.so
+00007efd3cd1b000       0       0       0 ----- librt-2.26.so
+00007efd3cf1a000       4       4       4 r---- librt-2.26.so
+00007efd3cf1a000       0       0       0 r---- librt-2.26.so
+00007efd3cf1b000       4       4       4 rw--- librt-2.26.so
+00007efd3cf1b000       0       0       0 rw--- librt-2.26.so
+00007efd3cf1c000      28      28       0 r-x-- libcrypt-nss-2.26.so
+00007efd3cf1c000       0       0       0 r-x-- libcrypt-nss-2.26.so
+00007efd3cf23000    2044       0       0 ----- libcrypt-nss-2.26.so
+00007efd3cf23000       0       0       0 ----- libcrypt-nss-2.26.so
+00007efd3d122000       4       4       4 r---- libcrypt-nss-2.26.so
+00007efd3d122000       0       0       0 r---- libcrypt-nss-2.26.so
+00007efd3d123000       4       4       4 rw--- libcrypt-nss-2.26.so
+00007efd3d123000       0       0       0 rw--- libcrypt-nss-2.26.so
+00007efd3d124000     184       0       0 rw---   [ anon ]
+00007efd3d124000       0       0       0 rw---   [ anon ]
+00007efd3d152000     148      92       0 r-x-- libselinux.so.1
+00007efd3d152000       0       0       0 r-x-- libselinux.so.1
+00007efd3d177000    2048       0       0 ----- libselinux.so.1
+00007efd3d177000       0       0       0 ----- libselinux.so.1
+00007efd3d377000       4       4       4 r---- libselinux.so.1
+00007efd3d377000       0       0       0 r---- libselinux.so.1
+00007efd3d378000       4       4       4 rw--- libselinux.so.1
+00007efd3d378000       0       0       0 rw--- libselinux.so.1
+00007efd3d379000       8       4       4 rw---   [ anon ]
+00007efd3d379000       0       0       0 rw---   [ anon ]
+00007efd3d37b000    1320     232       0 r-x-- libm-2.26.so
+00007efd3d37b000       0       0       0 r-x-- libm-2.26.so
+00007efd3d4c5000    2044       0       0 ----- libm-2.26.so
+00007efd3d4c5000       0       0       0 ----- libm-2.26.so
+00007efd3d6c4000       4       4       4 r---- libm-2.26.so
+00007efd3d6c4000       0       0       0 r---- libm-2.26.so
+00007efd3d6c5000       4       4       4 rw--- libm-2.26.so
+00007efd3d6c5000       0       0       0 rw--- libm-2.26.so
+00007efd3d6c6000     148     104       0 r-x-- liblzma.so.5.2.3
+00007efd3d6c6000       0       0       0 r-x-- liblzma.so.5.2.3
+00007efd3d6eb000    2044       0       0 ----- liblzma.so.5.2.3
+00007efd3d6eb000       0       0       0 ----- liblzma.so.5.2.3
+00007efd3d8ea000       4       4       4 r---- liblzma.so.5.2.3
+00007efd3d8ea000       0       0       0 r---- liblzma.so.5.2.3
+00007efd3d8eb000       4       0       0 rw---   [ anon ]
+00007efd3d8eb000       0       0       0 rw---   [ anon ]
+00007efd3d8ec000     228      64       0 r-x-- libnspr4.so
+00007efd3d8ec000       0       0       0 r-x-- libnspr4.so
+00007efd3d925000    2048       0       0 ----- libnspr4.so
+00007efd3d925000       0       0       0 ----- libnspr4.so
+00007efd3db25000       4       4       4 r---- libnspr4.so
+00007efd3db25000       0       0       0 r---- libnspr4.so
+00007efd3db26000       8       8       8 rw--- libnspr4.so
+00007efd3db26000       0       0       0 rw--- libnspr4.so
+00007efd3db28000       8       0       0 rw---   [ anon ]
+00007efd3db28000       0       0       0 rw---   [ anon ]
+00007efd3db2a000      16      16       0 r-x-- libplc4.so
+00007efd3db2a000       0       0       0 r-x-- libplc4.so
+00007efd3db2e000    2044       0       0 ----- libplc4.so
+00007efd3db2e000       0       0       0 ----- libplc4.so
+00007efd3dd2d000       4       4       4 r---- libplc4.so
+00007efd3dd2d000       0       0       0 r---- libplc4.so
+00007efd3dd2e000       4       4       4 rw--- libplc4.so
+00007efd3dd2e000       0       0       0 rw--- libplc4.so
+00007efd3dd2f000      12      12       0 r-x-- libplds4.so
+00007efd3dd2f000       0       0       0 r-x-- libplds4.so
+00007efd3dd32000    2044       0       0 ----- libplds4.so
+00007efd3dd32000       0       0       0 ----- libplds4.so
+00007efd3df31000       4       4       4 r---- libplds4.so
+00007efd3df31000       0       0       0 r---- libplds4.so
+00007efd3df32000       4       4       4 rw--- libplds4.so
+00007efd3df32000       0       0       0 rw--- libplds4.so
+00007efd3df33000     164      64       0 r-x-- libnssutil3.so
+00007efd3df33000       0       0       0 r-x-- libnssutil3.so
+00007efd3df5c000    2044       0       0 ----- libnssutil3.so
+00007efd3df5c000       0       0       0 ----- libnssutil3.so
+00007efd3e15b000      28      28      28 r---- libnssutil3.so
+00007efd3e15b000       0       0       0 r---- libnssutil3.so
+00007efd3e162000       4       4       4 rw--- libnssutil3.so
+00007efd3e162000       0       0       0 rw--- libnssutil3.so
+00007efd3e163000    1152     116       0 r-x-- libnss3.so
+00007efd3e163000       0       0       0 r-x-- libnss3.so
+00007efd3e283000    2044       0       0 ----- libnss3.so
+00007efd3e283000       0       0       0 ----- libnss3.so
+00007efd3e482000      20      20      20 r---- libnss3.so
+00007efd3e482000       0       0       0 r---- libnss3.so
+00007efd3e487000       8       8       8 rw--- libnss3.so
+00007efd3e487000       0       0       0 rw--- libnss3.so
+00007efd3e489000       8       0       0 rw---   [ anon ]
+00007efd3e489000       0       0       0 rw---   [ anon ]
+00007efd3e48b000     144      64       0 r-x-- libsmime3.so
+00007efd3e48b000       0       0       0 r-x-- libsmime3.so
+00007efd3e4af000    2044       0       0 ----- libsmime3.so
+00007efd3e4af000       0       0       0 ----- libsmime3.so
+00007efd3e6ae000      12      12      12 r---- libsmime3.so
+00007efd3e6ae000       0       0       0 r---- libsmime3.so
+00007efd3e6b1000       4       4       4 rw--- libsmime3.so
+00007efd3e6b1000       0       0       0 rw--- libsmime3.so
+00007efd3e6b2000     300      64       0 r-x-- libssl3.so
+00007efd3e6b2000       0       0       0 r-x-- libssl3.so
+00007efd3e6fd000    2044       0       0 ----- libssl3.so
+00007efd3e6fd000       0       0       0 ----- libssl3.so
+00007efd3e8fc000      16      16      16 r---- libssl3.so
+00007efd3e8fc000       0       0       0 r---- libssl3.so
+00007efd3e900000       4       4       4 rw--- libssl3.so
+00007efd3e900000       0       0       0 rw--- libssl3.so
+00007efd3e901000       4       0       0 rw---   [ anon ]
+00007efd3e901000       0       0       0 rw---   [ anon ]
+00007efd3e902000     108      64       0 r-x-- libsasl2.so.3.0.0
+00007efd3e902000       0       0       0 r-x-- libsasl2.so.3.0.0
+00007efd3e91d000    2048       0       0 ----- libsasl2.so.3.0.0
+00007efd3e91d000       0       0       0 ----- libsasl2.so.3.0.0
+00007efd3eb1d000       4       4       4 r---- libsasl2.so.3.0.0
+00007efd3eb1d000       0       0       0 r---- libsasl2.so.3.0.0
+00007efd3eb1e000       4       4       4 rw--- libsasl2.so.3.0.0
+00007efd3eb1e000       0       0       0 rw--- libsasl2.so.3.0.0
+00007efd3eb1f000      56      56       0 r-x-- liblber-2.4.so.2.10.8
+00007efd3eb1f000       0       0       0 r-x-- liblber-2.4.so.2.10.8
+00007efd3eb2d000    2044       0       0 ----- liblber-2.4.so.2.10.8
+00007efd3eb2d000       0       0       0 ----- liblber-2.4.so.2.10.8
+00007efd3ed2c000       4       4       4 r---- liblber-2.4.so.2.10.8
+00007efd3ed2c000       0       0       0 r---- liblber-2.4.so.2.10.8
+00007efd3ed2d000       4       4       4 rw--- liblber-2.4.so.2.10.8
+00007efd3ed2d000       0       0       0 rw--- liblber-2.4.so.2.10.8
+00007efd3ed2e000      76      64       0 r-x-- libresolv-2.26.so
+00007efd3ed2e000       0       0       0 r-x-- libresolv-2.26.so
+00007efd3ed41000    2048       0       0 ----- libresolv-2.26.so
+00007efd3ed41000       0       0       0 ----- libresolv-2.26.so
+00007efd3ef41000       4       4       4 r---- libresolv-2.26.so
+00007efd3ef41000       0       0       0 r---- libresolv-2.26.so
+00007efd3ef42000       4       4       4 rw--- libresolv-2.26.so
+00007efd3ef42000       0       0       0 rw--- libresolv-2.26.so
+00007efd3ef43000       8       0       0 rw---   [ anon ]
+00007efd3ef43000       0       0       0 rw---   [ anon ]
+00007efd3ef45000      12      12       0 r-x-- libkeyutils.so.1.6
+00007efd3ef45000       0       0       0 r-x-- libkeyutils.so.1.6
+00007efd3ef48000    2044       0       0 ----- libkeyutils.so.1.6
+00007efd3ef48000       0       0       0 ----- libkeyutils.so.1.6
+00007efd3f147000       4       4       4 r---- libkeyutils.so.1.6
+00007efd3f147000       0       0       0 r---- libkeyutils.so.1.6
+00007efd3f148000       4       0       0 rw---   [ anon ]
+00007efd3f148000       0       0       0 rw---   [ anon ]
+00007efd3f149000      52      52       0 r-x-- libkrb5support.so.0.1
+00007efd3f149000       0       0       0 r-x-- libkrb5support.so.0.1
+00007efd3f156000    2048       0       0 ----- libkrb5support.so.0.1
+00007efd3f156000       0       0       0 ----- libkrb5support.so.0.1
+00007efd3f356000       4       4       4 r---- libkrb5support.so.0.1
+00007efd3f356000       0       0       0 r---- libkrb5support.so.0.1
+00007efd3f357000       4       4       4 rw--- libkrb5support.so.0.1
+00007efd3f357000       0       0       0 rw--- libkrb5support.so.0.1
+00007efd3f358000      12      12       0 r-x-- libcom_err.so.2.1
+00007efd3f358000       0       0       0 r-x-- libcom_err.so.2.1
+00007efd3f35b000    2044       0       0 ----- libcom_err.so.2.1
+00007efd3f35b000       0       0       0 ----- libcom_err.so.2.1
+00007efd3f55a000       4       4       4 r---- libcom_err.so.2.1
+00007efd3f55a000       0       0       0 r---- libcom_err.so.2.1
+00007efd3f55b000       4       4       4 rw--- libcom_err.so.2.1
+00007efd3f55b000       0       0       0 rw--- libcom_err.so.2.1
+00007efd3f55c000     196      64       0 r-x-- libk5crypto.so.3.1
+00007efd3f55c000       0       0       0 r-x-- libk5crypto.so.3.1
+00007efd3f58d000    2044       0       0 ----- libk5crypto.so.3.1
+00007efd3f58d000       0       0       0 ----- libk5crypto.so.3.1
+00007efd3f78c000       8       8       8 r---- libk5crypto.so.3.1
+00007efd3f78c000       0       0       0 r---- libk5crypto.so.3.1
+00007efd3f78e000       4       4       4 rw--- libk5crypto.so.3.1
+00007efd3f78e000       0       0       0 rw--- libk5crypto.so.3.1
+00007efd3f78f000     860     196       0 r-x-- libkrb5.so.3.3
+00007efd3f78f000       0       0       0 r-x-- libkrb5.so.3.3
+00007efd3f866000    2044       0       0 ----- libkrb5.so.3.3
+00007efd3f866000       0       0       0 ----- libkrb5.so.3.3
+00007efd3fa65000      60      60      60 r---- libkrb5.so.3.3
+00007efd3fa65000       0       0       0 r---- libkrb5.so.3.3
+00007efd3fa74000       8       8       8 rw--- libkrb5.so.3.3
+00007efd3fa74000       0       0       0 rw--- libkrb5.so.3.3
+00007efd3fa76000      12      12       0 r-x-- libdl-2.26.so
+00007efd3fa76000       0       0       0 r-x-- libdl-2.26.so
+00007efd3fa79000    2044       0       0 ----- libdl-2.26.so
+00007efd3fa79000       0       0       0 ----- libdl-2.26.so
+00007efd3fc78000       4       4       4 r---- libdl-2.26.so
+00007efd3fc78000       0       0       0 r---- libdl-2.26.so
+00007efd3fc79000       4       4       4 rw--- libdl-2.26.so
+00007efd3fc79000       0       0       0 rw--- libdl-2.26.so
+00007efd3fc7a000      88      64       0 r-x-- libz.so.1.2.11
+00007efd3fc7a000       0       0       0 r-x-- libz.so.1.2.11
+00007efd3fc90000    2044       0       0 ----- libz.so.1.2.11
+00007efd3fc90000       0       0       0 ----- libz.so.1.2.11
+00007efd3fe8f000       4       4       4 r---- libz.so.1.2.11
+00007efd3fe8f000       0       0       0 r---- libz.so.1.2.11
+00007efd3fe90000       4       0       0 rw---   [ anon ]
+00007efd3fe90000       0       0       0 rw---   [ anon ]
+00007efd3fe91000    1388     980       0 r-x-- libxml2.so.2.9.7
+00007efd3fe91000       0       0       0 r-x-- libxml2.so.2.9.7
+00007efd3ffec000    2048       0       0 ----- libxml2.so.2.9.7
+00007efd3ffec000       0       0       0 ----- libxml2.so.2.9.7
+00007efd401ec000      32      32      32 r---- libxml2.so.2.9.7
+00007efd401ec000       0       0       0 r---- libxml2.so.2.9.7
+00007efd401f4000       8       8       8 rw--- libxml2.so.2.9.7
+00007efd401f4000       0       0       0 rw--- libxml2.so.2.9.7
+00007efd401f6000       4       4       4 rw---   [ anon ]
+00007efd401f6000       0       0       0 rw---   [ anon ]
+00007efd401f7000     344     100       0 r-x-- libldap_r-2.4.so.2.10.8
+00007efd401f7000       0       0       0 r-x-- libldap_r-2.4.so.2.10.8
+00007efd4024d000    2044       0       0 ----- libldap_r-2.4.so.2.10.8
+00007efd4024d000       0       0       0 ----- libldap_r-2.4.so.2.10.8
+00007efd4044c000      12      12      12 r---- libldap_r-2.4.so.2.10.8
+00007efd4044c000       0       0       0 r---- libldap_r-2.4.so.2.10.8
+00007efd4044f000       4       4       4 rw--- libldap_r-2.4.so.2.10.8
+00007efd4044f000       0       0       0 rw--- libldap_r-2.4.so.2.10.8
+00007efd40450000       8       0       0 rw---   [ anon ]
+00007efd40450000       0       0       0 rw---   [ anon ]
+00007efd40452000     296      64       0 r-x-- libgssapi_krb5.so.2.2
+00007efd40452000       0       0       0 r-x-- libgssapi_krb5.so.2.2
+00007efd4049c000    2048       0       0 ----- libgssapi_krb5.so.2.2
+00007efd4049c000       0       0       0 ----- libgssapi_krb5.so.2.2
+00007efd4069c000       8       8       8 r---- libgssapi_krb5.so.2.2
+00007efd4069c000       0       0       0 r---- libgssapi_krb5.so.2.2
+00007efd4069e000       4       4       4 rw--- libgssapi_krb5.so.2.2
+00007efd4069e000       0       0       0 rw--- libgssapi_krb5.so.2.2
+00007efd4069f000    2416     708       0 r-x-- libcrypto.so.1.1.0g
+00007efd4069f000       0       0       0 r-x-- libcrypto.so.1.1.0g
+00007efd408fb000    2048       0       0 ----- libcrypto.so.1.1.0g
+00007efd408fb000       0       0       0 ----- libcrypto.so.1.1.0g
+00007efd40afb000     116     116     116 r---- libcrypto.so.1.1.0g
+00007efd40afb000       0       0       0 r---- libcrypto.so.1.1.0g
+00007efd40b18000      48      48      48 rw--- libcrypto.so.1.1.0g
+00007efd40b18000       0       0       0 rw--- libcrypto.so.1.1.0g
+00007efd40b24000      12       8       8 rw---   [ anon ]
+00007efd40b24000       0       0       0 rw---   [ anon ]
+00007efd40b27000     392     100       0 r-x-- libssl.so.1.1.0g
+00007efd40b27000       0       0       0 r-x-- libssl.so.1.1.0g
+00007efd40b89000    2048       0       0 ----- libssl.so.1.1.0g
+00007efd40b89000       0       0       0 ----- libssl.so.1.1.0g
+00007efd40d89000      16      16      16 r---- libssl.so.1.1.0g
+00007efd40d89000       0       0       0 r---- libssl.so.1.1.0g
+00007efd40d8d000      24      24      24 rw--- libssl.so.1.1.0g
+00007efd40d8d000       0       0       0 rw--- libssl.so.1.1.0g
+00007efd40d93000    1712    1432       0 r-x-- libc-2.26.so
+00007efd40d93000       0       0       0 r-x-- libc-2.26.so
+00007efd40f3f000    2048       0       0 ----- libc-2.26.so
+00007efd40f3f000       0       0       0 ----- libc-2.26.so
+00007efd4113f000      16      16      16 r---- libc-2.26.so
+00007efd4113f000       0       0       0 r---- libc-2.26.so
+00007efd41143000       8       8       8 rw--- libc-2.26.so
+00007efd41143000       0       0       0 rw--- libc-2.26.so
+00007efd41145000      16      12      12 rw---   [ anon ]
+00007efd41145000       0       0       0 rw---   [ anon ]
+00007efd41149000      44      44       0 r-x-- libcdrmediator.so
+00007efd41149000       0       0       0 r-x-- libcdrmediator.so
+00007efd41154000    2044       0       0 ----- libcdrmediator.so
+00007efd41154000       0       0       0 ----- libcdrmediator.so
+00007efd41353000       4       4       4 r---- libcdrmediator.so
+00007efd41353000       0       0       0 r---- libcdrmediator.so
+00007efd41354000      12      12      12 rw--- libcdrmediator.so
+00007efd41354000       0       0       0 rw--- libcdrmediator.so
+00007efd41357000      56      56       0 r-x-- librating.so
+00007efd41357000       0       0       0 r-x-- librating.so
+00007efd41365000    2048       0       0 ----- librating.so
+00007efd41365000       0       0       0 ----- librating.so
+00007efd41565000       4       4       4 r---- librating.so
+00007efd41565000       0       0       0 r---- librating.so
+00007efd41566000       4       4       4 rw--- librating.so
+00007efd41566000       0       0       0 rw--- librating.so
+00007efd41567000      28      28       0 r-x-- libre6cc.so
+00007efd41567000       0       0       0 r-x-- libre6cc.so
+00007efd4156e000    2044       0       0 ----- libre6cc.so
+00007efd4156e000       0       0       0 ----- libre6cc.so
+00007efd4176d000       4       4       4 r---- libre6cc.so
+00007efd4176d000       0       0       0 r---- libre6cc.so
+00007efd4176e000       4       4       4 rw--- libre6cc.so
+00007efd4176e000       0       0       0 rw--- libre6cc.so
+00007efd4176f000      36      36       0 r-x-- libre6core.so
+00007efd4176f000       0       0       0 r-x-- libre6core.so
+00007efd41778000    2044       0       0 ----- libre6core.so
+00007efd41778000       0       0       0 ----- libre6core.so
+00007efd41977000       4       4       4 r---- libre6core.so
+00007efd41977000       0       0       0 r---- libre6core.so
+00007efd41978000       4       4       4 rw--- libre6core.so
+00007efd41978000       0       0       0 rw--- libre6core.so
+00007efd41979000     100      92       0 r-x-- libpthread-2.26.so
+00007efd41979000       0       0       0 r-x-- libpthread-2.26.so
+00007efd41992000    2044       0       0 ----- libpthread-2.26.so
+00007efd41992000       0       0       0 ----- libpthread-2.26.so
+00007efd41b91000       4       4       4 r---- libpthread-2.26.so
+00007efd41b91000       0       0       0 r---- libpthread-2.26.so
+00007efd41b92000       4       4       4 rw--- libpthread-2.26.so
+00007efd41b92000       0       0       0 rw--- libpthread-2.26.so
+00007efd41b93000      16       4       4 rw---   [ anon ]
+00007efd41b93000       0       0       0 rw---   [ anon ]
+00007efd41b97000     180     164       0 r-x-- libpq.so.5.9
+00007efd41b97000       0       0       0 r-x-- libpq.so.5.9
+00007efd41bc4000    2048       0       0 ----- libpq.so.5.9
+00007efd41bc4000       0       0       0 ----- libpq.so.5.9
+00007efd41dc4000      12      12      12 r---- libpq.so.5.9
+00007efd41dc4000       0       0       0 r---- libpq.so.5.9
+00007efd41dc7000       4       4       4 rw--- libpq.so.5.9
+00007efd41dc7000       0       0       0 rw--- libpq.so.5.9
+00007efd41dc8000     148     148       0 r-x-- ld-2.26.so
+00007efd41dc8000       0       0       0 r-x-- ld-2.26.so
+00007efd41fbc000      72      72      72 rw---   [ anon ]
+00007efd41fbc000       0       0       0 rw---   [ anon ]
+00007efd41fec000       4       4       4 r---- ld-2.26.so
+00007efd41fec000       0       0       0 r---- ld-2.26.so
+00007efd41fed000       4       4       4 rw--- ld-2.26.so
+00007efd41fed000       0       0       0 rw--- ld-2.26.so
+00007efd41fee000       4       4       4 rw---   [ anon ]
+00007efd41fee000       0       0       0 rw---   [ anon ]
+00007ffd547fd000     132      20      20 rw---   [ stack ]
+00007ffd547fd000       0       0       0 rw---   [ stack ]
+00007ffd548b3000      12       0       0 r----   [ anon ]
+00007ffd548b3000       0       0       0 r----   [ anon ]
+00007ffd548b6000       8       4       0 r-x--   [ anon ]
+00007ffd548b6000       0       0       0 r-x--   [ anon ]
+ffffffffff600000       4       0       0 r-x--   [ anon ]
+ffffffffff600000       0       0       0 r-x--   [ anon ]
+---------------- ------- ------- ------- 
+total kB          235316    6732    1212
