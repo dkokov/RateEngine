@@ -1,0 +1,14 @@
+mod/CDRMediator
+mod/Rating
+#mod/CallControl
+mod/db_pgsql
+#mod/db_mysql
+#mod/db_redis
+#mod/db_mongodb
+#mod/tcp
+#mod/udp
+#mod/sctp
+#mod/tls
+#mod/my_cc
+#mod/jsonrpc_cc
+#mod/jsonrpc_rt
