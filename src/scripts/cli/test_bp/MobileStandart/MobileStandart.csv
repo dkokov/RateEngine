@@ -1,0 +1,12 @@
+
+1,"X-BG-Operator","",""
+2,35910,"","X-BG-Operator/mobile/",0,"","",""
+*,1,0.00,1,,
+;
+1,"BG-Standart",,0,0
+2,359,"","National(standart)",60000,"","",""
+*,1,0.095833,30,1,
+*,2,0.003194,1,,
+;
+5,"MobileStandart","FreeCalls","X-BG-Operator","FIX","BG-Standart","International-Standart"
+;

@@ -1,0 +1,137 @@
+RATE-ENGINE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY,
+	enterprises, 
+	OBJECT-TYPE, 
+	OBJECT-IDENTITY,
+	NOTIFICATION-TYPE,
+	Integer32,
+	Unsigned32,
+	Counter32,
+	Counter64,
+	Gauge32
+		FROM SNMPv2-SMI;
+   
+rateEngineRegMibModule  MODULE-IDENTITY
+	LAST-UPDATED  "202004220000Z"
+	ORGANIZATION  "RateEngine"
+	CONTACT-INFO
+	"postal:    Dimitar Kokov
+				Lulin 9
+				Sofia,1000
+	
+	email:    dkokov75@gmail.com"
+	DESCRIPTION
+		"RateEngine Global Registration MIB"
+
+	REVISION "200702150430Z"
+	DESCRIPTION
+		"Moved the RateEngine MIBs from the experimental branch to the IANA
+		assigned enterprise branch 55672"       
+
+	REVISION "200603211200Z"
+	DESCRIPTION
+		"Initial RateEngine Mib Release"
+	::= { rateEngineModules 1 }
+
+rateEngine OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"The IANA has assigned enterprise branch 55672 to RateEngine."
+			::= { enterprises 55672}
+
+rateEngineReg OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for objects and events common to RateEngine products."
+			::= { rateEngine 1 }
+
+rateEngineGeneric OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for objects and events common to RateEngine products."
+			::= { rateEngine 2 }
+
+rateEngineStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine statistics."
+			::= { rateEngine 3 }
+
+rateEngineCDRMediatorStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for CDRMediator module statistics."
+			::= { rateEngineStatistics 1 }
+
+rateEngineCDRMediatorTable   OBJECT-TYPE
+			SYNTAX      SEQUENCE OF  cdrMediatorTableEntry
+			MAX-ACCESS  not-accessible
+			STATUS      current
+			DESCRIPTION
+			"This table contains information on all active calls in the system."
+			::= { rateEngineCDRMediatorStatistics 1 }
+  
+rateEngineCDRMediatorTableEntry   OBJECT-TYPE
+			SYNTAX      cdrMediatorTableEntry
+			MAX-ACCESS  not-accessible
+			STATUS      current
+			DESCRIPTION
+			"This entry contains information for a single active call in the system."
+			INDEX { cdrMediatorIndex }
+			::= { rateEngineCDRMediatorTable 1 }
+
+cdrMediatorTableEntry ::= SEQUENCE {
+			cdrMediatorIndex		Unsigned32,
+			cdrMediatorType 		INTEGER,
+		}
+
+cdrMediatorIndex OBJECT-TYPE
+		SYNTAX      Unsigned32
+		MAX-ACCESS  not-accessible
+		STATUS current
+		DESCRIPTION 
+		"The index of this dialog."
+		::= { rateEngineCDRMediatorTableEntry 1 }
+
+cdrMediatorType OBJECT-TYPE
+		SYNTAX      INTEGER {
+			invite(1),
+			subscribe(2)
+		}
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION 
+		"The type of Dialog:
+			invite(1)     - the dialog was created with a SIP INVITE.
+			subscribe(2)  - the dialog was created with a SIP SUBSCRIBE."
+		::= { rateEngineCDRMediatorTableEntry 2 }
+
+rateEngineRatingStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for Rating module statistics."
+			::= { rateEngineStatistics 2 }
+
+rateEngineCallControlStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for CallControl module statistics."
+			::= { rateEngineStatistics 3 }
+
+rateEngineStatus OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine statistics."
+			::= { rateEngine 4 }
+
+rateEngineModules  OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+	"Sub-tree to register the values assigned to modules with the 
+	MODULE-IDENTITY construct. Core MIBs are registered under this branch."
+	::= { rateEngineReg 1 }
+
+
+END

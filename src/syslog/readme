@@ -1,0 +1,18 @@
+[2013-4-10 17:10:13],[PCardManager],[[6096a6fc-7b2e-11e2-a553-bf1c36a5750a],card id[184],pcard_manager(1) start[2013-02-01],current[2013-02-20],end[2013-03-01]]
+[2013-4-10 17:10:13],[calc_cprice_2()],[call_uid = 6096a6fc-7b2e-11e2-a553-bf1c36a5750a,p = 0,units = 2]
+[2013-4-10 17:10:13],[calc_cprice_2()],[call_uid = 6096a6fc-7b2e-11e2-a553-bf1c36a5750a,p = 1,units = 21]
+[2013-4-10 17:10:13],[calc_cprice_2()],[call_uid = 6096a6fc-7b2e-11e2-a553-bf1c36a5750a,p = 1,checksec = 0,billsec = 81]
+
+
+|TIMESTAMP|CALL_UID|FUNC NAME|FUNC RESULT|\n
+
+|2013-4-10 17:10:13|6096a6fc-7b2e-11e2-a553-bf1c36a5750a|PCardManager|card_id 184,start 2013-02-01,current 2013-02-13,end 2013-03-01|\n
+
+|TIMESTAMP|FUNC NAME|FUNC RESULT|\n
+
+|2013-4-10 17:10:13|PCardManager|card_id 184,start 2013-02-01,current 2013-02-13,end 2013-03-01|\n
+
+FUNC_RESULT FORMAT
+format , value1,value2,value3,...,valueN
+
+Da se izpolzva promenliv broi argumenti !?

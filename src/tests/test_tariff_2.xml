@@ -1,0 +1,14 @@
+<calcs>
+	<calc>
+		<pos>1</pos>
+		<delta>30</delta>
+		<fee>0.002</fee>
+		<iteration>1</iteration>
+	</calc>
+	<calc>
+		<pos>2</pos>
+		<delta>1</delta>
+		<fee>0.002</fee>
+		<iteration>*</iteration>
+	</calc>	
+</calcs>

@@ -1,0 +1,179 @@
+;
+; 1,"BillPlan","BillPlanType",start_period,end_period
+;    - BillPlanType can be used "postpaid" or "prepaid"
+;
+; 2,prefix,prefix_desc,tariff_name,bill_freesec,time_condition_id,start_period,end_period
+; *,pos,fee,delta_time,iterations
+;
+; 3,billing_account,leg,currency_id,rating_mode_id,rating_account,cdr_server_id,clg_nadi,cld_nadi
+;
+; 4,pcard_type,pcard_status,amount,start_date,end_date
+;
+; 5,bill_plan_tree(name),bill_plan....
+;
+; currency_id :
+;  1 => bg(лв.)
+;  2 => euro
+;
+; rating_mode_id :
+;   1 => calling_number
+;   2 => account_code
+;   3 => src_context
+;   4 => dst_context
+;   5 => src_tgroup
+;   6 => dst_tgroup
+;
+1,"BSC=>VivaSF",,0,0
+;
+; 700 numbers
+2,700,"","BSC=>VivaSF_700-pick-on",0,"pick-on-fix",
+*,1,0.0005,1,,
+;
+2,700,"","BSC=>VivaSF_700-pick-off",0,"pick-on-fix",
+*,1,0.00045,1,,
+2,700,"","BSC=>VivaSF_700-pick-off",0,"weekend",
+;
+; 800 numbers
+2,800,"","BSC=>VivaSF_800",0,"",
+*,1,0.00108,1,,
+;
+; Local Segment
+2,2,"","BSC=>VivaSF_Local-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,71,"","BSC=>VivaSF_Local-pick-on",0,"pick-on-fix",
+2,72,"","BSC=>VivaSF_Local-pick-on",0,"pick-on-fix",
+2,750,"","BSC=>VivaSF_Local-pick-on",0,"pick-on-fix",
+;
+2,2,"","BSC=>VivaSF_Local-pick-off",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,71,"","BSC=>VivaSF_Local-pick-off",0,"pick-off-fix",
+2,72,"","BSC=>VivaSF_Local-pick-off",0,"pick-off-fix",
+2,750,"","BSC=>VivaSF_Local-pick-off",0,"pick-off-fix",
+;
+2,2,"","BSC=>VivaSF_Local-pick-off",0,"weekend",
+2,71,"","BSC=>VivaSF_Local-pick-off",0,"weekend",
+2,72,"","BSC=>VivaSF_Local-pick-off",0,"weekend",
+2,750,"","BSC=>VivaSF_Local-pick-off",0,"weekend",
+;
+; National Segment
+2,3,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,4,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+2,5,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+2,6,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+2,7,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+2,8,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+2,9,"","BSC=>VivaSF_National-pick-on",0,"pick-on-fix",
+;
+2,3,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+*,1,0.000083,1,,
+2,4,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+2,5,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+2,6,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+2,7,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+2,8,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+2,9,"","BSC=>VivaSF_National-pick-off",0,"pick-off-fix",
+;
+2,3,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,4,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,5,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,6,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,7,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,8,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+2,9,"","BSC=>VivaSF_National-pick-off",0,"weekend",
+;
+;
+; FNP Local Segment
+2,E113812,"","BSC=>VivaSF_FNP_Local-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,E1138171,"","BSC=>VivaSF_FNP_Local-pick-on",0,"pick-on-fix",
+2,E1138172,"","BSC=>VivaSF_FNP_Local-pick-on",0,"pick-on-fix",
+2,E11381750,"","BSC=>VivaSF_FNP_Local-pick-on",0,"pick-on-fix",
+;
+2,E113812,"","BSC=>VivaSF_FNP_Local-pick-off",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,E1138171,"","BSC=>VivaSF_FNP_Local-pick-off",0,"pick-off-fix",
+2,E1138172,"","BSC=>VivaSF_FNP_Local-pick-off",0,"pick-off-fix",
+2,E11381750,"","BSC=>VivaSF_FNP_Local-pick-off",0,"pick-off-fix",
+;
+2,E113812,"","BSC=>VivaSF_FNP_Local-pick-off",0,"weekend",
+2,E1138171,"","BSC=>VivaSF_FNP_Local-pick-off",0,"weekend",
+2,E1138172,"","BSC=>VivaSF_FNP_Local-pick-off",0,"weekend",
+2,E11381750,"","BSC=>VivaSF_FNP_Local-pick-off",0,"weekend",
+;
+; FNP National Segment
+2,E113813,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,E113814,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+2,E113815,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+2,E113816,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+2,E113817,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+2,E113818,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+2,E113819,"","BSC=>VivaSF_FNP_National-pick-on",0,"pick-on-fix",
+;
+2,E113813,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+*,1,0.000083,1,,
+2,E113814,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+2,E113815,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+2,E113816,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+2,E113817,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+2,E113818,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+2,E113819,"","BSC=>VivaSF_FNP_National-pick-off",0,"pick-off-fix",
+;
+2,E113813,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113814,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113815,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113816,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113817,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113818,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+2,E113819,"","BSC=>VivaSF_FNP_National-pick-off",0,"weekend",
+;
+; International Local Segment
+2,2,"","BSC=>VivaSF_INT_Local-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,71,"","BSC=>VivaSF_INT_Local-pick-on",0,"pick-on-fix",
+2,72,"","BSC=>VivaSF_INT_Local-pick-on",0,"pick-on-fix",
+2,750,"","BSC=>VivaSF_INT_Local-pick-on",0,"pick-on-fix",
+;
+2,2,"","BSC=>VivaSF_INT_Local-pick-off",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,71,"","BSC=>VivaSF_INT_Local-pick-off",0,"pick-off-fix",
+2,72,"","BSC=>VivaSF_INT_Local-pick-off",0,"pick-off-fix",
+2,750,"","BSC=>VivaSF_INT_Local-pick-off",0,"pick-off-fix",
+;
+2,2,"","BSC=>VivaSF_INT_Local-pick-off",0,"weekend",
+2,71,"","BSC=>VivaSF_INT_Local-pick-off",0,"weekend",
+2,72,"","BSC=>VivaSF_INT_Local-pick-off",0,"weekend",
+2,750,"","BSC=>VivaSF_INT_Local-pick-off",0,"weekend",
+;
+; International National Segment
+2,3,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+*,1,0.000083,1,,
+2,4,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+2,5,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+2,6,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+2,7,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+2,8,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+2,9,"","BSC=>VivaSF_INT_National-pick-on",0,"pick-on-fix",
+;
+2,3,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+*,1,0.000083,1,,
+2,4,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+2,5,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+2,6,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+2,7,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+2,8,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+2,9,"","BSC=>VivaSF_INT_National-pick-off",0,"pick-off-fix",
+;
+2,3,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,4,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,5,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,6,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,7,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,8,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+2,9,"","BSC=>VivaSF_INT_National-pick-off",0,"weekend",
+;
+;
+3,"vivacom-fix-sf",a+b,1,6,"g4",4,3,3
+3,"vivacom-fix-sf",a+b,1,6,"g9",4,4,3
+;

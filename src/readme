@@ -1,0 +1,12 @@
+
+yum install postgresql postgresql-server libpq libpq-devel libxml2 libxml2-devel
+
+make
+make install
+cd /usr/local/RateEngine/
+
+yum install php php-pgsql uuid
+
+edit configuration files
+
+

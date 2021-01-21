@@ -1,0 +1,279 @@
+RATE-ENGINE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY,
+	enterprises, 
+	OBJECT-TYPE, 
+	OBJECT-IDENTITY,
+	NOTIFICATION-TYPE,
+	Integer32,
+	Unsigned32,
+	Counter32,
+	Counter64,
+	Gauge32
+		FROM SNMPv2-SMI;
+	
+--	DisplayString
+--		FROM SNMPv2-TC
+
+rateEngineRegMibModule  MODULE-IDENTITY
+	LAST-UPDATED  "202004220000Z"
+	ORGANIZATION  "RateEngine"
+	CONTACT-INFO
+	"postal:    Dimitar Kokov
+				Lulin 9
+				Sofia,1000
+	
+	email:    dkokov75@gmail.com"
+	DESCRIPTION
+		"RateEngine Global Registration MIB"
+
+	REVISION "200702150430Z"
+	DESCRIPTION
+		"Moved the RateEngine MIBs from the experimental branch to the IANA
+		assigned enterprise branch 55672"       
+
+	REVISION "200603211200Z"
+	DESCRIPTION
+		"Initial RateEngine Mib Release"
+	::= { rateEngineModules 1 }
+
+rateEngine OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"The IANA has assigned enterprise branch 55672 to RateEngine."
+			::= { enterprises 55672}
+
+rateEngineReg OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			""
+			::= { rateEngine 1 }
+
+rateEngineGeneric OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"The RateEngine generic information."
+			::= { rateEngine 2 }
+
+rateEngineHostname OBJECT-TYPE
+			SYNTAX     OCTET STRING (SIZE (0..255))
+			MAX-ACCESS accessible-for-notify
+			STATUS current
+			DESCRIPTION
+			"Hostname of the machine that sends the trap notification."
+			::= { rateEngineGeneric 1 }
+
+rateEngineStartTimestamp OBJECT-TYPE
+			SYNTAX     Counter32
+			MAX-ACCESS accessible-for-notify
+			STATUS current
+			DESCRIPTION
+			"Hostname of the machine that sends the trap notification."
+			::= { rateEngineGeneric 2 }
+
+rateEngineCurrentTimestamp OBJECT-TYPE
+			SYNTAX     Counter32
+			MAX-ACCESS accessible-for-notify
+			STATUS current
+			DESCRIPTION
+			"Hostname of the machine that sends the trap notification."
+			::= { rateEngineGeneric 3 }
+
+rateEngineStatus OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine status."
+			::= { rateEngine 3 }
+
+rateEngineStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine statistics."
+			::= { rateEngine 4 }
+
+rateEngineCDRMediatorStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for CDRMediator module statistics."
+			::= { rateEngineStatistics 1 }
+
+rateEngineCDRMediatorTable   OBJECT-TYPE
+			SYNTAX      SEQUENCE OF  cdrMediatorTableEntry
+			MAX-ACCESS  not-accessible
+			STATUS      current
+			DESCRIPTION
+			"This table contains information on all active calls in the system."
+			::= { rateEngineCDRMediatorStatistics 1 }
+  
+rateEngineCDRMediatorTableEntry   OBJECT-TYPE
+			SYNTAX      cdrMediatorTableEntry
+			MAX-ACCESS  not-accessible
+			STATUS      current
+			DESCRIPTION
+			"This entry contains information for a single active call in the system."
+			INDEX { cdrMediatorId}
+			::= { rateEngineCDRMediatorTable 1 }
+
+cdrMediatorTableEntry ::= SEQUENCE {
+			cdrMediatorId			Unsigned32,
+			cdrMediatorType 		INTEGER,
+			cdrMediatorGetRecords 	Counter32,
+			cdrMediatorRatingLegA	Counter32,
+			cdrMediatorRatingLegB	Counter32
+		}
+
+cdrMediatorId OBJECT-TYPE
+		SYNTAX      Unsigned32
+		MAX-ACCESS  not-accessible
+		STATUS current
+		DESCRIPTION 
+		"The CDR Server ID."
+		::= { rateEngineCDRMediatorTableEntry 1 }
+
+cdrMediatorType OBJECT-TYPE
+		SYNTAX      INTEGER {
+			db(1),
+			file(2)
+		}
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION 
+		"The type of CDR Server:
+			db(1)    - .
+			file(2)  - ."
+		::= { rateEngineCDRMediatorTableEntry 2 }
+		
+cdrMediatorGetTotalRecords OBJECT-TYPE
+		SYNTAX      Counter32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION 
+		"Get total records from this CDR server"
+		::= { rateEngineCDRMediatorTableEntry 3 }
+		
+cdrMediatorGetRatingLegA OBJECT-TYPE
+		SYNTAX      Counter32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION 
+		"Rating LegA records from this CDR server"
+		::= { rateEngineCDRMediatorTableEntry 4 }
+
+cdrMediatorGetRatingLegB OBJECT-TYPE
+		SYNTAX      Counter32
+		MAX-ACCESS  read-only
+		STATUS current
+		DESCRIPTION 
+		"Rating LegB records from this CDR server"
+		::= { rateEngineCDRMediatorTableEntry 5 }
+
+rateEngineRatingStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for Rating module statistics."
+			::= { rateEngineStatistics 2 }
+
+rateEngineRatingTotalCalls OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The total number of rating calls."
+			::= { rateEngineRatingStatistics 1 }
+
+rateEngineRatingSuccessCalls OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The number of success rating calls."
+			::= { rateEngineRatingStatistics 2 }
+			
+rateEngineRatingErrorCalls OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The number of error rating calls."
+			::= { rateEngineRatingStatistics 3 }
+			
+rateEngineRatingMinutes OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The minutes of rating calls."
+			::= { rateEngineRatingStatistics 4 }
+
+rateEngineCallControlStatistics OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for CallControl module statistics."
+			::= { rateEngineStatistics 3 }
+
+rateEngineCallControlRequests OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The total number of rating calls."
+			::= { rateEngineCallControlStatistics 1 }
+
+rateEngineCallControlResponses OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The number of success rating calls."
+			::= { rateEngineCallControlStatistics 2 }
+			
+rateEngineCallControlReturnErrors OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The number of error rating calls."
+			::= { rateEngineCallControlStatistics 3 }
+
+rateEngineCallControlRatingMinutes OBJECT-TYPE
+			SYNTAX      Counter32
+			MAX-ACCESS  read-only
+			STATUS      current
+			DESCRIPTION
+			"The minutes of rating calls."
+			::= { rateEngineCallControlStatistics 4 }
+
+rateEngineNotifications OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine notifications."
+			::= { rateEngine 5 }
+
+rateEngineAlarms OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine alarms."
+			::= { rateEngineNotifications 1 }
+
+rateEngineEvents OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine events."
+			::= { rateEngineNotifications 2 }
+
+rateEngineMessages OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION 
+			"Sub-tree for RateEngine messages."
+			::= { rateEngineNotifications 3 }
+
+rateEngineModules  OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+	"Sub-tree to register the values assigned to modules with the 
+	MODULE-IDENTITY construct. Core MIBs are registered under this branch."
+	::= { rateEngineReg 1 }
+
+
+END
