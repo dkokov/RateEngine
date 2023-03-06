@@ -1,0 +1,8 @@
+{
+	"bplan":"Standart",
+	"start_period":0,
+	"end_period":0,
+	"rates":[{"prefix":"3592","tariff":"national_1"},
+			 {"prefix":"35988","tariff":"nat_mobile_1"},
+			 {"prefix":"35989","tariff":"nat_mobile_1"}]
+}
