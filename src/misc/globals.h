@@ -35,57 +35,57 @@
 #define TEST_NET 2
 
 /* Logging Level */
-unsigned short log_debug_level;
+extern unsigned short log_debug_level;
 
-char log_separator;
+extern char log_separator;
 
-unsigned int log_max_file_size;
+extern unsigned int log_max_file_size;
 
 /* A flag for demonize of the RE5 */
-unsigned short demonize;
+extern unsigned short demonize;
 
 /* A flag for CDRMediator starting */
-unsigned short get_cdrs_flag;
+extern unsigned short get_cdrs_flag;
 
-char cdr_storage_sched_ts[64];
+extern char cdr_storage_sched_ts[64];
 
 /* A flag for RatingEngine starting */
-unsigned short rating_flag;
+extern unsigned short rating_flag;
 
-unsigned int console_call_id;
+extern unsigned int console_call_id;
 
 /* A flag for CallControl(ccserver) starting */
-unsigned short call_control_flag;
+extern unsigned short call_control_flag;
 
-unsigned int caching_refresh;
+extern unsigned int caching_refresh;
 
 /* Start/Stop RE5 Manager */
-char loop_flag;
+extern char loop_flag;
 
-unsigned int call_maxsec_limit;
-unsigned int sim_calls;
+extern unsigned int call_maxsec_limit;
+extern unsigned int sim_calls;
 //unsigned int cdr_tcp_conn;
-unsigned long rates_per_bplan;
+extern unsigned long rates_per_bplan;
 
-unsigned short get_cdrs_mode;
+extern unsigned short get_cdrs_mode;
 
 /* Default Billing Day */
-char billing_day[2];
+extern char billing_day[2];
 
 /* Default Payment Day*/
-int day_of_payment;
+extern int day_of_payment;
 
 /* */
-float k_limit_min;
+extern float k_limit_min;
 
 /* A file descriptor to PIDFile of the application */
-int pidFilehandle;
+extern int pidFilehandle;
 
 /* Copy a CDR Table */
 //cdr_table_t *cdr_tbl_cpy_ptr;
 
 /* Main config dynamic struct */
-main_cfg_t *mcfg;
+extern main_cfg_t *mcfg;
 
 //rate_engine rt_eng;
 
@@ -122,7 +122,7 @@ typedef struct re5_server
     pthread_mutex_t sync_crating_threads;
 }re5_server;
 
-re5_server config;
+extern re5_server config;
 
 #define ERROR_STR_LEN 512
 #define ERROR_END 1
@@ -148,9 +148,9 @@ typedef struct opt_cli {
 }opt_cli_t;
 
 /* Command options from CLI */
-opt_cli_t opt_cli_mem;
+extern opt_cli_t opt_cli_mem;
 
 /* modules list , pointer */
-mod_t *mod_lst;
+extern mod_t *mod_lst;
 
 #endif

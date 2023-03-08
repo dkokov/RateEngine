@@ -526,7 +526,7 @@ int cdr_cfg_insert_profile(cdr_profile_cfg_t *cfg)
 		sprintf(str,"set %s %s",cdr_j.header,cdr_j.msg);
 		mem_free(cdr_j.msg);
 		
-		ret = db_set(cfg->dbp,str);
+		ret = db_set(cfg->dbp,str,NULL);
 		if(ret < 0) {
 			db_error(ret);
 		} else return 1;
@@ -589,7 +589,7 @@ int cdr_cfg_insert_server(cdr_profile_cfg_t *profile)
 		
 		sprintf(str,"SET cdr_server_%s 'true'",profile->profile_name);
 		
-		ret = db_set(profile->dbp,str);
+		ret = db_set(profile->dbp,str,NULL);
 		if(ret < 0) db_error(ret);
 	} else return DB_ERR_TYPE_UNK;
     
