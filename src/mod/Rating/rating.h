@@ -29,7 +29,7 @@ typedef struct rate_engine
  	char rt_cfg_json_dir[256];   
 } rate_engine_t;
 
-rate_engine_t rt_eng;
+extern rate_engine_t rt_eng;
 
 void *RateEngine(void *dt);
 void rt_exec(db_t *dbp,racc_t *rtp,char leg);
@@ -38,6 +38,6 @@ int rt_double_rating(db_t *dbp,racc_t *rtp,char leg);
 void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end);
 
 /* cdrm export functions */
-cdr_funcs_t *cdrm_api;
+extern cdr_funcs_t *cdrm_api;
 
 #endif

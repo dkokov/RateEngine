@@ -98,7 +98,7 @@ int cdr_storage_sched_nosql_insert(cdr_storage_profile_t *cfg)
 	sprintf(str,"set %s %s",cdr_j.header,cdr_j.msg);
 	mem_free(cdr_j.msg);
 		
-	ret = db_set(cfg->dbp,str);
+	ret = db_set(cfg->dbp,str,NULL);
 	if(ret < 0) {
 		db_error(ret);
 		return -1;

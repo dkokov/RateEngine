@@ -18,6 +18,9 @@
 #include "round_billsec.h"
 #include "rt_data_q.h"
 
+rate_engine_t rt_eng;
+cdr_funcs_t *cdrm_api;
+ 
 int rt_init(void);
 int rt_free(void);
 

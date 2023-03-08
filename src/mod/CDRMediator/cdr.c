@@ -8,6 +8,8 @@
 #include "cdr.h"
 #include "cdrm_json.h"
 
+cdr_table_t *cdr_tbl_cpy_ptr;
+
 cdr_table_t cdr_tbl[] = {
 	{"id",cdr_add_id},
 	{"cdr_server_id",cdr_add_cdr_server_id},
@@ -564,7 +566,7 @@ int cdr_add_in_db_set(db_t *dbp,cdr_t *cdr_pt)
 		
 	sprintf(buf,"SET %s '%s'",cdr_json_pt.header,cdr_json_pt.msg);
 	
-	ret = db_set(dbp,buf);
+	ret = db_set(dbp,buf,NULL);
 	if(ret < 0) {
 		db_error(ret);
 		LOG("cdr_add_in_db()","The CDR (%s) is not inserted!",cdr_pt->call_uid);

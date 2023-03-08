@@ -1,5 +1,29 @@
 #include "globals.h"
 
+mod_t *mod_lst = NULL;
+opt_cli_t opt_cli_mem;
+re5_server config;
+main_cfg_t *mcfg = NULL;
+int pidFilehandle = 0;
+float k_limit_min;
+int day_of_payment;
+char billing_day[2];
+unsigned short get_cdrs_mode;
+unsigned long rates_per_bplan;
+unsigned int sim_calls;
+unsigned int call_maxsec_limit;
+char loop_flag;
+unsigned int caching_refresh;
+unsigned short call_control_flag;
+unsigned int console_call_id;
+unsigned short rating_flag;
+char cdr_storage_sched_ts[64];
+unsigned short get_cdrs_flag;
+unsigned short demonize;
+unsigned int log_max_file_size;
+char log_separator;
+unsigned short log_debug_level;
+
 void init_globals(void)
 {
 	get_cdrs_flag = 0;

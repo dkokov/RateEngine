@@ -203,7 +203,7 @@ int cdr_get_cdr_id(db_t *dbp,cdr_t *the_cdr);
 cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig);
 void cdr_update_cdr(db_t *dbp,int rating_id,int cdr_id,char leg,char *call_uid);
 
-cdr_table_t *cdr_tbl_cpy_ptr;
+extern cdr_table_t *cdr_tbl_cpy_ptr;
 
 /* *** end *** */
 #endif
