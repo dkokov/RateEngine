@@ -16,7 +16,7 @@ typedef struct meminfo {
 } meminfo_t;
 
 #ifdef DEBUG_MEM
-	meminfo_t memstat;
+	extern meminfo_t memstat;
 	
 	#define MEM_MSIZE_DEC(mem) memstat.m_size = memstat.m_size - mem;
 	

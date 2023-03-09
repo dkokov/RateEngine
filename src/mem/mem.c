@@ -4,6 +4,8 @@
 
 #include "mem.h"
 
+meminfo_t memstat;
+
 void mem_info_clear(void)
 {
 #if DEBUG_MEM
