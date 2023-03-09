@@ -4,11 +4,10 @@
     <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
  <LoadModules>
-	 <module file="redis.so" />
-	 <module file="pgsql.so" />
-	 <module file="mysql.so" />
-	 <module file="cdrm.so" />
-	 <module file="rt.so" />
+    <param name="module" value="redis.so" />
+    <param name="module" value="pgsql.so" />
+    <param name="module" value="cdrm.so" />
+    <param name="module" value="rt.so" />
  </LoadModules>
  <DB>
     <!-- pgsql,mysql,redis -->
