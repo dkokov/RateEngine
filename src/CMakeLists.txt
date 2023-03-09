@@ -1,0 +1,20 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
+
+PROJECT (RateEngine7)
+
+set(CMAKE_C_COMPILER "/usr/bin/gcc")
+
+OPTION(RE7_USE_CDRMediator    "CDRMediator" ON)
+OPTION(RE7_USE_Rating                  "Rating" ON)
+OPTION(RE7_USE_CallControl         "CallControl" OFF)
+OPTION(RE7_USE_DBPgSQL           "PgSQL" ON)
+OPTION(RE7_USE_DBMySQL           "MySQL" OFF)
+OPTION(SEMS_USE_TTS           "Build with Text-to-speech support (requires Flite)" OFF)
+OPTION(SEMS_USE_OPENSSL       "Build with OpenSSL" ON)
+OPTION(SEMS_USE_MONITORING    "Build with monitoring support" ON)
+OPTION(SEMS_USE_IPV6          "Build with IPv6 support" OFF)
+OPTION(SEMS_USE_GTEST         "Build with googletest" ON)
+OPTION(SEMS_USE_AMARG_STAT    "Use AmArg statistic" OFF)
+OPTION(USE_SYSTEMD            "Use systemd instead of SysV" ON)
+OPTION(USE_ADDRESS_SANITIZER  "Use address sanitizer gcc option" OFF)
+OPTION(USE_OBJECTS_COUNTERS   "Use objects counters in AmStatistics" ON)
