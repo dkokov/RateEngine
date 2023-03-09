@@ -107,7 +107,7 @@ void *mod_load_module(char *path)
 //void mod_destroy_module(void *handle)
 void mod_destroy_module(mod_t *mod_ptr)
 {
-	int (*fptr)(void);
+//	int (*fptr)(void);
 	/*
 	if(mod_ptr->destroy != NULL) {
 		fptr = mod_ptr->destroy;
@@ -206,21 +206,18 @@ int mod_load_modules(char *dirname)
 	
 		if(cfg->doc != NULL) {
 			cfg->root = xml_cfg_root(cfg->doc);
-	
 			if(cfg->root != NULL) {
 				cfg->node = xml_cfg_node_init();
 
 				strcpy(cfg->node->node_name,"LoadModules");
-				
 				xml_cfg_params_get(cfg->root,cfg->node);
 				
 				params = cfg->node->params;
-	
+
 				while(params != NULL) {
 					if(strcmp(params->name,"module") == 0) {							
 						memset(path,0,512);
 						sprintf(path,"%s%s",dirname,params->value);
-						
 						handle = mod_load_module(path);
 						if(handle) {
 							ptr = mod_init();
@@ -266,7 +263,7 @@ int mod_load_modules(char *dirname)
 		
 					params = params->next_param;
 				}
-	
+
 				xml_cfg_params_free(cfg->node->params);
 				
 				mem_free(cfg->node);

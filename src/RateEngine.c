@@ -68,8 +68,6 @@ int cli_opts_parser(int arg_num, char *arg_arr[])
 		}		
 		
 		if((!strcmp(arg_arr[i],"--debug"))) {
-
-			
 			opt_cli_mem.debug = atoi(arg_arr[i+1]);
 		}
 				
@@ -174,7 +172,7 @@ int main(int argc, char *argv[])
 
     /* Get main config from xml file */
     mcfg = main_cfg_main(opt_cli_mem.cfgfile);
-    
+
     if(mcfg != NULL) {
 		/* Init parameters for logging */
 		init_log_params();
@@ -196,10 +194,10 @@ int main(int argc, char *argv[])
 
 	/* Load RateEngine's modules */
 	memset(mod_dir,0,sizeof(mod_dir));
-	
+
 	if(strlen(mcfg->system_dir) > 0) sprintf(mod_dir,"%smodules/",mcfg->system_dir);
 	else strcpy(mod_dir,MODF);
-	
+
 	mod_load_modules(mod_dir);
 	if(mod_lst == NULL) {
 		LOG("RateEngine","The 'mod_lst' is empty - don't load modules !!!");
