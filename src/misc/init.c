@@ -1,13 +1,13 @@
 #include "globals.h"
 
 mod_t *mod_lst = NULL;
-opt_cli_t opt_cli_mem;
-re5_server config;
 main_cfg_t *mcfg = NULL;
 int pidFilehandle = 0;
 float k_limit_min;
 int day_of_payment;
 char billing_day[2];
+opt_cli_t opt_cli_mem;
+re5_server config;
 unsigned short get_cdrs_mode;
 unsigned long rates_per_bplan;
 unsigned int sim_calls;
