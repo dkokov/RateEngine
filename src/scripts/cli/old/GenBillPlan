@@ -1,0 +1,110 @@
+#!/usr/bin/php -q
+<?php
+
+function config1_template($bill_plan,$start,$end)
+{
+    printf(";+ BillPlan Settings \n");
+    printf('1,"%s",,%d,%d',$bill_plan,$start,$end);
+    printf("\n;+\n");
+}
+
+function config2_template($prefix,$prefix_comm,$tariff,$free_billsec,$tc,$start,$end)
+{
+    printf(";++ Rate Settings \n");
+    printf('2,%s,"%s","%s",%d,"%s",%d,%d',$prefix,$prefix_comm,$tariff,$free_billsec,$tc,$start,$end);
+    printf("\n;++\n");
+}
+
+function config2b_template($pos,$fee,$delta,$iterations)
+{
+    printf(";+++ Tariff Settings \n");
+    printf('*,%d,%f,%d,%d',$pos,$fee,$delta,$iterations);
+    printf("\n;+++\n");
+}
+
+function config3_template($bacc,$leg,$curr,$rmode,$racc,$cdr_server_id)
+{
+    printf(";+ Billing&Rating Account Settings \n");
+    printf('3,"%s",%s,%d,%d,"%s",%d',$bacc,$leg,$curr,$rmode,$racc,$cdr_server_id);
+    printf("\n;+\n");
+}
+
+function config4_template($ptype,$pstatus,$amount,$start,$end)
+{
+    printf(";+ Payment Card Settings \n");
+    printf('4,"%s",%d,%f,"%s","%s"',$ptype,$pstatus,$amount,$start,$end);
+    printf("\n;+\n");
+}
+
+/*
+;
+; 1,"BillPlan","BillPlanType",start_period,end_period
+    - BillPlanType can be used "postpaid" or "prepaid"
+;
+; 2,prefix,prefix_desc,tariff_name,bill_freesec,time_condition_id,start_period,end_period
+; *,pos,fee,delta_time,iterations
+;
+; 3,billing_account,leg,currency_id,rating_mode_id,rating_account,cdr_server_id
+;
+; 4,pcard_type,pcard_status,amount,start_date,end_date
+;
+; 5,bill_plan_tree(name),bill_plan....
+;
+; currency_id :
+;  1 => bg(лв.)
+;  2 => euro
+;
+; rating_mode_id :
+;   1 => calling_number
+;   2 => account_code
+;   3 => src_context
+;   4 => dst_context
+;   5 => src_tgroup
+;   6 => dst_tgroup
+;
+1,"GCN-FreeCalls",,0,0
+2,35924200,"ГКН София","безплатни",0,,
+*,1,0.00,1,,
+2,35958520,"ГКН Добрич","безплатни",0,,
+2,35952920,"ГКН Варна","безплатни",0,,
+2,35954930,"ГКН Шумен","безплатни",0,,
+2,35960170,"ГКН Търговище","безплатни",0,,
+2,35964920,"ГКН Плевен","безплатни",0,,
+2,35956930,"ГКН Бургас","безплатни",0,,
+2,35970032,"ГКН 0700","безплатни - негеографски (0700)",0,,
+2,359800,"0800","безплатни - негеографски (0800)",0,,
+2,112,"спешен кратък номер 112","безплатни",0,,
+2,150,"спешен кратък номер 150","безплатни",0,,
+2,160,"спешен кратък номер 160","безплатни",0,,
+2,166,"спешен кратък номер 166","безплатни",0,,
+;
+1,"Mobile-Standart",,1317416400,1325368799
+2,35987,,"мобилни-стандарт",0,,
+*,1,0.10,30,1
+*,2,0.0033,1,,
+2,35988,,"мобилни-стандарт",0,,
+2,35989,,"мобилни-стандарт",0,,
+;
+1,"SF-Standart",,1317416400,1325368799
+2,3592,"","селищни-стандарт",0,,
+*,1,0.015,30,1,
+*,2,0.0005,1,,
+2,359700,"","негеографски (0700)",0,,
+*,1,0.025,30,1,
+*,2,0.00083,1,,
+2,359,,"междуселищни-стандарт",0,,
+*,1,0.025,30,1,
+*,2,0.00083,1,,
+5,"GCN-FreeCalls","Mobile-Standart"
+;
+3,"Димитър Петров Коков",a,1,1,"35924200599",3
+4,"credit","active",50.00,"2011-10-01","2011-12-31"
+*/
+
+    config1_template("Test",0,0);
+    config2_template("3592","","test",0,"",0,0);
+    config2b_template(1,0.09,30,1);
+    config2b_template(2,0.0033,1,0);
+    config3_template("VivaTel","a+b",1,4,"vivatel",1);
+    config4_template("debit",1,50.00,"2011-11-01","");
+?>
