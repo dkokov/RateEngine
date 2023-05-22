@@ -14,7 +14,7 @@ typedef struct cc_server {
 
 }cc_server_t;
 
-cc_server_t ccserver;
+extern cc_server_t ccserver;
 
 typedef struct cc_server_tbl {
 	
@@ -23,8 +23,8 @@ typedef struct cc_server_tbl {
 	
 }cc_server_tbl_t;
 
-cc_server_tbl_t *cc_tbl;
-pthread_mutex_t cc_tbl_lock;
+extern cc_server_tbl_t *cc_tbl;
+extern pthread_mutex_t cc_tbl_lock;
 //pthread_t ccserver_proc;
 
 void cc_server_main(void);
@@ -35,7 +35,7 @@ void cc_server_call_term(cc_server_tbl_t *tbl,cc_t *cc_ptr);
 
 #define CC_SERVER_USLEEP 50000
 
-unsigned short cc_server_sim;
+extern unsigned short cc_server_sim;
 
 #define CALL_MAXSEC_LIMIT 3660
 #define CALL_MAXSEC_LIMIT_WAIT 90

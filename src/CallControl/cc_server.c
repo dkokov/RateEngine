@@ -11,6 +11,11 @@
 
 #include <unistd.h>
 
+cc_server_t ccserver;
+cc_server_tbl_t *cc_tbl;
+pthread_mutex_t cc_tbl_lock;
+unsigned short cc_server_sim;
+
 cc_server_tbl_t *cc_server_tbl_init(int sim)
 {
 	cc_server_tbl_t *tbl;

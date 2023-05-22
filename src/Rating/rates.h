@@ -4,7 +4,7 @@
 #define RATES_BPLAN_TBL_NUM 20
 #define RATES_SHMEM_KEY 5768
 
-pthread_mutex_t cache_tbl_lock;
+extern pthread_mutex_t cache_tbl_lock;
 
 typedef struct rates_cache_tbl
 {

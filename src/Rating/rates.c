@@ -5,6 +5,7 @@
 
 #include "rates.h"
 
+pthread_mutex_t cache_tbl_lock;
 rates_cache_tbl cache_bplan_rates_tbl[RATES_BPLAN_TBL_NUM];
 
 void rates_cache_tbl_free(void)
