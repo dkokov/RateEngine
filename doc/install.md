@@ -4,56 +4,34 @@
 
 |lib|using|
 |---|---|
-|json-c|always|
 |libxml2|always|
 |libpq|if you want to use PGSQL/compile pgsql.so|
-|libmysqlclient|if you want to use MYSQL/compile mysql.so|
+
 
 **You have to install devel version of these libs!!!**
 
 RedHat/CentOS/Fedora :
 ```
-yum install libxml2-devel libjson-c-devel
+yum install libxml2-devel
 or
-dnf install libxml2-devel libjson-c-devel
+dnf install libxml2-devel
 ```
 
 Debian :
 ```
-apt-get install libxml2-dev libjson-c-dev
+apt-get install libxml2-dev libpq-dev
 ```
 
 
 #### Installation steps are follow:
 
 ``` 
-git clone https://github.com/dkokov/RateEngine.git
+git clone -b 0.6.14 https://github.com/dkokov/RateEngine.git
 ```
 
 main source directory:
 ```
 cd RateEngine/src/
-```
-
-edit 'config.md' file - comment/uncomment names by modules:
-```
-vim config.md
-```
-
-The same file examines such:
-```
-mod/CDRMediator
-mod/Rating
-#mod/CallControl
-mod/db_pgsql
-mod/db_mysql
-mod/db_redis
-#mod/tcp
-#mod/udp
-#mod/sctp
-#mod/tls
-mod/my_cc
-#mod/json_rpc[
 ```
 
 compile core and modules,install in default path(/usr/local/RateEngine/)
@@ -80,7 +58,7 @@ cd /usr/local/RateEngine/scripts/sql/
 
 If you want to use PGSQL,should start follow:
 ```
-psql -h localhost -U youruser yourdbname -f rate_engine.sql
+psql -h localhost -U youruser yourdbname -f rate_engine_0.6.10.sql
 ```
 
 #### Start/stop script:

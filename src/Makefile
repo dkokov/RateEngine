@@ -17,12 +17,19 @@
 #
 #       2018-03-24, add make option 'CC_LOOP=1/0' for GCC option '-DCC_NOLOOP' 
 #
+#	2023-05-20, add 'xml-config' and 'pg_config' to get 'xml2' and 'pq' pathes for 'include' files
 
 SHELL = /bin/sh
 CC    = gcc
 
+XML2_CFLAGS = $(shell xml2-config --cflags)
+
+#PGSQL_DIR="/usr/include/"
+PGSQL_DIR=$(shell pg_config --includedir)
+PGSQL_H= $(PGSQL_DIR)
+
 FLAGS   = -Wall
-CFLAGS  = -fPIC -Ofast
+CFLAGS  = -fPIC -Ofast $(XML2_CFLAGS) -I$(PGSQL_H)
 LDFLAGS = -shared
 LDLIBS  = -lpq
 
@@ -68,8 +75,6 @@ ifeq ($(CC_NOLOOP),1)
 	CFLAGS += -DCC_NOLOOP
 endif
 
-PGSQL_DIR="/usr/include/"
-PGSQL_H=$(PGSQL_DIR)"libpq-fe.h"
 
 #ifeq ($(PGSQL_H),)
 #    echo "DEBUG TEST"
