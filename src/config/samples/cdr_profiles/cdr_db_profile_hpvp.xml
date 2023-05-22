@@ -1,7 +1,7 @@
 <CDRProfile>
   <General>
     <param name="profile-version" value="1" />
-    <param name="profile-name" value="hpvp" />
+    <param name="profile-name" value="profile1" />
     <param name="active" value="yes" />
     <!-- Thread parameters -->
     <param name="getCDRsInterval" value="600" />
@@ -12,10 +12,10 @@
     <!-- file,db -->
     <param name="cdr-type" value="db" />
     <!-- Get CDR 'db' config -->
-    <param name="dbhost" value="46.47.127.60" />
-    <param name="dbuser" value="global" />
-    <param name="dbpass" value="_cfg.access" />
-    <param name="dbname" value="hpvp" />
+    <param name="dbhost" value="dbhost" />
+    <param name="dbuser" value="dbuser" />
+    <param name="dbpass" value="dbpass" />
+    <param name="dbname" value="dbname" />
     <!-- DB type (pgsql,mysql,oracle) -->
     <param name="dbtype" value="pgsql" />
     <!-- SQL Query into the remote db server -->
@@ -60,9 +60,9 @@
 	<param name="billusec" value="" />
   </CDRFormat>
   <PrefixFiltering>
-    <filter prefix="2" num="1" replace="359429372" len="3" />
-    <filter prefix="4" num="1" replace="359241194" len="3" />
-    <filter prefix="6" num="1" replace="359241196" len="3" />
-    <filter prefix="9" num="1" replace="359241199" len="3" />
+    <filter prefix="2" num="1" replace="3592" len="3" />
+    <filter prefix="4" num="1" replace="3594" len="3" />
+    <filter prefix="6" num="1" replace="3596" len="3" />
+    <filter prefix="9" num="1" replace="3599" len="3" />
   </PrefixFiltering>
 </CDRProfile>
