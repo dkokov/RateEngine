@@ -1,4 +1,0 @@
-mkfifo /var/spool/postfix/public/pickup
-ps aux | grep mail
-kill [insert process number]
-sudo /etc/init.d/postfix restart
