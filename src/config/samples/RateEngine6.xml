@@ -2,7 +2,7 @@
  <System>
     <param name="DIR" value="/usr/local/RateEngine/" />
     <param name="PIDFile" value="logs/rate_engine_6.pid" />
-    <param name="DBVersion" value="0.6.10(devel)" />
+    <param name="DBVersion" value="0.6.10(beta)" />
  </System>
  <DB>
     <param name="dbhost" value="your_hostname" />
