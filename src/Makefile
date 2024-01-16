@@ -18,6 +18,8 @@
 #       2018-03-24, add make option 'CC_LOOP=1/0' for GCC option '-DCC_NOLOOP' 
 #
 #	2023-05-20, add 'xml-config' and 'pg_config' to get 'xml2' and 'pq' pathes for 'include' files
+#	2024-01-16, change install and uninstall procedures
+#
 
 SHELL = /bin/sh
 CC    = gcc
@@ -259,7 +261,11 @@ install: RateEngine
 	    mkdir -p $(CFG); \
 	    cp -vR $(SMP) $(CFG);\
 	else \
-	    cp -vfR $(_SMP) $(CFG);\
+	    if [ -z "$(ls -A $CFG)" ]; then \
+		cp -vR $(SMP) $(CFG); \
+	    else \
+		cp -vfR $(_SMP) $(CFG); \
+	    fi \
 	fi
 	@if [ ! -d $(LOG) ]; then \
 	    mkdir -p $(LOG); \
@@ -272,8 +278,20 @@ install: RateEngine
 
 .PHONY: uninstall
 uninstall:
-	@if [ -d $(PREFIX) ]; then \
-	    rm -fvR $(PREFIX); \
+	@if [ -d $(PREFIX)/bin ]; then \
+	    rm -fvR $(PREFIX)/bin; \
+	fi
+	@if [ -d $(PREFIX)/config ]; then \
+	    rm -fvR $(PREFIX)/config/*; \
+	fi
+	@if [ -d $(PREFIX)/logs ]; then \
+	    rm -fvR $(PREFIX)/logs/*; \
+	fi
+	@if [ -d $(PREFIX)/libs ]; then \
+	    rm -fvR $(PREFIX)/libs; \
+	fi
+	@if [ -d $(PREFIX)/scripts ]; then \
+	    rm -fvR $(PREFIX)/scripts; \
 	fi
 	@if [ -f $(LIBS_CFG) ]; then \
 	    rm -fv $(LIBS_CFG); \
