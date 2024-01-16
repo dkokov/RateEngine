@@ -2616,7 +2616,7 @@ CREATE INDEX leg_a_ind ON cdrs USING btree (leg_a);
 -- Name: leg_a_ind_v2; Type: INDEX; Schema: public; Owner: global
 --
 
-CREATE INDEX leg_a_ind_v2 ON cdrs_v2 USING btree (leg_a);
+--CREATE INDEX leg_a_ind_v2 ON cdrs_v2 USING btree (leg_a);
 
 
 --
@@ -2630,7 +2630,7 @@ CREATE INDEX leg_b_ind ON cdrs USING btree (leg_b);
 -- Name: leg_b_ind_v2; Type: INDEX; Schema: public; Owner: global
 --
 
-CREATE INDEX leg_b_ind_v2 ON cdrs_v2 USING btree (leg_b);
+--CREATE INDEX leg_b_ind_v2 ON cdrs_v2 USING btree (leg_b);
 
 
 --
