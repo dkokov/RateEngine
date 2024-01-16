@@ -259,7 +259,11 @@ install: RateEngine
 	    mkdir -p $(CFG); \
 	    cp -vR $(SMP) $(CFG);\
 	else \
-	    cp -vfR $(_SMP) $(CFG);\
+	    if [ -z "$(ls -A $CFG)" ]; then \
+		cp -vR $(SMP) $(CFG); \
+	    else \
+		cp -vfR $(_SMP) $(CFG); \
+	    fi \
 	fi
 	@if [ ! -d $(LOG) ]; then \
 	    mkdir -p $(LOG); \
