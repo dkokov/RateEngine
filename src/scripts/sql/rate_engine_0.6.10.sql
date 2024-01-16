@@ -520,62 +520,62 @@ ALTER TABLE cdr_storage_sched OWNER TO global;
 -- Name: cdrs_id_seq; Type: SEQUENCE; Schema: public; Owner: global
 --
 
-CREATE SEQUENCE cdrs_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+--CREATE SEQUENCE cdrs_id_seq
+--    START WITH 1
+--    INCREMENT BY 1
+--    NO MINVALUE
+--    NO MAXVALUE
+--    CACHE 1;
 
 
-ALTER TABLE cdrs_id_seq OWNER TO global;
+--ALTER TABLE cdrs_id_seq OWNER TO global;
 
 --
 -- Name: cdrs; Type: TABLE; Schema: public; Owner: global
 --
 
-CREATE TABLE cdrs (
-    id integer DEFAULT nextval('cdrs_id_seq'::regclass) NOT NULL,
-    cdr_server_id integer NOT NULL,
-    call_uid character varying(128) NOT NULL,
-    leg_a integer DEFAULT 0 NOT NULL,
-    leg_b integer DEFAULT 0 NOT NULL,
-    ts timestamp with time zone NOT NULL,
-    src character varying(80),
-    dst character varying(80) NOT NULL,
-    prefix_filter_id integer,
-    calling_number character varying(80),
-    called_number character varying(80) NOT NULL,
-    clg_nadi integer DEFAULT 0 NOT NULL,
-    cld_nadi integer DEFAULT 0 NOT NULL,
-    presentation integer DEFAULT 0 NOT NULL,
-    screen integer DEFAULT 0 NOT NULL,
-    "clg-type" character varying(32),
-    "cld-type" character varying(32),
-    src_context character varying(80),
-    dst_context character varying(80),
-    billsec integer NOT NULL,
-    duration integer NOT NULL,
-    incoming_channel character varying(128),
-    outgoing_channel character varying(128),
-    incoming_codec character varying(16),
-    outgoing_codec character varying(16),
-    account_code character varying(80),
-    src_tgroup character varying(80),
-    dst_tgroup character varying(80),
-    uduration bigint DEFAULT (0)::bigint NOT NULL,
-    billusec bigint DEFAULT (0)::bigint NOT NULL,
-    epoch integer
-);
+--CREATE TABLE cdrs (
+--    id integer DEFAULT nextval('cdrs_id_seq'::regclass) NOT NULL,
+--    cdr_server_id integer NOT NULL,
+--    call_uid character varying(128) NOT NULL,
+--    leg_a integer DEFAULT 0 NOT NULL,
+--    leg_b integer DEFAULT 0 NOT NULL,
+--    ts timestamp with time zone NOT NULL,
+--   src character varying(80),
+--    dst character varying(80) NOT NULL,
+--    prefix_filter_id integer,
+--    calling_number character varying(80),
+--    called_number character varying(80) NOT NULL,
+--    clg_nadi integer DEFAULT 0 NOT NULL,
+--    cld_nadi integer DEFAULT 0 NOT NULL,
+--    presentation integer DEFAULT 0 NOT NULL,
+--    screen integer DEFAULT 0 NOT NULL,
+--   "clg-type" character varying(32),
+--    "cld-type" character varying(32),
+--    src_context character varying(80),
+--    dst_context character varying(80),
+--    billsec integer NOT NULL,
+--    duration integer NOT NULL,
+--    incoming_channel character varying(128),
+--    outgoing_channel character varying(128),
+--    incoming_codec character varying(16),
+--    outgoing_codec character varying(16),
+--    account_code character varying(80),
+--    src_tgroup character varying(80),
+--    dst_tgroup character varying(80),
+--    uduration bigint DEFAULT (0)::bigint NOT NULL,
+--    billusec bigint DEFAULT (0)::bigint NOT NULL,
+--    epoch integer
+--);
 
 
-ALTER TABLE cdrs OWNER TO global;
+--ALTER TABLE cdrs OWNER TO global;
 
 --
 -- Name: cdrs_v2; Type: TABLE; Schema: public; Owner: global
 --
 
-CREATE TABLE cdrs_v2 (
+CREATE TABLE cdrs (
     id integer NOT NULL,
     cdr_server_id integer NOT NULL,
     cdr_rec_type_id integer DEFAULT 0,
@@ -611,13 +611,13 @@ CREATE TABLE cdrs_v2 (
 );
 
 
-ALTER TABLE cdrs_v2 OWNER TO global;
+ALTER TABLE cdrs OWNER TO global;
 
 --
 -- Name: cdrs_v2_id_seq; Type: SEQUENCE; Schema: public; Owner: global
 --
 
-CREATE SEQUENCE cdrs_v2_id_seq
+CREATE SEQUENCE cdrs_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -625,13 +625,13 @@ CREATE SEQUENCE cdrs_v2_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdrs_v2_id_seq OWNER TO global;
+ALTER TABLE cdrs_id_seq OWNER TO global;
 
 --
 -- Name: cdrs_v2_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
 --
 
-ALTER SEQUENCE cdrs_v2_id_seq OWNED BY cdrs_v2.id;
+ALTER SEQUENCE cdrs_id_seq OWNED BY cdrs.id;
 
 
 --
