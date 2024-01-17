@@ -2680,8 +2680,8 @@ CREATE INDEX tree_root_id_ind ON bill_plan_tree USING btree (root_bplan_id);
 --
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-REVOKE ALL ON SCHEMA public FROM postgres;
-GRANT ALL ON SCHEMA public TO postgres;
+REVOKE ALL ON SCHEMA public FROM re_admin;
+GRANT ALL ON SCHEMA public TO re_admin;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
