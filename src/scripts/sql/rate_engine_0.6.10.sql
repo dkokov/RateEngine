@@ -44,7 +44,7 @@ CREATE TABLE account_code (
 );
 
 
-ALTER TABLE account_code OWNER TO global;
+ALTER TABLE account_code OWNER TO re_admin;
 
 --
 -- Name: acc_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -58,7 +58,7 @@ CREATE SEQUENCE acc_id_seq
     CACHE 1;
 
 
-ALTER TABLE acc_id_seq OWNER TO global;
+ALTER TABLE acc_id_seq OWNER TO re_admin;
 
 --
 -- Name: acc_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -78,7 +78,7 @@ CREATE TABLE account_code_deff (
 );
 
 
-ALTER TABLE account_code_deff OWNER TO global;
+ALTER TABLE account_code_deff OWNER TO re_admin;
 
 --
 -- Name: bal_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -92,7 +92,7 @@ CREATE SEQUENCE bal_id_seq
     CACHE 1;
 
 
-ALTER TABLE bal_id_seq OWNER TO global;
+ALTER TABLE bal_id_seq OWNER TO re_admin;
 
 --
 -- Name: balance; Type: TABLE; Schema: public; Owner: global
@@ -110,7 +110,7 @@ CREATE TABLE balance (
 );
 
 
-ALTER TABLE balance OWNER TO global;
+ALTER TABLE balance OWNER TO re_admin;
 
 --
 -- Name: bill_plan; Type: TABLE; Schema: public; Owner: global
@@ -125,7 +125,7 @@ CREATE TABLE bill_plan (
 );
 
 
-ALTER TABLE bill_plan OWNER TO global;
+ALTER TABLE bill_plan OWNER TO re_admin;
 
 --
 -- Name: bill_plan_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -139,7 +139,7 @@ CREATE SEQUENCE bill_plan_id_seq
     CACHE 1;
 
 
-ALTER TABLE bill_plan_id_seq OWNER TO global;
+ALTER TABLE bill_plan_id_seq OWNER TO re_admin;
 
 --
 -- Name: bill_plan_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -159,7 +159,7 @@ CREATE TABLE bill_plan_tree (
 );
 
 
-ALTER TABLE bill_plan_tree OWNER TO global;
+ALTER TABLE bill_plan_tree OWNER TO re_admin;
 
 --
 -- Name: bill_plan_tree_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -173,7 +173,7 @@ CREATE SEQUENCE bill_plan_tree_id_seq
     CACHE 1;
 
 
-ALTER TABLE bill_plan_tree_id_seq OWNER TO global;
+ALTER TABLE bill_plan_tree_id_seq OWNER TO re_admin;
 
 --
 -- Name: bill_plan_tree_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -192,7 +192,7 @@ CREATE TABLE bill_plan_type (
 );
 
 
-ALTER TABLE bill_plan_type OWNER TO global;
+ALTER TABLE bill_plan_type OWNER TO re_admin;
 
 --
 -- Name: billing_account; Type: TABLE; Schema: public; Owner: global
@@ -210,7 +210,7 @@ CREATE TABLE billing_account (
 );
 
 
-ALTER TABLE billing_account OWNER TO global;
+ALTER TABLE billing_account OWNER TO re_admin;
 
 --
 -- Name: billing_account_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -224,7 +224,7 @@ CREATE SEQUENCE billing_account_id_seq
     CACHE 1;
 
 
-ALTER TABLE billing_account_id_seq OWNER TO global;
+ALTER TABLE billing_account_id_seq OWNER TO re_admin;
 
 --
 -- Name: billing_account_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -245,7 +245,7 @@ CREATE SEQUENCE binding_id_seq
     CACHE 1;
 
 
-ALTER TABLE binding_id_seq OWNER TO global;
+ALTER TABLE binding_id_seq OWNER TO re_admin;
 
 --
 -- Name: binding_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -268,7 +268,7 @@ CREATE TABLE calc_function (
 );
 
 
-ALTER TABLE calc_function OWNER TO global;
+ALTER TABLE calc_function OWNER TO re_admin;
 
 --
 -- Name: clg_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -282,7 +282,7 @@ CREATE SEQUENCE clg_id_seq
     CACHE 1;
 
 
-ALTER TABLE clg_id_seq OWNER TO global;
+ALTER TABLE clg_id_seq OWNER TO re_admin;
 
 --
 -- Name: calling_number; Type: TABLE; Schema: public; Owner: global
@@ -295,7 +295,7 @@ CREATE TABLE calling_number (
 );
 
 
-ALTER TABLE calling_number OWNER TO global;
+ALTER TABLE calling_number OWNER TO re_admin;
 
 --
 -- Name: clg_deff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -309,7 +309,7 @@ CREATE SEQUENCE clg_deff_id_seq
     CACHE 1;
 
 
-ALTER TABLE clg_deff_id_seq OWNER TO global;
+ALTER TABLE clg_deff_id_seq OWNER TO re_admin;
 
 --
 -- Name: calling_number_deff; Type: TABLE; Schema: public; Owner: global
@@ -323,7 +323,7 @@ CREATE TABLE calling_number_deff (
 );
 
 
-ALTER TABLE calling_number_deff OWNER TO global;
+ALTER TABLE calling_number_deff OWNER TO re_admin;
 
 --
 -- Name: cdr_dbstorage; Type: TABLE; Schema: public; Owner: global
@@ -341,7 +341,7 @@ CREATE TABLE cdr_dbstorage (
 );
 
 
-ALTER TABLE cdr_dbstorage OWNER TO global;
+ALTER TABLE cdr_dbstorage OWNER TO re_admin;
 
 --
 -- Name: cdr_dbstorage_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -355,7 +355,7 @@ CREATE SEQUENCE cdr_dbstorage_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdr_dbstorage_id_seq OWNER TO global;
+ALTER TABLE cdr_dbstorage_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdr_dbstorage_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -376,7 +376,7 @@ CREATE TABLE cdr_files (
 );
 
 
-ALTER TABLE cdr_files OWNER TO global;
+ALTER TABLE cdr_files OWNER TO re_admin;
 
 --
 -- Name: cdr_files_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -390,7 +390,7 @@ CREATE SEQUENCE cdr_files_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdr_files_id_seq OWNER TO global;
+ALTER TABLE cdr_files_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdr_files_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -409,7 +409,7 @@ CREATE TABLE cdr_get_mode (
 );
 
 
-ALTER TABLE cdr_get_mode OWNER TO global;
+ALTER TABLE cdr_get_mode OWNER TO re_admin;
 
 --
 -- Name: cdr_mode_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -423,7 +423,7 @@ CREATE SEQUENCE cdr_mode_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdr_mode_id_seq OWNER TO global;
+ALTER TABLE cdr_mode_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdr_mode_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -443,7 +443,7 @@ CREATE TABLE cdr_profiles (
 );
 
 
-ALTER TABLE cdr_profiles OWNER TO global;
+ALTER TABLE cdr_profiles OWNER TO re_admin;
 
 --
 -- Name: cdr_profiles_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -457,7 +457,7 @@ CREATE SEQUENCE cdr_profiles_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdr_profiles_id_seq OWNER TO global;
+ALTER TABLE cdr_profiles_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdr_profiles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -478,7 +478,7 @@ CREATE TABLE cdr_servers (
 );
 
 
-ALTER TABLE cdr_servers OWNER TO global;
+ALTER TABLE cdr_servers OWNER TO re_admin;
 
 --
 -- Name: cdr_servers_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -492,7 +492,7 @@ CREATE SEQUENCE cdr_servers_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdr_servers_id_seq OWNER TO global;
+ALTER TABLE cdr_servers_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdr_servers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -514,7 +514,7 @@ CREATE TABLE cdr_storage_sched (
 );
 
 
-ALTER TABLE cdr_storage_sched OWNER TO global;
+ALTER TABLE cdr_storage_sched OWNER TO re_admin;
 
 --
 -- Name: cdrs_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -528,7 +528,7 @@ ALTER TABLE cdr_storage_sched OWNER TO global;
 --    CACHE 1;
 
 
---ALTER TABLE cdrs_id_seq OWNER TO global;
+--ALTER TABLE cdrs_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdrs; Type: TABLE; Schema: public; Owner: global
@@ -569,7 +569,7 @@ ALTER TABLE cdr_storage_sched OWNER TO global;
 --);
 
 
---ALTER TABLE cdrs OWNER TO global;
+--ALTER TABLE cdrs OWNER TO re_admin;
 
 --
 -- Name: cdrs_v2; Type: TABLE; Schema: public; Owner: global
@@ -611,7 +611,7 @@ CREATE TABLE cdrs (
 );
 
 
-ALTER TABLE cdrs OWNER TO global;
+ALTER TABLE cdrs OWNER TO re_admin;
 
 --
 -- Name: cdrs_v2_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -625,7 +625,7 @@ CREATE SEQUENCE cdrs_id_seq
     CACHE 1;
 
 
-ALTER TABLE cdrs_id_seq OWNER TO global;
+ALTER TABLE cdrs_id_seq OWNER TO re_admin;
 
 --
 -- Name: cdrs_v2_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -646,7 +646,7 @@ CREATE SEQUENCE clg_deff__id_seq
     CACHE 1;
 
 
-ALTER TABLE clg_deff__id_seq OWNER TO global;
+ALTER TABLE clg_deff__id_seq OWNER TO re_admin;
 
 --
 -- Name: credit_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -660,7 +660,7 @@ CREATE SEQUENCE credit_id_seq
     CACHE 1;
 
 
-ALTER TABLE credit_id_seq OWNER TO global;
+ALTER TABLE credit_id_seq OWNER TO re_admin;
 
 --
 -- Name: curr_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -674,7 +674,7 @@ CREATE SEQUENCE curr_id_seq
     CACHE 1;
 
 
-ALTER TABLE curr_id_seq OWNER TO global;
+ALTER TABLE curr_id_seq OWNER TO re_admin;
 
 --
 -- Name: currency; Type: TABLE; Schema: public; Owner: global
@@ -687,7 +687,7 @@ CREATE TABLE currency (
 );
 
 
-ALTER TABLE currency OWNER TO global;
+ALTER TABLE currency OWNER TO re_admin;
 
 --
 -- Name: dbstorage_type; Type: TABLE; Schema: public; Owner: global
@@ -699,7 +699,7 @@ CREATE TABLE dbstorage_type (
 );
 
 
-ALTER TABLE dbstorage_type OWNER TO global;
+ALTER TABLE dbstorage_type OWNER TO re_admin;
 
 --
 -- Name: dbtype_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -713,7 +713,7 @@ CREATE SEQUENCE dbtype_id_seq
     CACHE 1;
 
 
-ALTER TABLE dbtype_id_seq OWNER TO global;
+ALTER TABLE dbtype_id_seq OWNER TO re_admin;
 
 --
 -- Name: dbtype_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -734,7 +734,7 @@ CREATE SEQUENCE debit_id_seq
     CACHE 1;
 
 
-ALTER TABLE debit_id_seq OWNER TO global;
+ALTER TABLE debit_id_seq OWNER TO re_admin;
 
 --
 -- Name: dst__deff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -748,7 +748,7 @@ CREATE SEQUENCE dst__deff_id_seq
     CACHE 1;
 
 
-ALTER TABLE dst__deff_id_seq OWNER TO global;
+ALTER TABLE dst__deff_id_seq OWNER TO re_admin;
 
 --
 -- Name: dst_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -762,7 +762,7 @@ CREATE SEQUENCE dst_id_seq
     CACHE 1;
 
 
-ALTER TABLE dst_id_seq OWNER TO global;
+ALTER TABLE dst_id_seq OWNER TO re_admin;
 
 --
 -- Name: dst_context; Type: TABLE; Schema: public; Owner: global
@@ -775,7 +775,7 @@ CREATE TABLE dst_context (
 );
 
 
-ALTER TABLE dst_context OWNER TO global;
+ALTER TABLE dst_context OWNER TO re_admin;
 
 --
 -- Name: dst_context_deff; Type: TABLE; Schema: public; Owner: global
@@ -788,7 +788,7 @@ CREATE TABLE dst_context_deff (
 );
 
 
-ALTER TABLE dst_context_deff OWNER TO global;
+ALTER TABLE dst_context_deff OWNER TO re_admin;
 
 --
 -- Name: dst_tgroup; Type: TABLE; Schema: public; Owner: global
@@ -801,7 +801,7 @@ CREATE TABLE dst_tgroup (
 );
 
 
-ALTER TABLE dst_tgroup OWNER TO global;
+ALTER TABLE dst_tgroup OWNER TO re_admin;
 
 --
 -- Name: dst_tgroup_deff; Type: TABLE; Schema: public; Owner: global
@@ -816,7 +816,7 @@ CREATE TABLE dst_tgroup_deff (
 );
 
 
-ALTER TABLE dst_tgroup_deff OWNER TO global;
+ALTER TABLE dst_tgroup_deff OWNER TO re_admin;
 
 --
 -- Name: dst_tgroup_deff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -830,7 +830,7 @@ CREATE SEQUENCE dst_tgroup_deff_id_seq
     CACHE 1;
 
 
-ALTER TABLE dst_tgroup_deff_id_seq OWNER TO global;
+ALTER TABLE dst_tgroup_deff_id_seq OWNER TO re_admin;
 
 --
 -- Name: dst_tgroup_deff_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -851,7 +851,7 @@ CREATE SEQUENCE dst_tgroup_id_seq
     CACHE 1;
 
 
-ALTER TABLE dst_tgroup_id_seq OWNER TO global;
+ALTER TABLE dst_tgroup_id_seq OWNER TO re_admin;
 
 --
 -- Name: dst_tgroup_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -872,7 +872,7 @@ CREATE SEQUENCE free_id_seq
     CACHE 1;
 
 
-ALTER TABLE free_id_seq OWNER TO global;
+ALTER TABLE free_id_seq OWNER TO re_admin;
 
 --
 -- Name: free_billsec; Type: TABLE; Schema: public; Owner: global
@@ -885,7 +885,7 @@ CREATE TABLE free_billsec (
 );
 
 
-ALTER TABLE free_billsec OWNER TO global;
+ALTER TABLE free_billsec OWNER TO re_admin;
 
 --
 -- Name: free_billsec_balance; Type: TABLE; Schema: public; Owner: global
@@ -900,7 +900,7 @@ CREATE TABLE free_billsec_balance (
 );
 
 
-ALTER TABLE free_billsec_balance OWNER TO global;
+ALTER TABLE free_billsec_balance OWNER TO re_admin;
 
 --
 -- Name: free_billsec_balance_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -914,7 +914,7 @@ CREATE SEQUENCE free_billsec_balance_id_seq
     CACHE 1;
 
 
-ALTER TABLE free_billsec_balance_id_seq OWNER TO global;
+ALTER TABLE free_billsec_balance_id_seq OWNER TO re_admin;
 
 --
 -- Name: free_billsec_balance_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -934,7 +934,7 @@ CREATE TABLE free_call_price (
 );
 
 
-ALTER TABLE free_call_price OWNER TO global;
+ALTER TABLE free_call_price OWNER TO re_admin;
 
 --
 -- Name: pcard; Type: TABLE; Schema: public; Owner: global
@@ -955,7 +955,7 @@ CREATE TABLE pcard (
 );
 
 
-ALTER TABLE pcard OWNER TO global;
+ALTER TABLE pcard OWNER TO re_admin;
 
 --
 -- Name: pcard_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -969,7 +969,7 @@ CREATE SEQUENCE pcard_id_seq
     CACHE 1;
 
 
-ALTER TABLE pcard_id_seq OWNER TO global;
+ALTER TABLE pcard_id_seq OWNER TO re_admin;
 
 --
 -- Name: pcard_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -988,7 +988,7 @@ CREATE TABLE pcard_status (
 );
 
 
-ALTER TABLE pcard_status OWNER TO global;
+ALTER TABLE pcard_status OWNER TO re_admin;
 
 --
 -- Name: pcard_status_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1002,7 +1002,7 @@ CREATE SEQUENCE pcard_status_id_seq
     CACHE 1;
 
 
-ALTER TABLE pcard_status_id_seq OWNER TO global;
+ALTER TABLE pcard_status_id_seq OWNER TO re_admin;
 
 --
 -- Name: pcard_status_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1022,7 +1022,7 @@ CREATE TABLE pcard_type (
 );
 
 
-ALTER TABLE pcard_type OWNER TO global;
+ALTER TABLE pcard_type OWNER TO re_admin;
 
 --
 -- Name: pcard_type_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1036,7 +1036,7 @@ CREATE SEQUENCE pcard_type_id_seq
     CACHE 1;
 
 
-ALTER TABLE pcard_type_id_seq OWNER TO global;
+ALTER TABLE pcard_type_id_seq OWNER TO re_admin;
 
 --
 -- Name: pcard_type_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1056,7 +1056,7 @@ CREATE TABLE prefix (
 );
 
 
-ALTER TABLE prefix OWNER TO global;
+ALTER TABLE prefix OWNER TO re_admin;
 
 --
 -- Name: prefix_filter; Type: TABLE; Schema: public; Owner: global
@@ -1073,7 +1073,7 @@ CREATE TABLE prefix_filter (
 );
 
 
-ALTER TABLE prefix_filter OWNER TO global;
+ALTER TABLE prefix_filter OWNER TO re_admin;
 
 --
 -- Name: prefix_filter_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1087,7 +1087,7 @@ CREATE SEQUENCE prefix_filter_id_seq
     CACHE 1;
 
 
-ALTER TABLE prefix_filter_id_seq OWNER TO global;
+ALTER TABLE prefix_filter_id_seq OWNER TO re_admin;
 
 --
 -- Name: prefix_filter_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1108,7 +1108,7 @@ CREATE SEQUENCE prefix_id_seq
     CACHE 1;
 
 
-ALTER TABLE prefix_id_seq OWNER TO global;
+ALTER TABLE prefix_id_seq OWNER TO re_admin;
 
 --
 -- Name: prefix_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1129,7 +1129,7 @@ CREATE TABLE rate (
 );
 
 
-ALTER TABLE rate OWNER TO global;
+ALTER TABLE rate OWNER TO re_admin;
 
 --
 -- Name: rate_function_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1143,7 +1143,7 @@ CREATE SEQUENCE rate_function_id_seq
     CACHE 1;
 
 
-ALTER TABLE rate_function_id_seq OWNER TO global;
+ALTER TABLE rate_function_id_seq OWNER TO re_admin;
 
 --
 -- Name: rate_function_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1164,7 +1164,7 @@ CREATE SEQUENCE rate_id_seq1
     CACHE 1;
 
 
-ALTER TABLE rate_id_seq1 OWNER TO global;
+ALTER TABLE rate_id_seq1 OWNER TO re_admin;
 
 --
 -- Name: rate_id_seq1; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1185,7 +1185,7 @@ CREATE SEQUENCE rating_id_seq
     CACHE 1;
 
 
-ALTER TABLE rating_id_seq OWNER TO global;
+ALTER TABLE rating_id_seq OWNER TO re_admin;
 
 --
 -- Name: rating; Type: TABLE; Schema: public; Owner: global
@@ -1206,7 +1206,7 @@ CREATE TABLE rating (
 );
 
 
-ALTER TABLE rating OWNER TO global;
+ALTER TABLE rating OWNER TO re_admin;
 
 --
 -- Name: rating_mode; Type: TABLE; Schema: public; Owner: global
@@ -1218,7 +1218,7 @@ CREATE TABLE rating_mode (
 );
 
 
-ALTER TABLE rating_mode OWNER TO global;
+ALTER TABLE rating_mode OWNER TO re_admin;
 
 --
 -- Name: round_mode; Type: TABLE; Schema: public; Owner: global
@@ -1231,7 +1231,7 @@ CREATE TABLE round_mode (
 );
 
 
-ALTER TABLE round_mode OWNER TO global;
+ALTER TABLE round_mode OWNER TO re_admin;
 
 --
 -- Name: src__deff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1245,7 +1245,7 @@ CREATE SEQUENCE src__deff_id_seq
     CACHE 1;
 
 
-ALTER TABLE src__deff_id_seq OWNER TO global;
+ALTER TABLE src__deff_id_seq OWNER TO re_admin;
 
 --
 -- Name: src_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1259,7 +1259,7 @@ CREATE SEQUENCE src_id_seq
     CACHE 1;
 
 
-ALTER TABLE src_id_seq OWNER TO global;
+ALTER TABLE src_id_seq OWNER TO re_admin;
 
 --
 -- Name: src_context; Type: TABLE; Schema: public; Owner: global
@@ -1272,7 +1272,7 @@ CREATE TABLE src_context (
 );
 
 
-ALTER TABLE src_context OWNER TO global;
+ALTER TABLE src_context OWNER TO re_admin;
 
 --
 -- Name: src_context_deff; Type: TABLE; Schema: public; Owner: global
@@ -1285,7 +1285,7 @@ CREATE TABLE src_context_deff (
 );
 
 
-ALTER TABLE src_context_deff OWNER TO global;
+ALTER TABLE src_context_deff OWNER TO re_admin;
 
 --
 -- Name: src_tgroup; Type: TABLE; Schema: public; Owner: global
@@ -1298,7 +1298,7 @@ CREATE TABLE src_tgroup (
 );
 
 
-ALTER TABLE src_tgroup OWNER TO global;
+ALTER TABLE src_tgroup OWNER TO re_admin;
 
 --
 -- Name: src_tgroup_deff; Type: TABLE; Schema: public; Owner: global
@@ -1313,7 +1313,7 @@ CREATE TABLE src_tgroup_deff (
 );
 
 
-ALTER TABLE src_tgroup_deff OWNER TO global;
+ALTER TABLE src_tgroup_deff OWNER TO re_admin;
 
 --
 -- Name: src_tgroup_deff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1327,7 +1327,7 @@ CREATE SEQUENCE src_tgroup_deff_id_seq
     CACHE 1;
 
 
-ALTER TABLE src_tgroup_deff_id_seq OWNER TO global;
+ALTER TABLE src_tgroup_deff_id_seq OWNER TO re_admin;
 
 --
 -- Name: src_tgroup_deff_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1348,7 +1348,7 @@ CREATE SEQUENCE src_tgroup_id_seq
     CACHE 1;
 
 
-ALTER TABLE src_tgroup_id_seq OWNER TO global;
+ALTER TABLE src_tgroup_id_seq OWNER TO re_admin;
 
 --
 -- Name: src_tgroup_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1371,7 +1371,7 @@ CREATE TABLE tariff (
 );
 
 
-ALTER TABLE tariff OWNER TO global;
+ALTER TABLE tariff OWNER TO re_admin;
 
 --
 -- Name: tariff_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1385,7 +1385,7 @@ CREATE SEQUENCE tariff_id_seq
     CACHE 1;
 
 
-ALTER TABLE tariff_id_seq OWNER TO global;
+ALTER TABLE tariff_id_seq OWNER TO re_admin;
 
 --
 -- Name: tariff_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1406,7 +1406,7 @@ CREATE SEQUENCE tc_id_seq
     CACHE 1;
 
 
-ALTER TABLE tc_id_seq OWNER TO global;
+ALTER TABLE tc_id_seq OWNER TO re_admin;
 
 --
 -- Name: time_condition; Type: TABLE; Schema: public; Owner: global
@@ -1420,7 +1420,7 @@ CREATE TABLE time_condition (
 );
 
 
-ALTER TABLE time_condition OWNER TO global;
+ALTER TABLE time_condition OWNER TO re_admin;
 
 --
 -- Name: time_condition_deff; Type: TABLE; Schema: public; Owner: global
@@ -1435,7 +1435,7 @@ CREATE TABLE time_condition_deff (
 );
 
 
-ALTER TABLE time_condition_deff OWNER TO global;
+ALTER TABLE time_condition_deff OWNER TO re_admin;
 
 --
 -- Name: time_conditions_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1449,7 +1449,7 @@ CREATE SEQUENCE time_conditions_id_seq
     CACHE 1;
 
 
-ALTER TABLE time_conditions_id_seq OWNER TO global;
+ALTER TABLE time_conditions_id_seq OWNER TO re_admin;
 
 --
 -- Name: time_conditions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1469,7 +1469,7 @@ CREATE TABLE users (
 );
 
 
-ALTER TABLE users OWNER TO global;
+ALTER TABLE users OWNER TO re_admin;
 
 --
 -- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: global
@@ -1483,7 +1483,7 @@ CREATE SEQUENCE users_id_seq
     CACHE 1;
 
 
-ALTER TABLE users_id_seq OWNER TO global;
+ALTER TABLE users_id_seq OWNER TO re_admin;
 
 --
 -- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: global
@@ -1502,7 +1502,7 @@ CREATE TABLE version (
 );
 
 
-ALTER TABLE version OWNER TO global;
+ALTER TABLE version OWNER TO re_admin;
 
 --
 -- Name: id; Type: DEFAULT; Schema: public; Owner: global
@@ -1585,7 +1585,7 @@ ALTER TABLE ONLY cdr_servers ALTER COLUMN id SET DEFAULT nextval('cdr_servers_id
 -- Name: id; Type: DEFAULT; Schema: public; Owner: global
 --
 
-ALTER TABLE ONLY cdrs_v2 ALTER COLUMN id SET DEFAULT nextval('cdrs_v2_id_seq'::regclass);
+--ALTER TABLE ONLY cdrs_v2 ALTER COLUMN id SET DEFAULT nextval('cdrs_v2_id_seq'::regclass);
 
 
 --
@@ -1789,7 +1789,7 @@ SELECT pg_catalog.setval('cdrs_id_seq', 1, true);
 -- Name: cdrs_v2_id_seq; Type: SEQUENCE SET; Schema: public; Owner: global
 --
 
-SELECT pg_catalog.setval('cdrs_v2_id_seq', 1, true);
+--SELECT pg_catalog.setval('cdrs_v2_id_seq', 1, true);
 
 
 --
@@ -2268,16 +2268,16 @@ ALTER TABLE ONLY cdrs
 -- Name: cdrs_v2_call_uid_key; Type: CONSTRAINT; Schema: public; Owner: global
 --
 
-ALTER TABLE ONLY cdrs_v2
-    ADD CONSTRAINT cdrs_v2_call_uid_key UNIQUE (call_uid);
+--ALTER TABLE ONLY cdrs_v2
+--    ADD CONSTRAINT cdrs_v2_call_uid_key UNIQUE (call_uid);
 
 
 --
 -- Name: cdrs_v2_pkey; Type: CONSTRAINT; Schema: public; Owner: global
 --
 
-ALTER TABLE ONLY cdrs_v2
-    ADD CONSTRAINT cdrs_v2_pkey PRIMARY KEY (id);
+--ALTER TABLE ONLY cdrs_v2
+--    ADD CONSTRAINT cdrs_v2_pkey PRIMARY KEY (id);
 
 
 --
