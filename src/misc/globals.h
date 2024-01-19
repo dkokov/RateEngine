@@ -119,6 +119,7 @@ typedef struct opt_cli {
 	char cfgfile[512];
 
 	unsigned short daemon_flag;
+	unsigned short foregrand_flag;
     unsigned short kill_flag;
     unsigned short test_flag;
     
