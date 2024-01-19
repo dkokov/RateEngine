@@ -1,5 +1,18 @@
 # Installation
 
+## You can be used Docker containers (re6-core,re6-db)
+
+You should be execute following commands:
+```bash
+git clone https://github.com/dkokov/RateEngine.git
+
+cd RateEngine/docker
+
+docker-compose up --build -d
+```
+
+## Compile and install from source
+
 #### A RateEngine use follow external libs:
 
 |lib|using|
@@ -26,7 +39,7 @@ apt-get install libxml2-dev libpq-dev
 #### Installation steps are follow:
 
 ``` 
-git clone -b 0.6.14 https://github.com/dkokov/RateEngine.git
+git clone https://github.com/dkokov/RateEngine.git
 ```
 
 main source directory:
@@ -61,7 +74,20 @@ If you want to use PGSQL,should start follow:
 psql -h localhost -U youruser yourdbname -f rate_engine_0.6.10.sql
 ```
 
-#### Start/stop script:
+#### Start and stop RateEngine daemon
+
+***Start daemon command by CLI:***
+``` bash 
+cd /usr/local/RateEngine
+./bin/RateEngine -d
+```
+
+***Stop daemon command by CLI:***
+```bash
+cd /usr/local/RateEngine
+./bin/RateEngine -k
+```
+<!--#### Start/stop script:
 
 Default path with start init script:
 ```
@@ -69,5 +95,5 @@ cd /usr/local/RateEngine/scripts/init.d
 
 cp -vi RateEngine /etc/init.d/
 ```
-
+-->
 
