@@ -28,9 +28,10 @@ void help(void)
 			       "  --rating-cdr-id or -r3 ,rating of the define cdr id;\n"
 			       "  --rating-racc or -r4   ,rating of the define RatingAccountTypeId and RatingAccount;\n"
 			       "  --ccserver or -2c      ,start Call Control server(not fork);\n"
-			       "  --stop or -k           ,exit from the backgroud mode of the RateEngine5(stop demonization);\n"
-			       "  --version or -v        ,show version of the RateEngine5;\n"
-			       "  --bg  or -d            ,backgroud mode of the RateEngine5(demonization);\n"
+			       "  --stop or -k           ,exit from the backgroud mode of the RateEngine(stop demonization);\n"
+			       "  --version or -v        ,show version of the RateEngine;\n"
+			       "  --bg  or -d            ,backgroud mode of the RateEngine(demonization);\n"
+			       "  --fg  or -f            ,foreground mode of the RateEngine;\n"
 			       "  --stat                 ,show RateEngine status services and global statistics"
 			       "\n"
 			       );
@@ -132,6 +133,10 @@ int cli_opts_parser(int arg_num, char *arg_arr[])
 		if((!strcmp(arg_arr[i],"--bg"))||(!strcmp(arg_arr[i],"-d"))) {
 			opt_cli_mem.daemon_flag = 1;
 		}
+
+		if((!strcmp(arg_arr[i],"--fg"))||(!strcmp(arg_arr[i],"-f"))) {
+			opt_cli_mem.foregrand_flag = 1;
+		}
 		
 		if((!strcmp(arg_arr[i],"--stop"))||(!strcmp(arg_arr[i],"-k"))) {
 			opt_cli_mem.kill_flag = 1;
@@ -207,6 +212,15 @@ int main(int argc, char *argv[])
 			daemonize(mcfg->system_dir, mcfg->system_pid_file);
 			LOG("RateEngine","The RateEngine daemon is starting...");
 			
+			if(stat_init() == 0) LOG("RateEngine","The RateEngine stat is not started (no init SHMEM)!");
+		} else if(opt_cli_mem.foregrand_flag) {
+			rating_flag = 1;
+			get_cdrs_flag = 1;
+			call_control_flag =1;
+
+//			daemonize(mcfg->system_dir, mcfg->system_pid_file);
+			LOG("RateEngine","The RateEngine foreground mode is starting...");
+
 			if(stat_init() == 0) LOG("RateEngine","The RateEngine stat is not started (no init SHMEM)!");
 		} else if(opt_cli_mem.kill_flag) {
 			stat_remove();
