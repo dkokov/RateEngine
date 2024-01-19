@@ -1,0 +1,68 @@
+<RateEngine version="0.6.11" >
+ <System>
+    <param name="DIR" value="/usr/local/RateEngine/" />
+    <param name="PIDFile" value="logs/rate_engine_6.pid" />
+    <param name="DBVersion" value="0.6.10(beta)" />
+ </System>
+ <DB>
+    <param name="dbhost" value="172.20.0.2" />
+    <param name="dbname" value="rate_engine" />
+    <param name="dbuser" value="re_admin" />
+    <param name="dbpass" value="_cfg.access" />
+    <param name="dbport" value="5432" />
+    
+    <param name="NumberRetries" value="10" />
+    <param name="IntervalRetries" value="2" />
+ </DB>
+ <CallControl>
+    <param name="active" value="yes" />
+
+    <!-- server sleeping in microseconds -->
+    <param name="CCServerMicroSleep" value="60000" />
+
+    <!-- maxsec per call in seconds -->
+    <param name="CallMaxsecLimit" value="3600" />
+    
+    <!-- Sim calls -->
+    <param name="SimCalls" value="150" />
+
+    <!-- Interface Configuration Directory - config per protocol/interface -->
+    <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
+
+<!--    <param name="LogFile" value="logs/ccserver.log" />
+    <param name="LogFileMaxSize" value="40960000" /> -->
+ </CallControl>
+ <Rating>
+    <param name="active" value="yes" />
+    <param name="leg" value="a" />
+    <!-- <param name="NoPrefixRating" value="&" /> -->
+    <param name="RatingInterval" value="300" />
+    <!-- When you want to use pcard for all subscribers,
+         set this param with 'yes' -->
+    <param name="UsePCard" value="no" />
+    <!-- 'start_date' or 'end_date' -->
+    <param name="PCardSortKey" value="start_date" />
+    <!-- 'desc' or 'asc' -->
+    <param name="PCardSortMode" value="desc" />
+    <!-- When you want to use only one billing day(one billing cycle),
+         insert a billing day here.If it's empty,
+         then will use 'billing_day' from the 'billing_account' table -->
+    <param name="BillingDay" value="01" />
+    <param name="DayOfPayment" value="10" />
+    <!-- k limit min = (limit/amount) when have more from 1 rating account per billing account -->
+    <param name="KLimitMin" value="0.05" />
+ </Rating>
+ <CDRMediator>
+    <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
+    <param name="CDRTCPConn" value="5" />
+ </CDRMediator>
+ <Logs>
+    <!-- <param name="active" value="yes" /> -->
+    <param name="LogFile" value="logs/rate_engine_6.log" />
+    <param name="LogMaxFileSize" value="40960000" />
+    <param name="LogSeparator" value="|" />
+    <param name="LogDateFormat" value="" />
+    <!-- 1,INFO ; 2,WARN ; 3,DEBUG ; 4,DEBUG + TIMING ;-->
+    <param name="LogDebugLevel" value="3" />
+ </Logs>
+</RateEngine>
