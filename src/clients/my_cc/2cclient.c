@@ -1,3 +1,7 @@
+/*
+ * gcc -g -Wall -o 2cclient 2cclient.c
+ * 
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
