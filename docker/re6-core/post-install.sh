@@ -16,7 +16,8 @@ else
     cp -vf .pgpass /root
     chmod 0600 /root/.pgpass
     sleep 5
-    _RES_SQL=`$CLI -h 172.20.0.2 -U re_admin rate_engine -c "select date from version;" -A -t`
+#    _RES_SQL=`$CLI -h 172.20.0.2 -U re_admin rate_engine -c "select date from version;" -A -t`
+	_RES_SQL=`$CLI -h re6-core -U re_admin rate_engine -c "select date from version;" -A -t`
     if [ "$_RES_SQL" == "" ]; then 
 		$CLI -h 172.20.0.2 -U re_admin rate_engine -f $_SQL
 	else

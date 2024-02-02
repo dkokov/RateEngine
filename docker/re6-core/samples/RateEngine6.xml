@@ -5,7 +5,7 @@
     <param name="DBVersion" value="0.6.10(beta)" />
  </System>
  <DB>
-    <param name="dbhost" value="172.20.0.2" />
+    <param name="dbhost" value="re6-db" />
     <param name="dbname" value="rate_engine" />
     <param name="dbuser" value="re_admin" />
     <param name="dbpass" value="_cfg.access" />
