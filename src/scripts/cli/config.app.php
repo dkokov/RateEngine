@@ -14,7 +14,7 @@
  $RE['dbhost'] = "127.0.0.1";
  $RE['dbname'] = "rate_engine";
  
- $RE['dbuser'] = "global";
+ $RE['dbuser'] = "re_admin";
  $RE['dbpass'] = "_cfg.access";
  
  $dbconn = conn();
