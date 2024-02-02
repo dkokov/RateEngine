@@ -1,7 +1,7 @@
 # RateEngine6 Docker containers,
 # author: Dimitar Kokov,
-# version: 0.1,
-# date: 2024-01-18
+# version: 0.2,
+# date: 2024-02-02
 
 # docker-compose up --build -d
 
@@ -18,8 +18,7 @@ services:
     ports:
       - "5432:5432"
     networks:
-      re6_network:
-        ipv4_address: 172.20.0.2
+      - re6_network
     volumes:
        - /var/lib/rate_engine/volumes/data:/var/lib/postgresql/data
     hostname: re6-db
@@ -35,8 +34,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      re6_network:
-        ipv4_address: 172.20.0.3
+      - re6_network
     volumes:
       - /var/lib/rate_engine/volumes/conf:/usr/local/RateEngine/config/
       - /var/lib/rate_engine/volumes/logs:/usr/local/RateEngine/logs/
@@ -53,6 +51,4 @@ networks:
     driver: bridge
     ipam:
       driver: default
-      config:
-        - subnet: 172.20.0.0/16
 
