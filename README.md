@@ -1,7 +1,7 @@
 # RateEngine
 
-  A **RateEngine(RE)** is engine for calls/messages calculate and 
-online call control (prepaid or postpaid).Can be started as server(daemon) or to use from the console.
+A **RateEngine (RE)** is engine for calls/messages calculate and online call control(prepaid or postpaid).
+Can be started as server(daemon) or to use from the console.
 The software packet is free and open source solution under [GPLv3](https://opensource.org/licenses/GPL-3.0) license .
 
 * [Introduction](#Introduction)
@@ -36,14 +36,14 @@ Make more from this - manage same services.Start and stop the service,modify set
 This system is interface into different services,servers,platforms.
 For example: Internet,IPTV,VOIP are different services. Usualy are released over different platforms.
 No problem to use one billing system and general interface from this system.
-But call/message rating is specific action.Should be had learning and experience.
-Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
+But call/message rating is specific action. Should be had learning and experience.
+Therefore is this release. In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
 
 You can see example topology for RateEngine using in the follow picture:
 
 ![](doc/png/RateEngine_v2.png)
 
-  A **RE** get need records from definited servers as files or from databases.
+A **RE** get need records from definited servers as files or from databases.
 Determine her **BillPlan** and **Tariff** is current call.
 Calculate and save in balance.Can be used **FreeBillsec** per difined tariff.
 Can be used **TimeConditions** per tariff - different prices in different time zone.
@@ -53,7 +53,7 @@ Can be used 'maxsec' as RTP timeout or other param in you call managment.
 
 ## Feedback
 
-  You have a question or issue,you see errors,
+You have a question or issue,you see errors,
 can send request to me here: [ISSUES](https://github.com/dkokov/RateEngine/issues)
 
 You have need from different/private helping or consulting -
