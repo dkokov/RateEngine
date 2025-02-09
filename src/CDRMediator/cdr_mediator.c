@@ -103,7 +103,7 @@ void *CDRMediatorThread(void *dt)
 					"profile: %s,cdr_server_id: %d,'filters' pointer is null",
 					profile->profile_name,profile->cdr_server_id);
 			}
-		}	
+		}
 
 		switch(profile->t) {
 			case file:

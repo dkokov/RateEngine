@@ -1,7 +1,7 @@
 <CDRProfile>
   <General>
     <param name="profile-version" value="1" />
-    <param name="profile-name" value="profile1" />
+    <param name="profile-name" value="hpvp" />
     <param name="active" value="yes" />
     <!-- Thread parameters -->
     <param name="getCDRsInterval" value="600" />
@@ -26,7 +26,7 @@
     <param name="sql-col-where-type" value="ts" />
     <param name="sql-where-const" value="billsec > 0" />
     <!-- Start scheduler timestamp (start date) -->
-    <param name="SchedTS" value="2017-10-19 15:00:00" />
+    <param name="SchedTS" value="2023-03-01 00:00:00" />
     <!-- unkn, isup, sms, voip-audio, voip-video ,voip-trunk -->
     <param name="cdr-rec-type" value="voip-audio" />
   </General>
