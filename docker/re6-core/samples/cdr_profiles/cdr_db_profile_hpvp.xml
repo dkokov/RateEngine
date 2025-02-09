@@ -12,10 +12,10 @@
     <!-- file,db -->
     <param name="cdr-type" value="db" />
     <!-- Get CDR 'db' config -->
-    <param name="dbhost" value="dbhost" />
-    <param name="dbuser" value="dbuser" />
-    <param name="dbpass" value="dbpass" />
-    <param name="dbname" value="dbname" />
+    <param name="dbhost" value="hpvp-db" />
+    <param name="dbuser" value="hpvp_admin" />
+    <param name="dbpass" value="_cfg.access" />
+    <param name="dbname" value="hpvp_cdr" />
     <!-- DB type (pgsql,mysql,oracle) -->
     <param name="dbtype" value="pgsql" />
     <!-- SQL Query into the remote db server -->
@@ -26,7 +26,7 @@
     <param name="sql-col-where-type" value="ts" />
     <param name="sql-where-const" value="billsec > 0" />
     <!-- Start scheduler timestamp (start date) -->
-    <param name="SchedTS" value="2017-10-19 15:00:00" />
+    <param name="SchedTS" value="2024-0-19 15:00:00" />
     <!-- unkn, isup, sms, voip-audio, voip-video ,voip-trunk -->
     <param name="cdr-rec-type" value="voip-audio" />
   </General>
