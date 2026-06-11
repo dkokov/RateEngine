@@ -14,8 +14,10 @@ CC    = gcc
 XML2_LIB_LD = $(shell xml2-config --libs)
 XML2_CFLAGS = $(shell xml2-config --cflags)
 
+PGSQL_INCLUDEDIR = $(shell pg_config --includedir 2>/dev/null)
+
 FLAGS   = -Wall
-CFLAGS  = -fPIC -Ofast -I/usr/include/libxml2/
+CFLAGS  = -fPIC -Ofast -I/usr/include/libxml2/ -I$(PGSQL_INCLUDEDIR)
 LDFLAGS = -shared
 LDLIBS  = -lpq
 
