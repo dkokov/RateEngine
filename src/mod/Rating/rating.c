@@ -17,6 +17,7 @@
 #include "calc_functions.h"
 #include "round_billsec.h"
 #include "rt_data_q.h"
+#include "rt_cache.h"
 
 rate_engine_t rt_eng;
 cdr_funcs_t *cdrm_api;
@@ -635,50 +636,55 @@ void rt_loop(rate_engine_t *rt_eng)
 {
 	rating_t rt;
 	rating_t *pre;
-	
+
 	struct timeval tim;
     double t1,t2;
 	char msg[512];
 	struct timeval times;
-	
+
     cdr_t *cdrs = 0;
-    
+
     int pp = 0;
     int cc = 0;
-    
+
 	pre = &rt;
-    
+
+	/* create cache for this batch cycle */
+	rt_eng->cache = rt_cache_init();
+
     if(log_debug_level >= LOG_LEVEL_INFO) {
 		gettimeofday(&tim, NULL);
 		t1 = tim.tv_sec+(tim.tv_usec/1000000.0);
 	}
-        
+
 	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
 
     if(cdrs) {
 		pp=0;
-		
+
 		while(cdrs[pp].id > 0) {
-			rt_rating_init(pre);			
+			rt_rating_init(pre);
 			rt_cdr_to_rating(&cdrs[pp],pre);
-			
+
 			gettimeofday(&times, NULL);
 			pre->start_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
-			
+
 			rt_main(rt_eng->dbp,pre,rt_eng->leg,cdrs[pp].cdr_rec_type_id);
-			
+
 			gettimeofday(&times, NULL);
 			pre->current_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
-			
-			char msg4[1024];
-			sprintf(msg4,"rating call times: %f,cdr_id: %d,call_uid: %s",
-			(double)((pre->current_timer)-(pre->start_timer))/1000000,cdrs[pp].id,cdrs[pp].call_uid);
-			
-			LOG("rating_loop()",msg4);
-			
+
+			if(log_debug_level >= LOG_LEVEL_DEBUG) {
+				char msg4[1024];
+				sprintf(msg4,"rating call times: %f,cdr_id: %d,call_uid: %s",
+				(double)((pre->current_timer)-(pre->start_timer))/1000000,cdrs[pp].id,cdrs[pp].call_uid);
+
+				LOG("rating_loop()",msg4);
+			}
+
 			if((pre->rating_id) > 0) cc++;
-			
-			usleep(rt_eng->wait_rating);
+
+			if(rt_eng->wait_rating > 0) usleep(rt_eng->wait_rating);
 			
 			pp++;
 		}
@@ -689,16 +695,20 @@ void rt_loop(rate_engine_t *rt_eng)
 		
 		mem_free(cdrs);
     }
-    
+
+	/* free cache - logs hit/miss stats */
+	if(rt_eng->cache != NULL) {
+		rt_cache_free(rt_eng->cache);
+		rt_eng->cache = NULL;
+	}
+
     if(log_debug_level >= LOG_LEVEL_INFO) {
 		gettimeofday(&tim, NULL);
 		t2 = tim.tv_sec+(tim.tv_usec/1000000.0);
-				
-		char msg3[1024];
-		sprintf(msg3,"times: %f %f",(t2-t1),((t2-t1)/cc));
-//		sprintf(msg3,"times: %f %f",(t2-t1),((t2-t1)/pp));
-	
-		LOG("rating_loop()",msg3);
+
+		if(cc > 0) {
+			LOG("rating_loop()","batch times: %f total, %f avg/cdr, cdrs: %d",(t2-t1),((t2-t1)/cc),cc);
+		}
 	}
 }
 

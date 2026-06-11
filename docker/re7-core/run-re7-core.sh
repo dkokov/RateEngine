@@ -32,4 +32,7 @@ if [ ! -f /root/.pgpass ]; then
 fi
 
 echo "starting RateEngine7 ..."
-exec $CLI -c $CONF -d
+$CLI -c $CONF -d
+
+# keep container alive, follow the log
+exec tail -f $APP_DIR/logs/rate_engine.log
