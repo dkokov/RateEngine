@@ -4,11 +4,13 @@
 #include "../CDRMediator/cdr_bind_api.h"
 
 #include "rt_data.h"
+#include "rt_cache.h"
 
 typedef struct rate_engine
 {
     db_t *dbp;
-    
+    rt_cache_t *cache;
+
     int  log;
     char active;
     char leg;

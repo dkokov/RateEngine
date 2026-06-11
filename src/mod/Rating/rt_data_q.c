@@ -8,6 +8,7 @@
 
 #include "rt_data.h"
 #include "rating.h"
+#include "rt_cache.h"
 #include "rt_json.h"
 #include "rt_data_q.h"
 /*
@@ -675,7 +676,7 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 			rtp->bacc_ptr->billing_day = atoi(result->cols_list[4].rows_list[i].row);
 				
 			rtp->bacc_ptr->round_mode_id = atoi(result->cols_list[5].rows_list[i].row);
-			rtp->bacc_ptr->day_of_payment = atoi(result->cols_list[5].rows_list[i].row);
+			rtp->bacc_ptr->day_of_payment = atoi(result->cols_list[6].rows_list[i].row);
 		}
 			
 		db_sql_result_free(result);
@@ -687,28 +688,37 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 
 //tariff *f_tariff_query(db_t *dbp,rating *pre)
 int rt_data_q_tariff_sql(db_t *dbp,racc_t *rtp)
-{ 
+{
 	int i;
     char str[DB_BUF_LEN];
-    
+
     calc_function_t *tr;
  	db_sql_result_t *result;
- 	
+
 	if(dbp == NULL) return DB_ERR_DBP_NUL;
-	
+
 	if(rtp->pre == NULL) return -999;
 	if(rtp->pre->tariff_id <= 0) return -998;
-	
+
+	/* check cache first */
+	if(rt_eng.cache != NULL) {
+		tr = rt_cache_tariff_get(rt_eng.cache,rtp->pre->tariff_id);
+		if(tr != NULL) {
+			rtp->bplan_ptr->rates_ptr->calc_funcs = tr;
+			return DB_OK;
+		}
+	}
+
 	sprintf(str,"select pos,delta_time,fee,iterations from calc_function where tariff_id = %d order by pos ",rtp->pre->tariff_id);
-		
+
 	db_select(dbp,str);
 	db_fetch(dbp);
-				
+
 	if(dbp->conn->result != NULL) {
 		result = (db_sql_result_t *)dbp->conn->result;
-				
+
 		if(result->rows == 0) return DB_ERR_SQLRES_NUL;
-			
+
 		tr = (calc_function_t *)mem_alloc_arr((result->rows+1),sizeof(calc_function_t));
 		if(tr != NULL) {
 			for(i = 0;i < result->rows;i++) {
@@ -717,17 +727,20 @@ int rt_data_q_tariff_sql(db_t *dbp,racc_t *rtp)
 				tr[i].fee   = atof(result->cols_list[2].rows_list[i].row);
 				tr[i].iterations = atoi(result->cols_list[3].rows_list[i].row);
 			}
-        
+
 			tr[i].pos = 0;
-			
+
+			/* store in cache */
+			if(rt_eng.cache != NULL) rt_cache_tariff_put(rt_eng.cache,rtp->pre->tariff_id,tr);
+
 			rtp->bplan_ptr->rates_ptr->calc_funcs = tr;
 		}
-			
+
 		db_sql_result_free(result);
 		dbp->conn->result = NULL;
 	}
-	
-	return DB_OK; 
+
+	return DB_OK;
 }
 
 int rt_data_q_tariff_nosql(db_t *dbp,racc_t *rtp)
@@ -767,15 +780,24 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 	int i;
     int bplan_num;
     char str[SQL_BUF_LEN];
-    
+
 	rate_t *rt;
  	db_sql_result_t *result;
 
 	if(dbp == NULL) return DB_ERR_DBP_NUL;
-	
+
 	rt = NULL;
-	
-	if(dbp->t == sql) {		
+
+	/* check cache first */
+	if(rt_eng.cache != NULL) {
+		rt = rt_cache_rates_get(rt_eng.cache,rtp->bplan_ptr->id);
+		if(rt != NULL) {
+			rtp->bplan_ptr->rates_ptr = rt;
+			return 0;
+		}
+	}
+
+	if(dbp->t == sql) {
 		bplan_num = rt_data_q_bplan_tree_num(dbp,rtp);
 
 		if(bplan_num == 0) {
@@ -795,13 +817,13 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 						" order by pr.prefix desc",
 						rtp->bplan_ptr->id);
 		}
-		
+
 		db_select(dbp,str);
 		db_fetch(dbp);
-				
+
 		if(dbp->conn->result != NULL) {
 			result = (db_sql_result_t *)dbp->conn->result;
-			
+
 			rt = (rate_t *)mem_alloc_arr((result->rows+1),sizeof(rate_t));
 			if(rt != NULL) {
 				for(i = 0;i < result->rows;i++) {
@@ -813,16 +835,19 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 					rt[i].prefix_id = atoi(result->cols_list[5].rows_list[i].row);
 					rt[i].free_billsec_id = atoi(result->cols_list[6].rows_list[i].row);
 				}
+
+				/* store in cache - cache owns the memory now */
+				if(rt_eng.cache != NULL) rt_cache_rates_put(rt_eng.cache,rtp->bplan_ptr->id,rt);
 			}
-			
+
 			db_sql_result_free(result);
 			dbp->conn->result = NULL;
 		}
 	} else return -999;
-	
+
 	rtp->bplan_ptr->rates_ptr = rt;
-	
-	return 0;    
+
+	return 0;
 }
 
 int rt_data_q_rate_nosql(db_t *dbp,racc_t *rtp,char *search)

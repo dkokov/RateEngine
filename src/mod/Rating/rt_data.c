@@ -5,6 +5,8 @@
 #include "../../mem/mem.h"
 
 #include "rt_data.h"
+#include "rt_cache.h"
+#include "rating.h"
 
 bacc_t *rt_data_bacc_init(void)
 {
@@ -56,20 +58,25 @@ void rt_data_racc_free(racc_t *racc_pt)
 	if(racc_pt != NULL) {
 		if(racc_pt->bacc_ptr != NULL) {
 			if(racc_pt->bacc_ptr->pcard_ptr != NULL) mem_free(racc_pt->bacc_ptr->pcard_ptr);
-			
+
 			mem_free(racc_pt->bacc_ptr);
 		}
-		
+
 		if(racc_pt->bplan_ptr != NULL) {
-			if(racc_pt->bplan_ptr->rates_ptr->calc_funcs != NULL) mem_free(racc_pt->bplan_ptr->rates_ptr->calc_funcs);
-			
+			/* rates and calc_funcs may be owned by cache - don't free if cached */
+			if(rt_eng.cache == NULL) {
+				if(racc_pt->bplan_ptr->rates_ptr != NULL) {
+					if(racc_pt->bplan_ptr->rates_ptr->calc_funcs != NULL)
+						mem_free(racc_pt->bplan_ptr->rates_ptr->calc_funcs);
+					mem_free(racc_pt->bplan_ptr->rates_ptr);
+				}
+			}
+
 			mem_free(racc_pt->bplan_ptr);
 		}
-		
+
 		if(racc_pt->bal_ptr != NULL) mem_free(racc_pt->bal_ptr);
-		
-		//if(racc_pt->pre != NULL) mem_free(racc_pt->pre); ??? problem
-		
+
 		mem_free(racc_pt);
 	}
 }
