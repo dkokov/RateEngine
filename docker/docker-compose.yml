@@ -1,0 +1,54 @@
+# RateEngine7 Docker containers
+# author: Dimitar Kokov
+# version: 0.1
+# date: 2026-06-11
+
+# docker-compose up --build -d
+# docker-compose down -v
+
+version: "3"
+
+services:
+  re7-db:
+    image: re7-db-image
+    build:
+        context: re7-db/
+        dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
+    networks:
+      - re7_network
+    volumes:
+       - re7_pgdata:/var/lib/postgresql/data
+    hostname: re7-db
+    container_name: re7-db
+    environment:
+      - TZ=Europe/Sofia
+
+  re7-core:
+    image: re7-core-image
+    build:
+        context: ../
+        dockerfile: docker/re7-core/Dockerfile
+    ports:
+      - "9090:9090"
+    networks:
+      - re7_network
+    volumes:
+      - re7_conf:/usr/local/RateEngine/config/
+      - re7_logs:/usr/local/RateEngine/logs/
+    hostname: re7-core
+    container_name: re7-core
+    depends_on:
+      - re7-db
+    environment:
+      - TZ=Europe/Sofia
+
+networks:
+  re7_network:
+    driver: bridge
+
+volumes:
+  re7_pgdata:
+  re7_conf:
+  re7_logs:

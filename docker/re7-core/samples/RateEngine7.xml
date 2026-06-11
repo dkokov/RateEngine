@@ -1,0 +1,50 @@
+<RateEngine version="0.7.1" >
+ <System>
+    <param name="DIR" value="/usr/local/RateEngine/" />
+    <param name="PIDFile" value="logs/rate_engine.pid" />
+ </System>
+ <LoadModules>
+    <param name="module" value="pgsql.so" />
+    <param name="module" value="cdrm.so" />
+    <param name="module" value="rt.so" />
+ </LoadModules>
+ <DB>
+    <param name="dbtype" value="pgsql" />
+    <param name="dbhost" value="re7-db" />
+    <param name="dbname" value="rate_engine" />
+    <param name="dbuser" value="re_admin" />
+    <param name="dbpass" value="_cfg.access" />
+    <param name="dbport" value="5432" />
+
+    <param name="NumberRetries" value="10" />
+    <param name="IntervalRetries" value="2" />
+ </DB>
+ <CallControl>
+    <param name="active" value="no" />
+    <param name="CCServerMicroSleep" value="60000" />
+    <param name="CallMaxsecLimit" value="3600" />
+    <param name="SimCalls" value="150" />
+    <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
+ </CallControl>
+ <Rating>
+    <param name="active" value="yes" />
+    <param name="leg" value="a" />
+    <param name="RatingInterval" value="300" />
+    <param name="waitRatingInterval" value="500" />
+    <param name="UsePCard" value="no" />
+    <param name="PCardSortKey" value="start_date" />
+    <param name="PCardSortMode" value="desc" />
+    <param name="BillingDay" value="01" />
+    <param name="DayOfPayment" value="10" />
+    <param name="KLimitMin" value="0.05" />
+ </Rating>
+ <CDRMediator>
+    <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
+ </CDRMediator>
+ <Logs>
+    <param name="LogFile" value="logs/rate_engine.log" />
+    <param name="LogMaxFileSize" value="40960000" />
+    <param name="LogSeparator" value="|" />
+    <param name="LogDebugLevel" value="3" />
+ </Logs>
+</RateEngine>
