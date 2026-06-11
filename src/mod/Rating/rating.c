@@ -58,13 +58,16 @@ void rt_chk_bplan_periods(bplan_t *bpt,int ts)
 
 void rt_chk_tr_opt(db_t *dbp,rating_t *pre)
 {
-/*	if(f_time_cond_query_id(dbp,pre)) {
+	if(f_time_cond_query_id(dbp,pre)) {
 		f_time_cond_query_v2(dbp,pre);
-		if(!tc_ts_cmp(pre)) pre->tariff = 0;
-		free(pre->tc);
+		if(!tc_ts_cmp(pre)) pre->tariff_id = 0;
+		if(pre->tc != NULL) {
+			mem_free(pre->tc);
+			pre->tc = NULL;
+		}
 	}
-	
-    f_free_billsec_query(dbp,pre); */
+
+	f_free_billsec_query(dbp,pre);
 }
 
 void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
@@ -197,11 +200,11 @@ int rt_prerating_process(db_t *dbp,racc_t *rtp)
 		} */
 		
 		rt_data_q_bal(dbp,rtp,card->start,card->end);
-		
-		//if(pre->free_billsec_limit) {
-		//	free_billsec_balance_v2(dbp,rtp,card->start,card->end);
-		//	f_free_billsec_bal_query_2(dbp,pre);
-		//}
+
+		if(pre->free_billsec_limit) {
+			free_billsec_balance_v2(dbp,rtp,card->start,card->end);
+			f_free_billsec_bal_query_2(dbp,pre);
+		}
     } else {
 		LOG("rt_prerating process()","ERROR,no start or end date,bacc: %d,start: %s,end: %s",btp->id,card->start,card->end);
 		
@@ -309,8 +312,8 @@ void rt_exec(db_t *dbp,racc_t *rtp,char leg)
 			if(billsec_temp) pre->billsec = billsec_temp;
 			
 			if(rtp->rtm == rt_mode_sms) {
-				//if((card > 0)&&(pre->free_billsec_id > 0)) free_billsec_sms_balance(dbp,rtp,card->start,card->end);
-				//ret = calc_cprice_sms(rtp);
+				if((card != NULL)&&(pre->free_billsec_id > 0)) free_billsec_sms_balance(dbp,rtp,card->start,card->end);
+				ret = calc_cprice_group(rtp);
 			} else ret = calc_cprice_group(rtp);
 			
 			switch(ret) {
@@ -337,10 +340,10 @@ void rt_exec(db_t *dbp,racc_t *rtp,char leg)
 	} else {
 		cdrm_api->update_cdr(dbp,pre->rating_id,pre->cdr_id,leg,pre->call_uid);
 
-		if((card)&&((pre->rating_id) > 0)) {			
+		if((card)&&((pre->rating_id) > 0)) {
 			rt_balance_exec(dbp,rtp,card->start,card->end);
-		
-			//if((pre->free_billsec_limit)&&(pre->rating_mode_id < 7)) free_billsec_exec(dbp,pre,card->start,card->end);	
+
+			if((pre->free_billsec_limit)&&(pre->rating_mode_id < rt_mode_sms)) free_billsec_exec(dbp,rtp,card->start,card->end);
 		}
 	}
 }
@@ -453,11 +456,14 @@ racc_t *rt_racc_voip_t_a(db_t *dbp,rating_t *pre)
 	return racc_pt;
 }
 
-void rt_racc_voip_t_b(db_t *dbp,rating_t *pre)
+racc_t *rt_racc_voip_t_b(db_t *dbp,rating_t *pre)
 {
-/*	f_dst_context_query(dbp,pre,pre->dst_context);	
-	
-	if((pre->bacc) > 0) pre->rating_mode_id = RT_MODE_DST_CONTEXT; */
+	racc_t *racc_pt;
+
+	pre->rating_mode_id = rt_mode_dstc;
+	racc_pt = rt_data_q_racc(dbp,pre);
+
+	return racc_pt;
 }
 
 racc_t *rt_racc_isup_a(db_t *dbp,rating_t *pre)
@@ -470,11 +476,14 @@ racc_t *rt_racc_isup_a(db_t *dbp,rating_t *pre)
 	return racc_pt;
 }
 
-void rt_racc_isup_b(db_t *dbp,rating_t *pre)
+racc_t *rt_racc_isup_b(db_t *dbp,rating_t *pre)
 {
-/*	f_dst_tgroup_query(dbp,pre,pre->dst_tgroup,pre->clg_nadi,pre->cld_nadi);
-	
-	if((pre->bacc) > 0) pre->rating_mode_id = RT_MODE_DST_TGROUP; */
+	racc_t *racc_pt;
+
+	pre->rating_mode_id = rt_mode_dsttg;
+	racc_pt = rt_data_q_racc(dbp,pre);
+
+	return racc_pt;
 }
 
 racc_t *rt_racc_sms_a(db_t *dbp,rating_t *pre)
@@ -487,9 +496,14 @@ racc_t *rt_racc_sms_a(db_t *dbp,rating_t *pre)
 	return racc_pt;
 }
 
-void rt_racc_sms_b(db_t *dbp,rating_t *pre)
+racc_t *rt_racc_sms_b(db_t *dbp,rating_t *pre)
 {
-	
+	racc_t *racc_pt;
+
+	pre->rating_mode_id = rt_mode_sms;
+	racc_pt = rt_data_q_racc(dbp,pre);
+
+	return racc_pt;
 }
 
 racc_t *rt_racc_unkn_a(db_t *dbp,rating_t *pre)
@@ -524,26 +538,36 @@ racc_t *rt_racc_unkn_a(db_t *dbp,rating_t *pre)
 	return racc_pt;
 }
 
-void rt_racc_unkn_b(db_t *dbp,rating_t *pre)
+racc_t *rt_racc_unkn_b(db_t *dbp,rating_t *pre)
 {
-/*	if(strcmp(pre->dst_context,"")) f_dst_context_query(dbp,pre,pre->dst_context);
-	
-	if((pre->bacc == 0)) {
-	    if(strcmp(pre->dst_tgroup,"")) f_dst_tgroup_query(dbp,pre,pre->dst_tgroup,pre->clg_nadi,pre->cld_nadi);
-	
-	    if((pre->bacc == 0)) {
-			if(log_debug_level > LOG_LEVEL_INFO) {
-				LOG("rating_unkn_b()","Rating5-LegB error,call_uid %s",pre->call_uid);
-			}
-	    } else pre->rating_mode_id = RT_MODE_DST_TGROUP;
-	} else pre->rating_mode_id = RT_MODE_DST_CONTEXT; */
+	racc_t *racc_pt;
+
+	if(strcmp(pre->dst_context,"")) {
+		pre->rating_mode_id = rt_mode_dstc;
+		racc_pt = rt_data_q_racc(dbp,pre);
+
+		if(racc_pt != NULL) return racc_pt;
+	}
+
+	if(strcmp(pre->dst_tgroup,"")) {
+		pre->rating_mode_id = rt_mode_dsttg;
+		racc_pt = rt_data_q_racc(dbp,pre);
+
+		if(racc_pt != NULL) return racc_pt;
+	}
+
+	if(log_debug_level > LOG_LEVEL_INFO) {
+		LOG("rt_racc_unkn_b()","Rating-LegB error,call_uid %s",pre->call_uid);
+	}
+
+	return NULL;
 }
 
 /* Main rating function */
 void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
 {
-	racc_t *rtp;
-	
+	racc_t *rtp = NULL;
+
     pre->rating_mode_id = 0;
 
     if(leg == 'a') {
@@ -561,7 +585,7 @@ void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
 					break;
 			case voip_t:
 					rtp = rt_racc_voip_t_a(dbp,pre);
-					break;			
+					break;
 			case sms:
 					rtp = rt_racc_sms_a(dbp,pre);
 					break;
@@ -569,24 +593,25 @@ void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
     }
 
     if(leg == 'b') {
-/*		switch(t) {
+		switch(t) {
 			case unkn:
-					rating_unkn_b(dbp,pre);
+					rtp = rt_racc_unkn_b(dbp,pre);
 					break;
 			case isup:
-					rating_isup_b(dbp,pre);
+					rtp = rt_racc_isup_b(dbp,pre);
 					break;
 			case voip_a:
+					rtp = rt_racc_voip_av_a(dbp,pre);
 					break;
 			case voip_v:
 					break;
 			case voip_t:
-					rating_voip_t_b(dbp,pre);
+					rtp = rt_racc_voip_t_b(dbp,pre);
 					break;
 			case sms:
-					rating_sms_b(dbp,pre);
+					rtp = rt_racc_sms_b(dbp,pre);
 					break;
-		}; */
+		};
     }
 
 	if(rtp == NULL) return;

@@ -38,17 +38,53 @@ void help(void)
 void re_stat(void)
 {
 	char buff[20];
+	char rt_buff[20];
+	char cdrm_buff[20];
 	stat_data_t *ptr;
-	
+
 	ptr = stat_read();
-	
+
 	if(ptr) {
 		strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&(ptr->ts)));
 
 		fprintf(stderr,"\n"
-						"  RateEngine realtime 'status & statistics' :\n"
-						"    ts : %s\n"
-						"    sim: %d\n\n",buff,ptr->sim);
+						"  RateEngine manager 'status':\n"
+						"    ts :  %s\n"
+						"    pid:  %d\n"
+						"    flag: '%c'\n"
+						"    sim:  %d\n",
+						buff,ptr->mgr_pid,ptr->mgr_flag,ptr->sim);
+
+		if(ptr->rt_ts) {
+			strftime(rt_buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&(ptr->rt_ts)));
+
+			fprintf(stderr,"\n"
+							"  Rating 'statistics':\n"
+							"    ts :     %s\n"
+							"    flag:    '%c'\n"
+							"    total:   %d\n"
+							"    success: %d\n"
+							"    error:   %d\n"
+							"    mins:    %d\n",
+							rt_buff,ptr->rt_flag,
+							ptr->rt_total_calls,ptr->rt_success_calls,
+							ptr->rt_error_calls,ptr->rt_rating_minutes);
+		}
+
+		if(ptr->cdrm_ts) {
+			strftime(cdrm_buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&(ptr->cdrm_ts)));
+
+			fprintf(stderr,"\n"
+							"  CDRMediator 'statistics':\n"
+							"    ts :   %s\n"
+							"    flag:  '%c'\n"
+							"    total: %d\n",
+							cdrm_buff,ptr->cdrm_flag,ptr->cdrm_total_cdrs);
+		}
+
+		fprintf(stderr,"\n"
+						"  CallControl:\n"
+						"    flag: '%c'\n\n",ptr->cc_flag);
 	}
 }
 

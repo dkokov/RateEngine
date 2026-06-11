@@ -34,6 +34,7 @@ extern rate_engine_t rt_eng;
 void *RateEngine(void *dt);
 void rt_exec(db_t *dbp,racc_t *rtp,char leg);
 void rt_chk_bplan_periods(bplan_t *bpt,int ts);
+void rt_chk_tr_opt(db_t *dbp,rating_t *pre);
 int rt_double_rating(db_t *dbp,racc_t *rtp,char leg);
 void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end);
 

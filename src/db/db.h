@@ -210,4 +210,10 @@ void db_nosql_result_free(db_nosql_result_t *ptr);
 
 int db_command_2(db_t *ptr,char *str,...);
 
+/* SQL string escaping - doubles single quotes to prevent SQL injection */
+int db_sql_escape(const char *src,char *dst,int dst_size);
+
+/* Safe sprintf for SQL - escapes all %S (capital S) args, passes %s unchanged */
+int db_sql_snprintf(char *dst,int dst_size,const char *fmt,...);
+
 #endif

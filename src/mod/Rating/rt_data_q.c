@@ -7,6 +7,7 @@
 #include "../../log/rt_log.h"
 
 #include "rt_data.h"
+#include "rating.h"
 #include "rt_json.h"
 #include "rt_data_q.h"
 /*
@@ -494,24 +495,27 @@ int rt_data_q_rating_add_sql(db_t *dbp,racc_t *rtp)
 {
  	int card_id;
     char str[SQL_BUF_LEN];
-    
+	char safe_ts[64];
+
     rating_t *pre;
-    
+
 	if(dbp == NULL) return -1;
-	
+
 	pre = rtp->pre;
-	
+
 	if(rtp->bacc_ptr->pcard_ptr->id == 0) card_id = 0;
 	else card_id = rtp->bacc_ptr->pcard_ptr->id ;
-	
+
 	if(dbp->t == sql) {
+		db_sql_escape(pre->timestamp,safe_ts,sizeof(safe_ts));
+
 		sprintf(str,"insert into rating"
 					" (call_price,call_billsec,rate_id,billing_account_id,call_id,rating_mode_id,pcard_id,time_condition_id,"
 					"call_ts,last_update,free_billsec_id)"
 					" values (%f,%d,%d,%d,%d,%d,%d,%d,'%s','now()',%d)",
-					pre->cprice,pre->billsec,pre->rate_id,rtp->bacc_ptr->id,pre->cdr_id,pre->rating_mode_id,card_id,pre->tc_id,pre->timestamp,pre->free_billsec_id);	
-		
-		db_insert(dbp,str);		
+					pre->cprice,pre->billsec,pre->rate_id,rtp->bacc_ptr->id,pre->cdr_id,pre->rating_mode_id,card_id,pre->tc_id,safe_ts,pre->free_billsec_id);
+
+		db_insert(dbp,str);
 	} else return -2;
 	
 	return 0;   
@@ -571,18 +575,19 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 {
 	int i;
     char str[DB_BUF_LEN];
+	char safe_cond[RATING_ACCOUNT_LEN * 2];
 	char *table,*cond;
 	int clg_nadi,cld_nadi;
-	
+
  	db_sql_result_t *result;
 
 	if(rtp == NULL) return -999;
-	
+
 	if(dbp == NULL) return DB_ERR_DBP_NUL;
-	
+
 	clg_nadi = -1;
 	cld_nadi = -1;
-		
+
 	switch(rtp->rtm) {
 		case rt_mode_clg:
 			table = RT_SQL_CLG_TBL_STR;
@@ -616,12 +621,15 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 			table = RT_SQL_CLG_TBL_STR;
 			cond = rtp->pre->clg;
 			clg_nadi = -2;
-			cld_nadi = -2;			
+			cld_nadi = -2;
 			break;
 		default:
 			return -999;
 	};
-		
+
+	/* Escape user-supplied condition value */
+	if(db_sql_escape(cond,safe_cond,sizeof(safe_cond)) < 0) return -998;
+
 	if((clg_nadi == -1)&&(cld_nadi == -1)) {
 		sprintf(str,"SELECT clg.billing_account_id,clg_df.bill_plan_id,bp.start_period,bp.end_period,"
 					"bacc.billing_day,bacc.round_mode_id,bacc.day_of_payment "
@@ -630,7 +638,7 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 					" bp.id = clg_df.bill_plan_id and "
 					" clg.%s = '%s' and "
 					" bacc.id = clg.billing_account_id and"
-					" bacc.cdr_server_id = %d ",table,table,table,table,cond,rtp->pre->cdr_server_id);
+					" bacc.cdr_server_id = %d ",table,table,table,table,safe_cond,rtp->pre->cdr_server_id);
 	} else if((clg_nadi == -2)&&(cld_nadi == -2)) {
 		sprintf(str,"SELECT clg.billing_account_id,clg_df.sm_bill_plan_id,bp.start_period,bp.end_period,"
 					"bacc.billing_day,bacc.round_mode_id,bacc.day_of_payment "
@@ -639,7 +647,7 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 					" bp.id = clg_df.sm_bill_plan_id and "
 					" clg.%s = '%s' and "
 					" bacc.id = clg.billing_account_id and"
-					" bacc.cdr_server_id = %d ",table,table,table,table,cond,rtp->pre->cdr_server_id);		
+					" bacc.cdr_server_id = %d ",table,table,table,table,safe_cond,rtp->pre->cdr_server_id);
 	} else {
 		sprintf(str,"SELECT src.billing_account_id,src_df.bill_plan_id,src_df.clg_nadi,src_df.cld_nadi,bp.start_period,bp.end_period,bacc.billing_day,bacc.round_mode_id"
 					" from %s as src,%s_deff as src_df,bill_plan as bp,billing_account as bacc  "
@@ -648,7 +656,7 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 					" src.%s = '%s' and "
 					" bacc.id = src.billing_account_id and "
 					" bacc.cdr_server_id = %d and src_df.clg_nadi = %d and src_df.cld_nadi = %d",
-					table,table,table,table,cond,rtp->pre->cdr_server_id,clg_nadi,cld_nadi);
+					table,table,table,table,safe_cond,rtp->pre->cdr_server_id,clg_nadi,cld_nadi);
 	}
 	
 	db_select(dbp,str);
@@ -803,7 +811,7 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 					rt[i].start_period = atoi(result->cols_list[3].rows_list[i].row);
 					rt[i].end_period = atoi(result->cols_list[4].rows_list[i].row);
 					rt[i].prefix_id = atoi(result->cols_list[5].rows_list[i].row);
-				//	rt[i].free_billsec_id = atoi(result->cols_list[6].rows_list[i].row);
+					rt[i].free_billsec_id = atoi(result->cols_list[6].rows_list[i].row);
 				}
 			}
 			
@@ -916,8 +924,8 @@ void rt_data_q_prefix_sql(db_t *dbp,racc_t *rtp)
 				pre->tariff_id = rt[p].tariff_id;
 				pre->rate_id = rt[p].id;
 				pre->prefix_id = rt[p].prefix_id;
-				//pre->free_billsec_id = rt[p].free_billsec_id;
-				//chk_tr_opt(dbp,pre);
+				pre->free_billsec_id = rt[p].free_billsec_id;
+				rt_chk_tr_opt(dbp,pre);
 				if(pre->tariff_id) {
 					rt_data_q_tariff_sql(dbp,rtp);
 					break;

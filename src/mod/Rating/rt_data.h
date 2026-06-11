@@ -83,16 +83,18 @@ typedef struct calc_function
 
 typedef struct rate {
 	unsigned int id;
-	
+
 	unsigned int prefix_id;
 	char prefix[32];
-	
+
 	unsigned int tariff_id;
 	char tariff_name[32];
-	
+
 	unsigned int start_period;
 	unsigned int end_period;
-	
+
+	unsigned int free_billsec_id;
+
 	calc_function_t *calc_funcs;
 } rate_t;
 
