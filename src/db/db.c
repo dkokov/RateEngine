@@ -760,5 +760,31 @@ void db_test(void)
 
 _end:
 	db_close(dbp);
-	db_free(dbp);	
+	db_free(dbp);
+}
+
+int db_sql_escape(const char *src,char *dst,int dst_size)
+{
+	int i,j;
+
+	if(src == NULL || dst == NULL || dst_size <= 0) return -1;
+
+	j = 0;
+	for(i = 0; src[i] != '\0'; i++) {
+		if(j >= (dst_size - 2)) return -2;
+
+		if(src[i] == '\'') {
+			dst[j++] = '\'';
+			dst[j++] = '\'';
+		} else if(src[i] == '\\') {
+			dst[j++] = '\\';
+			dst[j++] = '\\';
+		} else {
+			dst[j++] = src[i];
+		}
+	}
+
+	dst[j] = '\0';
+
+	return j;
 }
