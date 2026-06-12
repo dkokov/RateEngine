@@ -392,7 +392,7 @@ cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig)
 		if(columns != NULL) {
 			bzero(str,sizeof(str));
 			
-			sprintf(str,"select %s from %s where leg_%c = %d",columns,CDR_TABLE_NAME,leg,dig);
+			sprintf(str,"select %s from %s where leg_%c = %d order by id limit %d",columns,CDR_TABLE_NAME,leg,dig,CDR_BATCH_LIMIT);
 
 			mem_free(columns);
 			

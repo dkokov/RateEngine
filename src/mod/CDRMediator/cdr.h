@@ -2,6 +2,7 @@
 #define CDR_H
 
 #define CDR_TABLE_NAME "cdrs"
+#define CDR_BATCH_LIMIT 1000
 
 /* CDR elements len */
 #define CALL_UID_LEN 128

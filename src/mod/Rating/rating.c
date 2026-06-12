@@ -305,8 +305,7 @@ void rt_exec(db_t *dbp,racc_t *rtp,char leg)
 		
 		rt_rate_searching(dbp,rtp);
 
-//		if((bplan_ptr->rates_ptr != NULL)&&(bplan_ptr->rates_i > 0)) {
-		if((bplan_ptr->rates_ptr != NULL)) {
+		if((bplan_ptr->rates_ptr != NULL)&&(bplan_ptr->rates_ptr->calc_funcs != NULL)) {
 			if(bacc_ptr->round_mode_id) 
 				billsec_temp = round_billsec(bacc_ptr->round_mode_id,pre->billusec);
 			
@@ -632,7 +631,8 @@ void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
 }
 
 
-void rt_loop(rate_engine_t *rt_eng)
+/* returns number of CDRs processed in this batch */
+int rt_loop(rate_engine_t *rt_eng)
 {
 	rating_t rt;
 	rating_t *pre;
@@ -706,10 +706,12 @@ void rt_loop(rate_engine_t *rt_eng)
 		gettimeofday(&tim, NULL);
 		t2 = tim.tv_sec+(tim.tv_usec/1000000.0);
 
-		if(cc > 0) {
-			LOG("rating_loop()","batch times: %f total, %f avg/cdr, cdrs: %d",(t2-t1),((t2-t1)/cc),cc);
+		if(pp > 0) {
+			LOG("rating_loop()","batch times: %f total, %f avg/cdr, rated: %d/%d",(t2-t1),((t2-t1)/pp),cc,pp);
 		}
 	}
+
+	return pp;
 }
 
 int rt_init(void)
@@ -820,27 +822,33 @@ void *RateEngine(void *dt)
 	
     loop:
     {
+		int batch_count = 0;
+
 		LOG("RateEngine","RateEngine is started ...");
-						
+
 		/* daemon,without leg value */
 		if(rt_eng.leg == '\0') {
 			rt_eng.leg = 'a';
 			LOG("RateEngine","leg_a ...");
-			rt_loop(&rt_eng);
-			
+			batch_count += rt_loop(&rt_eng);
+
 			LOG("RateEngine","leg_b ...");
 			rt_eng.leg = 'b';
-			rt_loop(&rt_eng);
-			
+			batch_count += rt_loop(&rt_eng);
+
 			rt_eng.leg = '\0';
 		} else {
 			LOG("RateEngine","leg_%c ...",rt_eng.leg);
-			rt_loop(&rt_eng);
+			batch_count = rt_loop(&rt_eng);
 		}
 
-		LOG("RateEngine","RateEngine is finished!");
-				
+		LOG("RateEngine","RateEngine cycle finished, batch_count: %d",batch_count);
+
 		if(rt_eng.active == 't') {
+			/* if batch was full, there may be more — continue immediately */
+			if(batch_count > 0) goto loop;
+
+			/* no CDRs left — sleep and wait for new ones */
 			sleep(rt_eng.rating_interval);
 			goto loop;
 		}

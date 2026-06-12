@@ -47,7 +47,9 @@ void calc_maxsec(racc_t *rtp)
 	
 	pre = rtp->pre;
 	tr = rtp->bplan_ptr->rates_ptr->calc_funcs;
-	
+
+	if(tr == NULL) return;
+
 	units = 0;
 	maxsec = 0;
 	free_billsec = ((pre->free_billsec_limit)-(pre->free_billsec_sum));
@@ -106,7 +108,9 @@ int calc_cprice(racc_t *rtp)
     
     pre = rtp->pre;
     tr = rtp->bplan_ptr->rates_ptr->calc_funcs;
-    
+
+    if(tr == NULL) return -1;
+
     checksec = pre->billsec;
     billsec  = pre->billsec;
 
@@ -166,6 +170,9 @@ int calc_cprice_2(racc_t *rtp)
 	
 	pre = rtp->pre;
 	tr = rtp->bplan_ptr->rates_ptr->calc_funcs;
+
+	if(tr == NULL) return -1;
+
 	checksec = pre->billsec;
 
 	p=0;
