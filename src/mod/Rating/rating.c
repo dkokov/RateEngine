@@ -59,16 +59,40 @@ void rt_chk_bplan_periods(bplan_t *bpt,int ts)
 
 void rt_chk_tr_opt(db_t *dbp,rating_t *pre)
 {
-	if(f_time_cond_query_id(dbp,pre)) {
-		f_time_cond_query_v2(dbp,pre);
-		if(!tc_ts_cmp(pre)) pre->tariff_id = 0;
-		if(pre->tc != NULL) {
-			mem_free(pre->tc);
-			pre->tc = NULL;
+	int has_tc;
+
+	/* check time condition cache */
+	if(rt_eng.cache != NULL && rt_cache_tc_get(rt_eng.cache,pre->tariff_id,&has_tc)) {
+		if(has_tc) {
+			f_time_cond_query_v2(dbp,pre);
+			if(!tc_ts_cmp(pre)) pre->tariff_id = 0;
+			if(pre->tc != NULL) {
+				mem_free(pre->tc);
+				pre->tc = NULL;
+			}
+		}
+	} else {
+		has_tc = f_time_cond_query_id(dbp,pre);
+		if(rt_eng.cache != NULL) rt_cache_tc_put(rt_eng.cache,pre->tariff_id,has_tc);
+
+		if(has_tc) {
+			f_time_cond_query_v2(dbp,pre);
+			if(!tc_ts_cmp(pre)) pre->tariff_id = 0;
+			if(pre->tc != NULL) {
+				mem_free(pre->tc);
+				pre->tc = NULL;
+			}
 		}
 	}
 
-	f_free_billsec_query(dbp,pre);
+	/* check free billsec cache */
+	int fbs_limit;
+	if(rt_eng.cache != NULL && rt_cache_fbs_get(rt_eng.cache,pre->tariff_id,&fbs_limit)) {
+		pre->free_billsec_limit = fbs_limit;
+	} else {
+		f_free_billsec_query(dbp,pre);
+		if(rt_eng.cache != NULL) rt_cache_fbs_put(rt_eng.cache,pre->tariff_id,pre->free_billsec_limit);
+	}
 }
 
 void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
@@ -660,6 +684,15 @@ int rt_loop(rate_engine_t *rt_eng)
 	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
 
     if(cdrs) {
+		/* count CDRs in batch */
+		for(pp = 0; cdrs[pp].id > 0; pp++);
+
+		/* preload subscribers and pcards for this batch */
+		if(rt_eng->cache != NULL && pp > 0) {
+			rt_cache_preload_raccs(rt_eng->cache,rt_eng->dbp,cdrs,pp,cdrs[0].cdr_server_id);
+			rt_cache_preload_pcards(rt_eng->cache,rt_eng->dbp);
+		}
+
 		pp=0;
 
 		while(cdrs[pp].id > 0) {
