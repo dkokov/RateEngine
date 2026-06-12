@@ -684,13 +684,19 @@ int rt_loop(rate_engine_t *rt_eng)
 	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
 
     if(cdrs) {
-		/* count CDRs in batch */
+		/* count CDRs and extract calling numbers for preload */
 		for(pp = 0; cdrs[pp].id > 0; pp++);
 
-		/* preload subscribers and pcards for this batch */
 		if(rt_eng->cache != NULL && pp > 0) {
-			rt_cache_preload_raccs(rt_eng->cache,rt_eng->dbp,cdrs,pp,cdrs[0].cdr_server_id);
-			rt_cache_preload_pcards(rt_eng->cache,rt_eng->dbp);
+			char **nums = (char **)mem_alloc(pp * sizeof(char *));
+			if(nums != NULL) {
+				int ni;
+				for(ni = 0; ni < pp; ni++) nums[ni] = cdrs[ni].calling_number;
+
+				rt_cache_preload_raccs(rt_eng->cache,rt_eng->dbp,nums,pp,cdrs[0].cdr_server_id);
+				rt_cache_preload_pcards(rt_eng->cache,rt_eng->dbp);
+				mem_free(nums);
+			}
 		}
 
 		pp=0;

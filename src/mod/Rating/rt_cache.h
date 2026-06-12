@@ -105,9 +105,8 @@ void rt_cache_tc_put(rt_cache_t *cache,unsigned int tariff_id,int has_tc);
 int rt_cache_fbs_get(rt_cache_t *cache,unsigned int tariff_id,int *limit);
 void rt_cache_fbs_put(rt_cache_t *cache,unsigned int tariff_id,int limit);
 
-/* preload subscribers from CDR batch */
-struct cdr;
-int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,struct cdr *cdrs,int count,int cdr_server_id);
+/* preload subscribers - pass array of calling numbers */
+int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,int cdr_server_id);
 int rt_cache_preload_pcards(rt_cache_t *cache,db_t *dbp);
 
 #endif

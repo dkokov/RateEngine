@@ -7,7 +7,6 @@
 #include "../../log/rt_log.h"
 
 #include "rt_cache.h"
-#include "../CDRMediator/cdr.h"
 
 static unsigned int rt_cache_hash_int(unsigned int key)
 {
@@ -342,36 +341,34 @@ void rt_cache_fbs_put(rt_cache_t *cache,unsigned int tariff_id,int limit)
 
 /* ---- preload: batch load subscribers from CDR batch ---- */
 
-int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,struct cdr *cdrs,int count,int cdr_server_id)
+int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,int cdr_server_id)
 {
 	int i,c,loaded;
 	char *in_clause;
-	char *sql;
+	char *sql_buf;
 	char safe[CLG_NUM_LEN * 2];
 	db_sql_result_t *result;
 	rt_cache_racc_data_t data;
 
-	if(cache == NULL || dbp == NULL || cdrs == NULL || count <= 0) return 0;
-	if(dbp->t != sql) return 0;
+	if(cache == NULL || dbp == NULL || numbers == NULL || count <= 0) return 0;
 
 	/* build IN clause from unique calling numbers */
-	/* worst case: 1000 CDRs x 80 chars + quotes + commas */
 	in_clause = (char *)mem_alloc(count * (CLG_NUM_LEN + 4));
 	if(in_clause == NULL) return -1;
 
 	in_clause[0] = '\0';
 	c = 0;
 
-	for(i = 0; i < count && cdrs[i].id > 0; i++) {
-		if(strlen(cdrs[i].calling_number) == 0) continue;
+	for(i = 0; i < count; i++) {
+		if(numbers[i] == NULL || strlen(numbers[i]) == 0) continue;
 
 		/* skip if already in cache */
 		char key[128];
-		sprintf(key,"%d:%s",rt_mode_clg,cdrs[i].calling_number);
+		sprintf(key,"%d:%s",rt_mode_clg,numbers[i]);
 		if(rt_cache_racc_get(cache,key) != NULL) continue;
 
 		/* check if already in IN clause (simple dedup) */
-		db_sql_escape(cdrs[i].calling_number,safe,sizeof(safe));
+		db_sql_escape(numbers[i],safe,sizeof(safe));
 
 		char needle[CLG_NUM_LEN + 4];
 		sprintf(needle,"'%s'",safe);
@@ -389,10 +386,10 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,struct cdr *cdrs,int coun
 	}
 
 	/* batch query */
-	sql = (char *)mem_alloc(strlen(in_clause) + 512);
-	if(sql == NULL) { mem_free(in_clause); return -1; }
+	sql_buf = (char *)mem_alloc(strlen(in_clause) + 512);
+	if(sql_buf == NULL) { mem_free(in_clause); return -1; }
 
-	sprintf(sql,
+	sprintf(sql_buf,
 		"SELECT clg.calling_number,clg.billing_account_id,clg_df.bill_plan_id,"
 		"bp.start_period,bp.end_period,bacc.billing_day,bacc.round_mode_id,bacc.day_of_payment "
 		"FROM calling_number AS clg,calling_number_deff AS clg_df,bill_plan AS bp,billing_account AS bacc "
@@ -400,7 +397,7 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,struct cdr *cdrs,int coun
 		"AND bacc.id = clg.billing_account_id AND bacc.cdr_server_id = %d "
 		"AND clg.calling_number IN (%s)",cdr_server_id,in_clause);
 
-	db_select(dbp,sql);
+	db_select(dbp,sql_buf);
 	db_fetch(dbp);
 
 	loaded = 0;
@@ -429,7 +426,7 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,struct cdr *cdrs,int coun
 		dbp->conn->result = NULL;
 	}
 
-	mem_free(sql);
+	mem_free(sql_buf);
 	mem_free(in_clause);
 
 	LOG("rt_cache_preload_raccs()","unique: %d, loaded: %d",c,loaded);
@@ -441,14 +438,13 @@ int rt_cache_preload_pcards(rt_cache_t *cache,db_t *dbp)
 {
 	int i,loaded;
 	char *in_clause;
-	char *sql;
+	char *sql_buf;
 	db_sql_result_t *result;
 
 	unsigned int bacc_ids[RT_CACHE_BUCKETS * 4];
 	int bacc_count = 0;
 
 	if(cache == NULL || dbp == NULL) return 0;
-	if(dbp->t != sql) return 0;
 
 	/* collect unique bacc_ids from racc cache */
 	for(i = 0; i < RT_CACHE_BUCKETS; i++) {
@@ -482,15 +478,15 @@ int rt_cache_preload_pcards(rt_cache_t *cache,db_t *dbp)
 	}
 
 	/* batch query */
-	sql = (char *)mem_alloc(strlen(in_clause) + 256);
-	if(sql == NULL) { mem_free(in_clause); return -1; }
+	sql_buf = (char *)mem_alloc(strlen(in_clause) + 256);
+	if(sql_buf == NULL) { mem_free(in_clause); return -1; }
 
-	sprintf(sql,
+	sprintf(sql_buf,
 		"SELECT id,amount,start_date,end_date,pcard_status_id,pcard_type_id,call_number,billing_account_id "
 		"FROM pcard WHERE billing_account_id IN (%s) AND pcard_status_id = 1 "
 		"ORDER BY billing_account_id,start_date DESC",in_clause);
 
-	db_select(dbp,sql);
+	db_select(dbp,sql_buf);
 	db_fetch(dbp);
 
 	loaded = 0;
@@ -542,7 +538,7 @@ int rt_cache_preload_pcards(rt_cache_t *cache,db_t *dbp)
 		dbp->conn->result = NULL;
 	}
 
-	mem_free(sql);
+	mem_free(sql_buf);
 	mem_free(in_clause);
 
 	LOG("rt_cache_preload_pcards()","bacc_ids: %d, loaded: %d",bacc_count,loaded);
