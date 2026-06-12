@@ -1,0 +1,88 @@
+# RateEngine7 CI - build, install and start
+# author: Dimitar Kokov
+# date: 2026-06-12
+
+name: Build and Test
+
+on:
+  push:
+    branches: [ master, 0.7.1 ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: rate_engine
+          POSTGRES_USER: re_admin
+          POSTGRES_PASSWORD: _cfg.access
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make \
+            libxml2-dev libjson-c-dev libpq-dev postgresql-client
+
+      - name: Build core
+        working-directory: src
+        run: make
+
+      - name: Build modules
+        working-directory: src
+        run: make modules
+
+      - name: Install
+        working-directory: src
+        run: sudo make install
+
+      - name: Init database schema
+        env:
+          PGPASSWORD: _cfg.access
+        run: |
+          SQL_FILE="src/scripts/sql/rate_engine_0.6.13.sql"
+          if [ -f "$SQL_FILE" ]; then
+            psql -h localhost -U re_admin rate_engine -f $SQL_FILE
+          else
+            echo "WARNING: schema file not found, skipping DB init"
+          fi
+
+      - name: Prepare config for CI
+        run: |
+          sudo sed -i 's/your_hostname/localhost/' /usr/local/RateEngine/config/RateEngine7.xml
+          sudo sed -i 's/your_dbname/rate_engine/' /usr/local/RateEngine/config/RateEngine7.xml
+          sudo sed -i 's/your_user/re_admin/' /usr/local/RateEngine/config/RateEngine7.xml
+          sudo sed -i 's/your_password/_cfg.access/' /usr/local/RateEngine/config/RateEngine7.xml
+
+      - name: Start RateEngine (smoke test)
+        run: |
+          export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
+          /usr/local/RateEngine/bin/RateEngine -c /usr/local/RateEngine/config/RateEngine7.xml -t db
+          echo "Config test passed"
+
+      - name: Verify modules installed
+        run: |
+          echo "Installed modules:"
+          ls -la /usr/local/RateEngine/modules/
+          echo "Core library:"
+          ls -la /usr/local/RateEngine/libs/
+
+      - name: Check version
+        run: |
+          export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
+          /usr/local/RateEngine/bin/RateEngine -v
