@@ -5,7 +5,8 @@
 #include "../../db/db.h"
 
 #include "rt_cfg.h"
-#include "rt_data.h"
+#include "rating.h"
+#include "rt_cache.h"
 #include "rt_data_q.h"
 #include "pcard.h"
 
@@ -32,10 +33,26 @@ void pcard_manager(db_t *dbp,racc_t *rtp)
     
     pcard_t *card,*tmp;
     
-    /* get only active pcards for this billing_account */	
+    /* check pcard cache first */
+	if(rt_eng.cache != NULL) {
+		rt_cache_pcard_entry_t *cached = rt_cache_pcard_get(rt_eng.cache,bpt->id);
+		if(cached != NULL) {
+			/* copy from cache - pcard_manager modifies card data, so we need a copy */
+			if(cached->count > 0 && cached->cards != NULL) {
+				card = (pcard_t *)mem_alloc_arr(cached->count + 1,sizeof(pcard_t));
+				if(card != NULL) memcpy(card,cached->cards,cached->count * sizeof(pcard_t));
+			} else card = NULL;
+
+			bpt->pcard_ptr = card;
+			goto pcard_process;
+		}
+	}
+
+    /* get only active pcards for this billing_account */
 	rt_data_q_pcard(dbp,bpt,pcard_active);
 	card = bpt->pcard_ptr;
 	
+	pcard_process:
 	tmp = NULL;
 	if(card != NULL) {
 		if(pre->epoch) tt = pre->epoch;

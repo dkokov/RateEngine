@@ -577,6 +577,7 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 	int i;
     char str[DB_BUF_LEN];
 	char safe_cond[RATING_ACCOUNT_LEN * 2];
+	char cache_key[128];
 	char *table,*cond;
 	int clg_nadi,cld_nadi;
 
@@ -631,6 +632,23 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 	/* Escape user-supplied condition value */
 	if(db_sql_escape(cond,safe_cond,sizeof(safe_cond)) < 0) return -998;
 
+	/* check subscriber cache first */
+	if(rt_eng.cache != NULL) {
+		sprintf(cache_key,"%d:%s",rtp->rtm,cond);
+		rt_cache_racc_data_t *cached = rt_cache_racc_get(rt_eng.cache,cache_key);
+
+		if(cached != NULL) {
+			rtp->bacc_ptr->id = cached->bacc_id;
+			rtp->bplan_ptr->id = cached->bplan_id;
+			rtp->bplan_ptr->bplan_start_period = cached->bplan_start_period;
+			rtp->bplan_ptr->bplan_end_period = cached->bplan_end_period;
+			rtp->bacc_ptr->billing_day = cached->billing_day;
+			rtp->bacc_ptr->round_mode_id = cached->round_mode_id;
+			rtp->bacc_ptr->day_of_payment = cached->day_of_payment;
+			return DB_OK;
+		}
+	}
+
 	if((clg_nadi == -1)&&(cld_nadi == -1)) {
 		sprintf(str,"SELECT clg.billing_account_id,clg_df.bill_plan_id,bp.start_period,bp.end_period,"
 					"bacc.billing_day,bacc.round_mode_id,bacc.day_of_payment "
@@ -682,7 +700,20 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 		db_sql_result_free(result);
 		dbp->conn->result = NULL;
 	}
-	
+
+	/* store in cache for subsequent CDRs with same subscriber */
+	if(rt_eng.cache != NULL && rtp->bacc_ptr->id > 0) {
+		rt_cache_racc_data_t store;
+		store.bacc_id = rtp->bacc_ptr->id;
+		store.bplan_id = rtp->bplan_ptr->id;
+		store.bplan_start_period = rtp->bplan_ptr->bplan_start_period;
+		store.bplan_end_period = rtp->bplan_ptr->bplan_end_period;
+		store.billing_day = rtp->bacc_ptr->billing_day;
+		store.round_mode_id = rtp->bacc_ptr->round_mode_id;
+		store.day_of_payment = rtp->bacc_ptr->day_of_payment;
+		rt_cache_racc_put(rt_eng.cache,cache_key,&store);
+	}
+
 	return DB_OK;
 }
 
