@@ -346,14 +346,14 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 	int i,c,loaded;
 	char *in_clause;
 	char *sql_buf;
-	char safe[CLG_NUM_LEN * 2];
+	char safe[CLG_LEN * 2];
 	db_sql_result_t *result;
 	rt_cache_racc_data_t data;
 
 	if(cache == NULL || dbp == NULL || numbers == NULL || count <= 0) return 0;
 
 	/* build IN clause from unique calling numbers */
-	in_clause = (char *)mem_alloc(count * (CLG_NUM_LEN + 4));
+	in_clause = (char *)mem_alloc(count * (CLG_LEN + 4));
 	if(in_clause == NULL) return -1;
 
 	in_clause[0] = '\0';
@@ -370,7 +370,7 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 		/* check if already in IN clause (simple dedup) */
 		db_sql_escape(numbers[i],safe,sizeof(safe));
 
-		char needle[CLG_NUM_LEN + 4];
+		char needle[CLG_LEN + 4];
 		sprintf(needle,"'%s'",safe);
 
 		if(strstr(in_clause,needle) != NULL) continue;
