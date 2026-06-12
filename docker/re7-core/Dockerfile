@@ -1,6 +1,6 @@
 # RateEngine7 Docker container
 # author: Dimitar Kokov
-# version: 0.1
+# version: 0.2
 # date: 2026-06-11
 
 FROM debian:12.2
