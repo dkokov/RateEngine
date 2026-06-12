@@ -9,7 +9,7 @@ PSQL=/usr/bin/psql
 # first run: install + init db
 if [ ! -f /root/.pgpass ]; then
     cp -vfR /re7-core/tmp/* $APP_DIR/
-    cp -vf /re7-core/docker/re7-core/samples/RateEngine7.xml $APP_DIR/config/
+    cp -vfR /re7-core/docker/re7-core/samples/* $APP_DIR/config/
     cp -vf /re7-core/docker/re7-core/.pgpass /root/.pgpass
     chmod 0600 /root/.pgpass
 

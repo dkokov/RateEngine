@@ -1,6 +1,6 @@
 # RateEngine7 Docker containers
 # author: Dimitar Kokov
-# version: 0.1
+# version: 0.2
 # date: 2026-06-11
 
 # docker-compose up --build -d
