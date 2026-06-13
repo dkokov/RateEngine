@@ -93,10 +93,10 @@ void re_put_in_syslog(FILE *fp,char *func,char *msg,va_list ap)
 				
 		re5_timestamp(re5_ts);
 		
-		if(strchr(msg,'%') != NULL) vsprintf(va_msg,msg,ap);
+		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
 
-		sprintf(dt,"%c%s%c%s%c%s%c\n",log_separator,re5_ts,log_separator,func,log_separator,va_msg,log_separator);
+		snprintf(dt,sizeof(dt)-1,"%c%s%c%s%c%s%c\n",log_separator,re5_ts,log_separator,func,log_separator,va_msg,log_separator);
 	           
 		len = strlen(dt);
 
@@ -121,7 +121,7 @@ void re_put_in_syslog_v2(int fp,char *func,char *msg,va_list ap)
 				
 		re5_timestamp(re5_ts);
 		
-		if(strchr(msg,'%') != NULL) vsprintf(va_msg,msg,ap);
+		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
 
 		sprintf(dt,
@@ -160,10 +160,10 @@ void re_put_in_syslog_v3(int fp,const char *func,int line,char *msg,va_list ap)
 				
 		re5_timestamp(re5_ts);
 		
-		if(strchr(msg,'%') != NULL) vsprintf(va_msg,msg,ap);
+		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
 
-		sprintf(dt,"%c%s%c%s(),line: %d%c%s%c\n",
+		snprintf(dt,sizeof(dt)-1,"%c%s%c%s(),line: %d%c%s%c\n",
 				log_separator,re5_ts,log_separator,func,line,log_separator,va_msg,log_separator);
 	           
 		len = strlen(dt);
