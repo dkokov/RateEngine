@@ -361,6 +361,8 @@ void rt_exec(db_t *dbp,racc_t *rtp,char leg)
 
 	if(pre->rating_id == 0) {
 		LOG("rating_exec()","rating_id is '0' after 'rating_save()' / this call_uid %s,call_id %d is already rated",pre->call_uid,pre->cdr_id);
+		/* mark CDR as processed (-1) to prevent re-fetching */
+		cdrm_api->update_cdr(dbp,-1,pre->cdr_id,leg,pre->call_uid);
 	} else {
 		cdrm_api->update_cdr(dbp,pre->rating_id,pre->cdr_id,leg,pre->call_uid);
 
