@@ -3,6 +3,9 @@
 
 #include "rt_data.h"
 
+/* forward declaration - defined in db/db.h */
+typedef struct db db_t;
+
 #define RT_CACHE_BUCKETS 256
 
 /* cache entry for rates (key = bplan_id) */
