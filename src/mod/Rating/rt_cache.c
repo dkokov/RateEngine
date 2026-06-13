@@ -350,7 +350,10 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 	db_sql_result_t *result;
 	rt_cache_racc_data_t data;
 
-	if(cache == NULL || dbp == NULL || numbers == NULL || count <= 0) return 0;
+	if(cache == NULL || dbp == NULL || numbers == NULL || count <= 0) {
+		LOG("rt_cache_preload_raccs()","skip: cache=%p,dbp=%p,numbers=%p,count=%d",cache,dbp,numbers,count);
+		return 0;
+	}
 
 	/* build IN clause from unique calling numbers */
 	in_clause = (char *)mem_alloc(count * (CLG_LEN + 4));
@@ -381,9 +384,12 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 	}
 
 	if(c == 0) {
+		LOG("rt_cache_preload_raccs()","no unique numbers to preload (count=%d)",count);
 		mem_free(in_clause);
 		return 0;
 	}
+
+	LOG("rt_cache_preload_raccs()","preloading %d unique numbers ...",c);
 
 	/* batch query */
 	sql_buf = (char *)mem_alloc(strlen(in_clause) + 512);
@@ -397,8 +403,11 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 		"AND bacc.id = clg.billing_account_id AND bacc.cdr_server_id = %d "
 		"AND clg.calling_number IN (%s)",cdr_server_id,in_clause);
 
-	db_select(dbp,sql_buf);
-	db_fetch(dbp);
+	{
+		int sel_ret = db_select(dbp,sql_buf);
+		int fetch_ret = db_fetch(dbp);
+		LOG("rt_cache_preload_raccs()","select=%d, fetch=%d, result=%p",sel_ret,fetch_ret,dbp->conn->result);
+	}
 
 	loaded = 0;
 
