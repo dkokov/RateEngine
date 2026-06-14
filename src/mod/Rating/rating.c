@@ -97,16 +97,22 @@ void rt_chk_tr_opt(db_t *dbp,rating_t *pre)
 
 void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 {
-	int ret;
-
 	if(dbp == NULL) return;
 	if(rtp == NULL) return;
 	if(rtp->pre == NULL) return;
+	if(rtp->bal_ptr == NULL) return;
 
-	ret = rt_data_q_bal(dbp,rtp,start,end);
-	if(ret == 0) {
+	if(rtp->bal_ptr->id > 0) {
+		/* balance already loaded from prerating - just update with cprice */
 		rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
 		rt_data_q_bal_add(dbp,rtp,start,end);
+	} else {
+		/* no balance loaded yet - query first */
+		int ret = rt_data_q_bal(dbp,rtp,start,end);
+		if(ret == 0) {
+			rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
+			rt_data_q_bal_add(dbp,rtp,start,end);
+		}
 	}
 }
 
