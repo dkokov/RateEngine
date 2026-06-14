@@ -85,6 +85,10 @@ void rt_cfg_get(rt_cfg_t *cfg)
 			if(strcmp(params->name,"RatingJSONConfigDIR") == 0) {
 				strcpy(cfg->rt_cfg_json_dir,params->value);
 			}
+
+			if(strcmp(params->name,"RatingThreads") == 0) {
+				cfg->rating_threads = atoi(params->value);
+			}
 						
 			params = params->next_param;
 		}

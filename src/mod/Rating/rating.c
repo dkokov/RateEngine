@@ -102,6 +102,8 @@ void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 	if(rtp->pre == NULL) return;
 	if(rtp->bal_ptr == NULL) return;
 
+	pthread_mutex_lock(&config.sync_bt_thread);
+
 	if(rtp->bal_ptr->id > 0) {
 		/* balance already loaded from prerating - just update with cprice */
 		rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
@@ -114,6 +116,8 @@ void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 			rt_data_q_bal_add(dbp,rtp,start,end);
 		}
 	}
+
+	pthread_mutex_unlock(&config.sync_bt_thread);
 }
 
 int rt_prerating_process(db_t *dbp,racc_t *rtp)
@@ -663,23 +667,42 @@ void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
 }
 
 
+/* worker thread function */
+void *rt_worker_func(void *arg)
+{
+	rt_worker_t *w = (rt_worker_t *)arg;
+	rating_t rt;
+	rating_t *pre;
+	int i;
+
+	pre = &rt;
+
+	for(i = 0; i < w->count; i++) {
+		int idx = w->indices[i];
+
+		rt_rating_init(pre);
+		rt_cdr_to_rating(&w->cdrs[idx],pre);
+
+		rt_main(w->dbp,pre,w->leg,w->cdrs[idx].cdr_rec_type_id);
+
+		if(pre->rating_id > 0) w->rated_ok++;
+		else w->rated_err++;
+	}
+
+	return NULL;
+}
+
 /* returns number of CDRs processed in this batch */
 int rt_loop(rate_engine_t *rt_eng)
 {
-	rating_t rt;
-	rating_t *pre;
-
 	struct timeval tim;
     double t1,t2;
-	char msg[512];
-	struct timeval times;
 
     cdr_t *cdrs = 0;
 
     int pp = 0;
     int cc = 0;
-
-	pre = &rt;
+	int num_threads = rt_eng->num_threads;
 
 	/* create cache for this batch cycle */
 	rt_eng->cache = rt_cache_init();
@@ -692,9 +715,10 @@ int rt_loop(rate_engine_t *rt_eng)
 	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
 
 	if(cdrs) {
-		/* count CDRs and extract calling numbers for preload */
+		/* count CDRs in batch */
 		for(pp = 0; cdrs[pp].id > 0; pp++);
 
+		/* preload subscribers and pcards */
 		if(rt_eng->cache != NULL && pp > 0) {
 			char **nums = (char **)mem_alloc(pp * sizeof(char *));
 			if(nums != NULL) {
@@ -707,44 +731,71 @@ int rt_loop(rate_engine_t *rt_eng)
 			}
 		}
 
-		pp=0;
+		if(num_threads <= 1) {
+			/* single-thread path (original) */
+			rating_t rt;
+			rating_t *pre = &rt;
+			int p;
 
-		while(cdrs[pp].id > 0) {
-			rt_rating_init(pre);
-			rt_cdr_to_rating(&cdrs[pp],pre);
+			for(p = 0; p < pp; p++) {
+				rt_rating_init(pre);
+				rt_cdr_to_rating(&cdrs[p],pre);
 
-			gettimeofday(&times, NULL);
-			pre->start_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
+				rt_main(rt_eng->dbp,pre,rt_eng->leg,cdrs[p].cdr_rec_type_id);
 
-			rt_main(rt_eng->dbp,pre,rt_eng->leg,cdrs[pp].cdr_rec_type_id);
+				if(pre->rating_id > 0) cc++;
 
-			gettimeofday(&times, NULL);
-			pre->current_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
+				if(rt_eng->wait_rating > 0) usleep(rt_eng->wait_rating);
+			}
+		} else {
+			/* multi-thread path */
+			int t,i;
+			int per_thread = pp / num_threads;
+			int remainder  = pp % num_threads;
 
-			if(log_debug_level >= LOG_LEVEL_DEBUG) {
-				char msg4[1024];
-				sprintf(msg4,"rating call times: %f,cdr_id: %d,call_uid: %s",
-				(double)((pre->current_timer)-(pre->start_timer))/1000000,cdrs[pp].id,cdrs[pp].call_uid);
+			/* allocate index arrays and set up workers */
+			for(t = 0; t < num_threads; t++) {
+				int start = t * per_thread + (t < remainder ? t : remainder);
+				int count = per_thread + (t < remainder ? 1 : 0);
 
-				LOG("rating_loop()",msg4);
+				rt_eng->workers[t].id = t;
+				rt_eng->workers[t].dbp = rt_eng->worker_dbp[t];
+				rt_eng->workers[t].cdrs = cdrs;
+				rt_eng->workers[t].leg = rt_eng->leg;
+				rt_eng->workers[t].rated_ok = 0;
+				rt_eng->workers[t].rated_err = 0;
+				rt_eng->workers[t].count = count;
+
+				rt_eng->workers[t].indices = (int *)mem_alloc(count * sizeof(int));
+				for(i = 0; i < count; i++) {
+					rt_eng->workers[t].indices[i] = start + i;
+				}
 			}
 
-			if((pre->rating_id) > 0) cc++;
+			/* launch worker threads */
+			for(t = 0; t < num_threads; t++) {
+				pthread_create(&rt_eng->worker_threads[t],NULL,rt_worker_func,&rt_eng->workers[t]);
+			}
 
-			if(rt_eng->wait_rating > 0) usleep(rt_eng->wait_rating);
-			
-			pp++;
+			/* wait for all workers */
+			for(t = 0; t < num_threads; t++) {
+				pthread_join(rt_eng->worker_threads[t],NULL);
+
+				cc += rt_eng->workers[t].rated_ok;
+
+				mem_free(rt_eng->workers[t].indices);
+				rt_eng->workers[t].indices = NULL;
+			}
+
+			LOG("rating_loop()","threads: %d, rated_ok: %d/%d",num_threads,cc,pp);
 		}
 
-		sprintf(msg,"Number of rating cdrs (leg %c) = [%d/%d]",rt_eng->leg,pp,cc);
-		
-		LOG("rating_loop",msg);
-		
+		LOG("rating_loop()","batch done (leg %c), rated: %d/%d",rt_eng->leg,cc,pp);
+
 		mem_free(cdrs);
     }
-DBG2("after get_cdrs()");
 
-	/* free cache - logs hit/miss stats */
+	/* free cache */
 	if(rt_eng->cache != NULL) {
 		rt_cache_free(rt_eng->cache);
 		rt_eng->cache = NULL;
@@ -755,7 +806,7 @@ DBG2("after get_cdrs()");
 		t2 = tim.tv_sec+(tim.tv_usec/1000000.0);
 
 		if(pp > 0) {
-			LOG("rating_loop()","batch times: %f total, %f avg/cdr, rated: %d/%d",(t2-t1),((t2-t1)/pp),cc,pp);
+			LOG("rating_loop()","batch times: %f total, %f avg/cdr, cdrs: %d",(t2-t1),((t2-t1)/pp),pp);
 		}
 	}
 
@@ -795,26 +846,74 @@ int rt_init(void)
 	}
 						
 	goto success;
-	
+
 error:
-	if(rt_eng.dbp != NULL) db_free(rt_eng.dbp);		 
-	
+	if(rt_eng.dbp != NULL) db_free(rt_eng.dbp);
+
 	return RE_ERROR_N;
-	
+
 success:
 	return RE_SUCCESS;
 }
 
+int rt_init_workers(int num_threads)
+{
+	int t;
+
+	if(num_threads <= 1) return RE_SUCCESS;
+	if(num_threads > RT_MAX_THREADS) num_threads = RT_MAX_THREADS;
+
+	for(t = 0; t < num_threads; t++) {
+		rt_eng.worker_dbp[t] = db_init();
+		if(rt_eng.worker_dbp[t] == NULL) {
+			LOG("rt_init_workers()","db_init failed for worker %d",t);
+			return RE_ERROR;
+		}
+
+		rt_eng.worker_dbp[t]->conn = db_conn_init(mcfg->dbtype,mcfg->dbhost,mcfg->dbname,mcfg->dbport,mcfg->dbuser,mcfg->dbpass,0);
+
+		if(db_engine_bind(rt_eng.worker_dbp[t]) < 0) {
+			LOG("rt_init_workers()","db_engine_bind failed for worker %d",t);
+			return RE_ERROR;
+		}
+
+		if(db_connect(rt_eng.worker_dbp[t]) < 0) {
+			LOG("rt_init_workers()","db_connect failed for worker %d",t);
+			return RE_ERROR;
+		}
+
+		LOG("rt_init_workers()","worker %d DB connected",t);
+	}
+
+	return RE_SUCCESS;
+}
+
+void rt_free_workers(int num_threads)
+{
+	int t;
+
+	for(t = 0; t < num_threads && t < RT_MAX_THREADS; t++) {
+		if(rt_eng.worker_dbp[t] != NULL) {
+			db_close(rt_eng.worker_dbp[t]);
+			db_free(rt_eng.worker_dbp[t]);
+			rt_eng.worker_dbp[t] = NULL;
+		}
+	}
+}
+
 int rt_free(void)
-{	
+{
 	int ret;
-	
+
+	/* free worker connections */
+	if(rt_eng.num_threads > 1) rt_free_workers(rt_eng.num_threads);
+
 	if(rt_eng.dbp != NULL) {
 		if(rt_eng.dbp->conn != NULL) {
 			ret = db_close(rt_eng.dbp);
 			if(ret < 0) db_error(ret);
 		}
-		
+
 		db_free(rt_eng.dbp);
 	} else return RE_ERROR;
 
@@ -865,6 +964,21 @@ void *RateEngine(void *dt)
 	else rt_eng.wait_rating = WAIT_RATING;
 
 	if(strlen(cfg->rt_cfg_json_dir) > 0) strcpy(rt_eng.rt_cfg_json_dir,cfg->rt_cfg_json_dir);
+
+	if(cfg->rating_threads > 1) rt_eng.num_threads = cfg->rating_threads;
+	else rt_eng.num_threads = RT_DEFAULT_THREADS;
+
+	if(rt_eng.num_threads > RT_MAX_THREADS) rt_eng.num_threads = RT_MAX_THREADS;
+
+	/* create worker DB connections */
+	if(rt_eng.num_threads > 1) {
+		if(rt_init_workers(rt_eng.num_threads) < 0) {
+			LOG("RateEngine","rt_init_workers() failed, falling back to single thread");
+			rt_eng.num_threads = 1;
+		} else {
+			LOG("RateEngine","multi-thread rating enabled: %d threads",rt_eng.num_threads);
+		}
+	}
 
 	mem_free(cfg);
 	
