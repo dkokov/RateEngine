@@ -684,18 +684,19 @@ int rt_loop(rate_engine_t *rt_eng)
 	}
 
 	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
-
-    if(cdrs) {
+DBG2("before get_cdrs()");
+	if(cdrs) {
 		/* count CDRs and extract calling numbers for preload */
 		for(pp = 0; cdrs[pp].id > 0; pp++);
-
+DBG2("pp=%d",pp);
 		if(rt_eng->cache != NULL && pp > 0) {
 			char **nums = (char **)mem_alloc(pp * sizeof(char *));
 			if(nums != NULL) {
 				int ni;
 				for(ni = 0; ni < pp; ni++) nums[ni] = cdrs[ni].calling_number;
 
-				rt_cache_preload_raccs(rt_eng->cache,rt_eng->dbp,nums,pp,cdrs[0].cdr_server_id);
+				int ret = rt_cache_preload_raccs(rt_eng->cache,rt_eng->dbp,nums,pp,cdrs[0].cdr_server_id);
+				LOG("rt_loop()","rt_cache_preload_racc,return: %d", ret);
 				rt_cache_preload_pcards(rt_eng->cache,rt_eng->dbp);
 				mem_free(nums);
 			}
@@ -736,6 +737,7 @@ int rt_loop(rate_engine_t *rt_eng)
 		
 		mem_free(cdrs);
     }
+DBG2("after get_cdrs()");
 
 	/* free cache - logs hit/miss stats */
 	if(rt_eng->cache != NULL) {

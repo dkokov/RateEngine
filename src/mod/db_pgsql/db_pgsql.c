@@ -63,8 +63,9 @@ PGresult *db_pgsql_exec(PGconn *conn,char *sql)
 		if(db_pgsql_status_query(res) == DB_ERR_SQLEXEC_NOOK) {
 			LOG("db_pgsql_exec()","query error: %s",PQerrorMessage(conn));
 		} else {
-			if(strlen(sql) < 900) DBG("db_pgsql_exec()","query '%s'",sql);
-			else DBG("db_pgsql_exec()","query (len=%d) '%.200s...'", (int)strlen(sql), sql);
+			//if(strlen(sql) < 900) 
+			DBG("db_pgsql_exec()","query '%s'",sql);
+			//else DBG("db_pgsql_exec()","query (len=%d) '%.200s...'", (int)strlen(sql), sql);
 		}
 	} else {
 		LOG("db_pgsql_exec()","PGSQL , no connection !!!");
