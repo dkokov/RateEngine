@@ -54,23 +54,28 @@ int db_pgsql_status_query(PGresult *res)
 PGresult *db_pgsql_exec(PGconn *conn,char *sql)
 {
 	PGresult *res;
-    
-	res = NULL;
-	
-	if(db_pgsql_conn_check(conn) == DB_OK) {
-		res = PQexec(conn,sql);
 
-		if(db_pgsql_status_query(res) == DB_ERR_SQLEXEC_NOOK) {
-			LOG("db_pgsql_exec()","query error: %s",PQerrorMessage(conn));
-		} else {
-			//if(strlen(sql) < 900) 
-			DBG("db_pgsql_exec()","query '%s'",sql);
-			//else DBG("db_pgsql_exec()","query (len=%d) '%.200s...'", (int)strlen(sql), sql);
+	res = NULL;
+
+	if(PQstatus(conn) != CONNECTION_OK) {
+		/* connection lost - try to reconnect once */
+		LOG("db_pgsql_exec()","connection lost, reconnecting ...");
+		PQreset(conn);
+
+		if(PQstatus(conn) != CONNECTION_OK) {
+			LOG("db_pgsql_exec()","reconnect failed: %s",PQerrorMessage(conn));
+			return NULL;
 		}
-	} else {
-		LOG("db_pgsql_exec()","PGSQL , no connection !!!");
 	}
-    
+
+	res = PQexec(conn,sql);
+
+	if(db_pgsql_status_query(res) == DB_ERR_SQLEXEC_NOOK) {
+		LOG("db_pgsql_exec()","query error: %s",PQerrorMessage(conn));
+	} else {
+		DBG("db_pgsql_exec()","query '%s'",sql);
+	}
+
     return res;
 }
 

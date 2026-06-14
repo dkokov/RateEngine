@@ -499,6 +499,7 @@ int rt_data_q_rating_add_sql(db_t *dbp,racc_t *rtp)
 	char safe_ts[64];
 
     rating_t *pre;
+	db_sql_result_t *result;
 
 	if(dbp == NULL) return -1;
 
@@ -510,16 +511,48 @@ int rt_data_q_rating_add_sql(db_t *dbp,racc_t *rtp)
 	if(dbp->t == sql) {
 		db_sql_escape(pre->timestamp,safe_ts,sizeof(safe_ts));
 
+		sprintf(str,"select id from rating where call_id = %d and billing_account_id = %d and rate_id = %d",
+					pre->cdr_id,rtp->bacc_ptr->id,pre->rate_id);
+
+		db_select(dbp,str);
+		db_fetch(dbp);
+
+		if(dbp->conn->result != NULL) {
+			result = (db_sql_result_t *)dbp->conn->result;
+
+			if(result->rows > 0) {
+				/* already rated */
+				pre->rating_id = 0;
+				db_sql_result_free(result);
+				dbp->conn->result = NULL;
+				return 0;
+			}
+
+			db_sql_result_free(result);
+			dbp->conn->result = NULL;
+		}
+
+		/* insert and get id back in one query */
 		sprintf(str,"insert into rating"
 					" (call_price,call_billsec,rate_id,billing_account_id,call_id,rating_mode_id,pcard_id,time_condition_id,"
 					"call_ts,last_update,free_billsec_id)"
-					" values (%f,%d,%d,%d,%d,%d,%d,%d,'%s','now()',%d)",
+					" values (%f,%d,%d,%d,%d,%d,%d,%d,'%s','now()',%d) returning id",
 					pre->cprice,pre->billsec,pre->rate_id,rtp->bacc_ptr->id,pre->cdr_id,pre->rating_mode_id,card_id,pre->tc_id,safe_ts,pre->free_billsec_id);
 
-		db_insert(dbp,str);
+		db_select(dbp,str);
+		db_fetch(dbp);
+
+		if(dbp->conn->result != NULL) {
+			result = (db_sql_result_t *)dbp->conn->result;
+
+			if(result->rows == 1) pre->rating_id = atoi(result->cols_list[0].rows_list[0].row);
+
+			db_sql_result_free(result);
+			dbp->conn->result = NULL;
+		}
 	} else return -2;
-	
-	return 0;   
+
+	return 0;
 }
 
 int rt_data_q_rating_add_nosql(db_t *dbp,racc_t *rtp)
@@ -544,24 +577,19 @@ int rt_data_q_rating_add_nosql(db_t *dbp,racc_t *rtp)
 int rt_data_q_rating_add(db_t *dbp,racc_t *rtp)
 {
 	int ret;
-	
+
 	rating_t *pre;
-	
+
 	if(rtp == NULL) return -999;
 	if(rtp->pre == NULL) return -998;
-	
+
 	pre = rtp->pre;
-	
+
 	if(dbp == NULL) return DB_ERR_DBP_NUL;
-	
+
 	if(dbp->t == sql) {
-		rt_data_q_rating_id(dbp,rtp);
-			
-		if(pre->rating_id > 0) pre->rating_id = 0; 
-		else { 
-			ret = rt_data_q_rating_add_sql(dbp,rtp);
-			rt_data_q_rating_id(dbp,rtp);
-		}
+		/* check + insert + get id all handled inside */
+		ret = rt_data_q_rating_add_sql(dbp,rtp);
 	} else if(dbp->t == nosql) {
 		ret = rt_data_q_rating_add_nosql(dbp,rtp);
 		pre->rating_id = 1;
