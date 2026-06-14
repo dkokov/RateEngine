@@ -6,6 +6,21 @@
 #include "rt_data.h"
 #include "rt_cache.h"
 
+#define RT_MAX_THREADS 16
+#define RT_DEFAULT_THREADS 1
+
+/* worker thread context */
+typedef struct rt_worker {
+    int id;
+    db_t *dbp;
+    cdr_t *cdrs;
+    int *indices;
+    int count;
+    char leg;
+    int rated_ok;
+    int rated_err;
+} rt_worker_t;
+
 typedef struct rate_engine
 {
     db_t *dbp;
@@ -20,15 +35,22 @@ typedef struct rate_engine
     int  rating_flag;
     char rating_mode[RATING_ACCOUNT_LEN];
     char rating_account[RATING_ACCOUNT_LEN];
-    
+
     pid_t pid;
     pthread_t rt_thread;
-    
+
     char pcard_sort_key[12];
     char pcard_sort_mode[5];
-    
+
     unsigned short bal_num;
- 	char rt_cfg_json_dir[256];   
+    unsigned short num_threads;
+
+    /* worker threads */
+    rt_worker_t workers[RT_MAX_THREADS];
+    pthread_t worker_threads[RT_MAX_THREADS];
+    db_t *worker_dbp[RT_MAX_THREADS];
+
+ 	char rt_cfg_json_dir[256];
 } rate_engine_t;
 
 extern rate_engine_t rt_eng;

@@ -35,6 +35,8 @@ typedef struct rt_cfg {
     
     unsigned short bal_num;
 
+	unsigned short rating_threads;
+
 	char rt_cfg_json_dir[256];
 }rt_cfg_t;
 
