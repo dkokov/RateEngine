@@ -539,7 +539,7 @@ int rt_data_q_rating_add_sql(db_t *dbp,racc_t *rtp)
 					" values (%f,%d,%d,%d,%d,%d,%d,%d,'%s','now()',%d) returning id",
 					pre->cprice,pre->billsec,pre->rate_id,rtp->bacc_ptr->id,pre->cdr_id,pre->rating_mode_id,card_id,pre->tc_id,safe_ts,pre->free_billsec_id);
 
-		db_select(dbp,str);
+		db_query(dbp,str,0);
 		db_fetch(dbp);
 
 		if(dbp->conn->result != NULL) {
