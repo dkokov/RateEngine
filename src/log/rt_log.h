@@ -27,7 +27,8 @@ void re_close_2(int fd);
 #define DBG(func,msg,args...) \
 	if(log_debug_level >= LOG_LEVEL_DEBUG) re_write_syslog_2(config.log,func,msg,##args); \
 
-#define DBG2(msg,args...) re_write_syslog_v3(config.log,__func__,__LINE__,msg,##args);
+#define DBG2(msg,args...) \
+	if(log_debug_level >= LOG_LEVEL_TIME_DEBUG) re_write_syslog_v3(config.log,__func__,__LINE__,msg,##args); \
 
 #define LOG_CLOSE re_close_2(config.log);
 

@@ -408,8 +408,8 @@ cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig)
 						for(c=0;c<result->rows;c++) {
 							for(p = 0;p < (CDR_TBL_NUM - 1);p++) {
 								(*cdr_tbl[p].func)(&cdrs[c],result->cols_list[p].rows_list[c].row);
-							}			
-						}					
+							}
+						}
 					}
 				}
 			
@@ -417,7 +417,7 @@ cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig)
 				dbp->conn->result = NULL;
 			}
 		}
-	} else if(dbp->t == nosql) {				
+	} else if(dbp->t == nosql) {
 		int ret;
 		
 		ret = db_command(dbp,"keys cdr_call_*");

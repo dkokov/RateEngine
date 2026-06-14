@@ -404,6 +404,7 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 		"AND clg.calling_number IN (%s)",cdr_server_id,in_clause);
 
 	{
+//		LOG("debug","sql: %s", sql_buf);
 		int sel_ret = db_select(dbp,sql_buf);
 		int fetch_ret = db_fetch(dbp);
 		LOG("rt_cache_preload_raccs()","select=%d, fetch=%d, result=%p",sel_ret,fetch_ret,dbp->conn->result);
