@@ -8,7 +8,7 @@
 
 #include "rt_maxsec.h"
 
-int rt_pgbatch_bind_api(rt_funcs_t *api)
+int rt_bind_api(rt_funcs_t *api)
 {
 	if(api == NULL) return -1;
 	

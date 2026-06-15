@@ -1,8 +1,8 @@
 include ../../config.mk
 
-MOD_NAME = rt_pgbatch
+MOD_NAME = rt
 
-# RatingBatch - PostgreSQL batch mode
+# RatingBatch - PostgreSQL batch mode (produces rt.so, drop-in replacement)
 MOD_LIB = $(MOD_NAME).so
 MOD_SRC = $(shell echo *.c)
 MOD_OBJS = $(MOD_SRC:.c=.o)
