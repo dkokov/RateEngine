@@ -1,5 +1,6 @@
 mod/CDRMediator
 mod/Rating
+#mod/RatingBatch
 #mod/CallControl
 mod/db_pgsql
 #mod/db_mysql
