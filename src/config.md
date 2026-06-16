@@ -1,5 +1,6 @@
 mod/CDRMediator
 mod/Rating
+#mod/RatingDuckDB
 #mod/CallControl
 mod/db_pgsql
 #mod/db_mysql
