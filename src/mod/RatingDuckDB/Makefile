@@ -15,7 +15,7 @@ MOD_OBJS = $(MOD_SRC:.c=.o)
 CFLAGS += $(DUCKDB_INC)
 
 MOD: $(MOD_OBJS)
-	$(CC) $(LDFLAGS) -o $(MOD_LIB) $(MOD_OBJS) -L../../ $(CORE_LIB_LD) -L$(DUCKDB_DIR) -lduckdb -Wl,-rpath,'$$ORIGIN/lib'
+	$(CC) $(LDFLAGS) -o $(MOD_LIB) $(MOD_OBJS) -L../../ $(CORE_LIB_LD) -L$(DUCKDB_DIR) -lduckdb -Wl,-rpath,'$$ORIGIN'
 
 all: MOD
 

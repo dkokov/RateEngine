@@ -133,9 +133,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id "
 		"  WHERE cf.pos = 1 "
 		") "
-		"SELECT cdr_id, calling_number, called_number, billsec, "
+		"SELECT CAST(cdr_id AS BIGINT) AS cdr_id, calling_number, called_number, CAST(billsec AS BIGINT) AS billsec, "
 		"  CAST(start_ts AS VARCHAR) AS start_ts_str, "
-		"  bacc_id, round_mode_id, rate_id, tariff_id, prefix_id, "
+		"  CAST(bacc_id AS BIGINT) AS bacc_id, round_mode_id, CAST(rate_id AS BIGINT) AS rate_id, tariff_id, prefix_id, "
 		"  delta_time, fee, iterations, "
 		"  CASE "
 		"    WHEN iterations = 0 THEN fee * CEIL(CAST(billsec AS DOUBLE) / delta_time) "
@@ -143,20 +143,6 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  END AS cprice "
 		"FROM with_tariff",
 		leg,limit);
-
-	/* first check how many unrated CDRs exist */
-	{
-		duckdb_result count_res;
-		char count_sql[256];
-		snprintf(count_sql,sizeof(count_sql),
-			"SELECT COUNT(*) FROM pg.cdrs WHERE leg_%c = 0",leg);
-
-		if(duckdb_query(ctx->conn,count_sql,&count_res) == DuckDBSuccess) {
-			int64_t total_unrated = duckdb_value_int64(&count_res,0,0);
-			LOG("rt_duckdb_rate_batch()","unrated CDRs: %ld",(long)total_unrated);
-			duckdb_destroy_result(&count_res);
-		}
-	}
 
 	state = duckdb_query(ctx->conn,sql,&result);
 
@@ -197,11 +183,11 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			" VALUES ");
 
 		for(i = 0; i < row_count; i++) {
-			int cdr_id    = duckdb_value_int32(&result,0,i);  /* cdr_id */
-			int billsec   = duckdb_value_int32(&result,3,i);  /* billsec */
-			int bacc_id   = duckdb_value_int32(&result,5,i);  /* bacc_id */
-			int rate_id   = duckdb_value_int32(&result,7,i);  /* rate_id */
-			double cprice = duckdb_value_double(&result,13,i); /* cprice */
+			long long cdr_id  = duckdb_value_int64(&result,0,i);  /* cdr_id */
+			int billsec       = (int)duckdb_value_int64(&result,3,i);  /* billsec */
+			long long bacc_id = duckdb_value_int64(&result,5,i);  /* bacc_id */
+			long long rate_id = duckdb_value_int64(&result,7,i);  /* rate_id */
+			double cprice     = duckdb_value_double(&result,13,i); /* cprice */
 
 			duckdb_string start_ts_str = duckdb_value_string(&result,4,i); /* start_ts_str (CAST AS VARCHAR) */
 
@@ -214,7 +200,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			}
 
 			snprintf(row_buf,sizeof(row_buf),
-				"%s(%f,%d,%d,%d,%d,1,0,0,'%s','now()',0)",
+				"%s(%f,%d,%lld,%lld,%lld,1,0,0,'%s','now()',0)",
 				(first ? "" : ","),
 				cprice,billsec,rate_id,bacc_id,cdr_id,safe_ts);
 
@@ -240,10 +226,10 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 					for(int j = 0; j < pg_result->rows; j++) {
 						char upd_row[64];
-						int rating_id = atoi(pg_result->cols_list[0].rows_list[j].row);
-						int cdr_id    = atoi(pg_result->cols_list[1].rows_list[j].row);
+						long long rating_id = atoll(pg_result->cols_list[0].rows_list[j].row);
+						long long cdr_id    = atoll(pg_result->cols_list[1].rows_list[j].row);
 
-						snprintf(upd_row,sizeof(upd_row),"%s(%d,%d)",
+						snprintf(upd_row,sizeof(upd_row),"%s(%lld,%lld)",
 							(j > 0 ? "," : ""),cdr_id,rating_id);
 						strcat(update_sql,upd_row);
 					}
