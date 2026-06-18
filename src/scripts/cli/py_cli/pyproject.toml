@@ -1,0 +1,19 @@
+[project]
+name = "re7-cli"
+version = "0.7.0"
+description = "RateEngine V7 admin/provisioning CLI (Python 3 port of the PHP RE6Commander)"
+authors = [{ name = "Dimitar Kokov" }]
+requires-python = ">=3.10"
+dependencies = [
+    "psycopg[binary]>=3.1",
+]
+
+[project.scripts]
+re7commander = "re_cli.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["re_cli", "re_cli.re7", "re_cli.re5"]
