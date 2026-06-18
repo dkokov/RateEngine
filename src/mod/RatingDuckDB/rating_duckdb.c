@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 #include "../mod.h"
 #include "../../misc/globals.h"
