@@ -1,0 +1,10 @@
+# real credentials — only .env.example is committed
+.env
+
+# python artifacts
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+build/
+dist/
