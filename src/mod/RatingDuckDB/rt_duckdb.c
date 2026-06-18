@@ -93,42 +93,76 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	duckdb_state state;
 	idx_t row_count,i;
 	int rated = 0;
+	long long max_window_id = 0;
 
 	if(ctx == NULL || pg_dbp == NULL) return 0;
 
 	/*
-	 * STEP 1: Big JOIN - match CDRs to subscribers, rates, tariffs
-	 * This single query replaces: racc lookup + rate lookup + prefix match + tariff lookup
-	 *
-	 * The prefix match uses: cld LIKE prefix || '%'
-	 * We pick the longest matching prefix via ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY LENGTH(prefix) DESC)
+	 * STEP 0: pin a deterministic batch window (the lowest `limit` unrated CDR
+	 * ids). Both the rating JOIN and the unmatched (-1) marking work on exactly
+	 * this set, so we never mark a CDR we did not actually evaluate.
+	 */
+	snprintf(sql,sizeof(sql),
+		"CREATE OR REPLACE TEMP TABLE batch_window AS "
+		"SELECT id, calling_number, called_number, billsec, start_ts, cdr_server_id "
+		"FROM pg.cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d",
+		leg,limit);
+
+	if(rt_duckdb_exec(ctx->conn,sql) < 0) {
+		LOG("rt_duckdb_rate_batch()","build batch_window failed");
+		return -1;
+	}
+
+	/* window bounds: is there work left, and the max id to scope the -1 mark */
+	{
+		long long win_count;
+		duckdb_result wr;
+
+		if(duckdb_query(ctx->conn,
+			"SELECT COUNT(*), COALESCE(MAX(id),0) FROM batch_window",&wr) == DuckDBError) {
+			duckdb_destroy_result(&wr);
+			return -1;
+		}
+
+		win_count     = duckdb_value_int64(&wr,0,0);
+		max_window_id = duckdb_value_int64(&wr,1,0);
+		duckdb_destroy_result(&wr);
+
+		if(win_count == 0) return 0;   /* backlog drained */
+	}
+
+	/*
+	 * STEP 1: Big JOIN over the window - match CDRs to subscribers, rates, tariffs.
+	 * Rates are reached through bill_plan_tree (nested plans); COALESCE falls back
+	 * to the plan itself for flat (non-nested) plans - mirrors rt_data_q rate sql.
+	 * Longest matching prefix wins via
+	 * ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY LENGTH(prefix) DESC).
 	 */
 	snprintf(sql,sizeof(sql),
 		"CREATE OR REPLACE TEMP TABLE rated_batch AS "
 		"WITH matched AS ( "
 		"  SELECT "
-		"    c.id AS cdr_id, c.calling_number, c.called_number, c.billsec, "
-		"    c.start_ts, c.cdr_rec_type_id, c.billusec, "
+		"    c.id AS cdr_id, c.calling_number, c.called_number, c.billsec, c.start_ts, "
 		"    ba.id AS bacc_id, ba.round_mode_id, "
 		"    rt.id AS rate_id, rt.tariff_id, pr.prefix, pr.id AS prefix_id, "
 		"    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY LENGTH(pr.prefix) DESC) AS rn "
-		"  FROM pg.cdrs c "
+		"  FROM batch_window c "
 		"  JOIN pg.calling_number clg ON clg.calling_number = c.calling_number "
 		"  JOIN pg.calling_number_deff cd ON cd.calling_number_id = clg.id "
 		"  JOIN pg.billing_account ba ON ba.id = clg.billing_account_id "
+		"    AND ba.cdr_server_id = c.cdr_server_id "
 		"  JOIN pg.bill_plan bp ON bp.id = cd.bill_plan_id "
-		"  JOIN pg.rate rt ON rt.bill_plan_id = bp.id "
+		"  LEFT JOIN pg.bill_plan_tree tree ON tree.root_bplan_id = bp.id "
+		"  JOIN pg.rate rt ON rt.bill_plan_id = COALESCE(tree.bill_plan_id, bp.id) "
 		"  JOIN pg.prefix pr ON pr.id = rt.prefix_id "
 		"    AND c.called_number LIKE pr.prefix || '%%' "
 		"  JOIN pg.tariff tr ON tr.id = rt.tariff_id "
-		"  WHERE c.leg_%c = 0 "
-		"  LIMIT %d "
 		"), "
 		"best_match AS ( "
 		"  SELECT * FROM matched WHERE rn = 1 "
 		"), "
 		"with_tariff AS ( "
-		"  SELECT bm.*, cf.pos, cf.delta_time, cf.fee, cf.iterations "
+		"  SELECT bm.*, cf.delta_time, cf.fee, cf.iterations "
 		"  FROM best_match bm "
 		"  JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id "
 		"  WHERE cf.pos = 1 "
@@ -141,10 +175,17 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"    WHEN iterations = 0 THEN fee * CEIL(CAST(billsec AS DOUBLE) / delta_time) "
 		"    ELSE fee * iterations "
 		"  END AS cprice "
-		"FROM with_tariff",
-		leg,limit);
+		"FROM with_tariff");
 
-	state = duckdb_query(ctx->conn,sql,&result);
+	/* CTAS only returns a status row (rows inserted), not the data: build the
+	 * temp table first ... */
+	if(rt_duckdb_exec(ctx->conn,sql) < 0) {
+		LOG("rt_duckdb_rate_batch()","build rated_batch failed");
+		return -1;
+	}
+
+	/* ... then read the matched rows back out of it. */
+	state = duckdb_query(ctx->conn,"SELECT * FROM rated_batch",&result);
 
 	if(state == DuckDBError) {
 		LOG("rt_duckdb_rate_batch()","query error: %s",duckdb_result_error(&result));
@@ -153,18 +194,14 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	}
 
 	row_count = duckdb_row_count(&result);
-	LOG("rt_duckdb_rate_batch()","matched and rated: %d CDRs",(int)row_count);
-
-	if(row_count == 0) {
-		duckdb_destroy_result(&result);
-		return 0;
-	}
+	LOG("rt_duckdb_rate_batch()","matched: %d CDRs (window <= id %lld)",
+		(int)row_count,(long long)max_window_id);
 
 	/*
-	 * STEP 2: Bulk INSERT results into rating table via PostgreSQL
-	 * Build multi-row INSERT from DuckDB results
+	 * STEP 2: Bulk INSERT rated rows into PostgreSQL and set leg = rating_id.
+	 * Skipped when nothing matched - the whole window then falls through to -1.
 	 */
-	{
+	if(row_count > 0) {
 		char *insert_sql;
 		char row_buf[512];
 		char safe_ts[64];
@@ -253,19 +290,21 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	duckdb_destroy_result(&result);
 
 	/*
-	 * STEP 3: Mark unmatched CDRs as leg_a = -1
-	 * to prevent re-fetching on next cycle
+	 * STEP 3: Mark the evaluated-but-unrated CDRs in this window as leg = -1.
+	 * Scoped to id <= max_window_id (the window we just rated against), so we
+	 * never mark a CDR that was never evaluated. Matched CDRs are already
+	 * leg > 0 and excluded by the leg = 0 predicate.
 	 */
 	{
 		char mark_sql[256];
 		snprintf(mark_sql,sizeof(mark_sql),
-			"UPDATE cdrs SET leg_%c = -1 WHERE leg_%c = 0 "
-			"AND id IN (SELECT id FROM cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d)",
-			leg,leg,leg,limit);
+			"UPDATE cdrs SET leg_%c = -1 WHERE leg_%c = 0 AND id <= %lld",
+			leg,leg,(long long)max_window_id);
 
 		db_query(pg_dbp,mark_sql,1);
 
-		LOG("rt_duckdb_rate_batch()","marked unmatched CDRs as -1");
+		LOG("rt_duckdb_rate_batch()","marked unmatched CDRs as -1 (id <= %lld)",
+			(long long)max_window_id);
 	}
 
 	LOG("rt_duckdb_rate_batch()","batch complete: %d rated",rated);
