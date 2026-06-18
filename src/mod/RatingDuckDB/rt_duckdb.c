@@ -133,7 +133,8 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id "
 		"  WHERE cf.pos = 1 "
 		") "
-		"SELECT cdr_id, calling_number, called_number, billsec, start_ts, "
+		"SELECT cdr_id, calling_number, called_number, billsec, "
+		"  CAST(start_ts AS VARCHAR) AS start_ts_str, "
 		"  bacc_id, round_mode_id, rate_id, tariff_id, prefix_id, "
 		"  delta_time, fee, iterations, "
 		"  CASE "
@@ -142,6 +143,20 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  END AS cprice "
 		"FROM with_tariff",
 		leg,limit);
+
+	/* first check how many unrated CDRs exist */
+	{
+		duckdb_result count_res;
+		char count_sql[256];
+		snprintf(count_sql,sizeof(count_sql),
+			"SELECT COUNT(*) FROM pg.cdrs WHERE leg_%c = 0",leg);
+
+		if(duckdb_query(ctx->conn,count_sql,&count_res) == DuckDBSuccess) {
+			int64_t total_unrated = duckdb_value_int64(&count_res,0,0);
+			LOG("rt_duckdb_rate_batch()","unrated CDRs: %ld",(long)total_unrated);
+			duckdb_destroy_result(&count_res);
+		}
+	}
 
 	state = duckdb_query(ctx->conn,sql,&result);
 
@@ -188,9 +203,15 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			int rate_id   = duckdb_value_int32(&result,7,i);  /* rate_id */
 			double cprice = duckdb_value_double(&result,13,i); /* cprice */
 
-			duckdb_string start_ts_str = duckdb_value_string(&result,4,i); /* start_ts */
-			db_sql_escape(start_ts_str.data,safe_ts,sizeof(safe_ts));
-			duckdb_free(start_ts_str.data);
+			duckdb_string start_ts_str = duckdb_value_string(&result,4,i); /* start_ts_str (CAST AS VARCHAR) */
+
+			memset(safe_ts,0,sizeof(safe_ts));
+			if(start_ts_str.data != NULL && start_ts_str.size > 0) {
+				db_sql_escape(start_ts_str.data,safe_ts,sizeof(safe_ts));
+				duckdb_free(start_ts_str.data);
+			} else {
+				strcpy(safe_ts,"1970-01-01 00:00:00");
+			}
 
 			snprintf(row_buf,sizeof(row_buf),
 				"%s(%f,%d,%d,%d,%d,1,0,0,'%s','now()',0)",
@@ -247,18 +268,18 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 	/*
 	 * STEP 3: Mark unmatched CDRs as leg_a = -1
-	 * (CDRs that were fetched but had no matching subscriber/rate)
+	 * to prevent re-fetching on next cycle
 	 */
 	{
 		char mark_sql[256];
 		snprintf(mark_sql,sizeof(mark_sql),
 			"UPDATE cdrs SET leg_%c = -1 WHERE leg_%c = 0 "
-			"AND id NOT IN (SELECT call_id FROM rating WHERE call_id IN "
-			"(SELECT cdr_id FROM rated_batch)) LIMIT %d",
-			leg,leg,limit);
+			"AND id IN (SELECT id FROM cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d)",
+			leg,leg,leg,limit);
 
-		/* This runs on DuckDB temp table reference - need to do it differently */
-		/* For now, mark via PostgreSQL directly */
+		db_query(pg_dbp,mark_sql,1);
+
+		LOG("rt_duckdb_rate_batch()","marked unmatched CDRs as -1");
 	}
 
 	LOG("rt_duckdb_rate_batch()","batch complete: %d rated",rated);
