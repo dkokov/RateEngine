@@ -1,18 +1,22 @@
+# Test bill-plan fixtures — import order
+#
+# Run from the scripts/cli/ directory (paths below are relative to it).
+# re7commander is the Python CLI in ../py_cli (the legacy PHP RE6Commander now
+# lives in ../legacy_php). The old `-f X` / `-d X` flags still work.
 
+re7commander -f test_bp/SMS.csv
+re7commander -f test_bp/FreeCalls.csv
+re7commander -f test_bp/BSCF.csv
 
-./RE6Commander -f test_bp/SMS.csv 
-./RE6Commander -f test_bp/FreeCalls.csv 
-./RE6Commander -f test_bp/BSCF.csv 
+re7commander -f test_bp/MobilePromo1/International-Promo1.csv
+re7commander -f test_bp/MobilePromo1/SMS-Promo1.csv
+re7commander -f test_bp/MobilePromo1/MobilePromo1.csv
 
-./RE6Commander -f test_bp/MobilePromo1/International-Promo1.csv 
-./RE6Commander -f test_bp/MobilePromo1/SMS-Promo1.csv 
-./RE6Commander -f test_bp/MobilePromo1/MobilePromo1.csv 
+re7commander -f test_bp/MobileStart/International-Start.csv
+re7commander -f test_bp/MobileStart/MobileStart.csv
 
-./RE6Commander -f test_bp/MobileStart/International-Start.csv 
-./RE6Commander -f test_bp/MobileStart/MobileStart.csv 
+re7commander -f test_bp/MobileUnlimited/International-Unlimited.csv
+re7commander -f test_bp/MobileUnlimited/MobileUnlimited.csv
 
-./RE6Commander -f test_bp/MobileUnlimited/International-Unlimited.csv 
-./RE6Commander -f test_bp/MobileUnlimited/MobileUnlimited.csv
-
-
-./RE6Commander -d MobilePromo1 | less
+# dump a plan back out (csv default; also --format json|yaml)
+re7commander -d MobilePromo1 | less
