@@ -37,14 +37,17 @@ No-install alternative (needs `psycopg` importable): run `./re7commander.py ...`
 ## Usage
 
 ```bash
-./re7commander.py import test_bp/SMS.csv     # was: ./RE6Commander -f test_bp/SMS.csv
-./re7commander.py dump MobilePromo1          # was: ./RE6Commander -d MobilePromo1
+./re7commander.py import ../test_bp/SMS.csv      # was: ./RE6Commander -f test_bp/SMS.csv
+./re7commander.py dump MobilePromo1              # was: ./RE6Commander -d MobilePromo1
+./re7commander.py test MobilePromo1 100 --start 0 --amount 20   # create 100 test accounts
+./re7commander.py gen-cdrs --count 50            # insert 50 random CDRs into fs_cdrs
 ```
 
 Short aliases `-f`/`-d`/`-t`/`-p` are accepted as subcommand names too.
 
 ## Status
 
-Phase 1 complete: configuration, connection layer, and CLI wiring are in place and
-import cleanly. Database-backed commands raise a clear "not implemented yet" error
-until their phase lands.
+The PHP CLI is ported: `config.app.php`, all of `lib.db.php`, `lib.importing.php`,
+`lib.dumping.php`, `lib.cdrserver.php`, and `lib.testing.php`. `perf` is a stub (the
+PHP `-p` was empty). What remains is validation against a live database (the parity
+gate) and final cutover — see [`../MIGRATION.md`](../MIGRATION.md) §5.
