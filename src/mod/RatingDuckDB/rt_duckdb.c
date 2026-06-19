@@ -8,20 +8,14 @@
 
 #include "rt_duckdb.h"
 
-static int rt_duckdb_exec(duckdb_connection conn,const char *sql)
+/* run a statement on the DuckDB engine; clear the native result afterwards */
+static int rt_duckdb_exec(rt_duckdb_t *ctx,const char *sql)
 {
-	duckdb_result result;
-	duckdb_state state;
-
-	state = duckdb_query(conn,sql,&result);
-
-	if(state == DuckDBError) {
-		LOG("rt_duckdb_exec()","error: %s",duckdb_result_error(&result));
-		duckdb_destroy_result(&result);
+	if(db_query(ctx->duck,(char *)sql,1) < 0) {
+		LOG("rt_duckdb_exec()","error on: %s",sql);
 		return -1;
 	}
 
-	duckdb_destroy_result(&result);
 	return 0;
 }
 
@@ -34,14 +28,21 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
 
 	memset(ctx,0,sizeof(rt_duckdb_t));
 
-	/* create in-memory DuckDB */
-	if(duckdb_open(NULL,&ctx->db) != DuckDBSuccess) {
-		LOG("rt_duckdb_init()","cannot create DuckDB");
+	/* open an in-memory DuckDB through the db_duckdb engine (duckdb.so) */
+	ctx->duck = db_init();
+	if(ctx->duck == NULL) return -1;
+
+	ctx->duck->conn = db_conn_init("duckdb",(char *)pg_host,":memory:",
+	                               (unsigned short)pg_port,(char *)pg_user,(char *)pg_pass,0);
+	if(ctx->duck->conn == NULL) return -1;
+
+	if(db_engine_bind(ctx->duck) < 0) {
+		LOG("rt_duckdb_init()","cannot bind duckdb engine (is duckdb.so loaded?)");
 		return -1;
 	}
 
-	if(duckdb_connect(ctx->db,&ctx->conn) != DuckDBSuccess) {
-		LOG("rt_duckdb_init()","cannot connect to DuckDB");
+	if(db_connect(ctx->duck) < 0) {
+		LOG("rt_duckdb_init()","cannot open DuckDB");
 		return -1;
 	}
 
@@ -51,14 +52,14 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
 		pg_host,pg_dbname,pg_user,pg_pass,pg_port);
 
 	/* install and load postgres_scanner */
-	rt_duckdb_exec(ctx->conn,"INSTALL postgres;");
-	rt_duckdb_exec(ctx->conn,"LOAD postgres;");
+	rt_duckdb_exec(ctx,"INSTALL postgres;");
+	rt_duckdb_exec(ctx,"LOAD postgres;");
 
 	/* attach PostgreSQL database */
 	snprintf(sql,sizeof(sql),
 		"ATTACH '%s' AS pg (TYPE POSTGRES, READ_ONLY);",ctx->pg_connstr);
 
-	if(rt_duckdb_exec(ctx->conn,sql) < 0) {
+	if(rt_duckdb_exec(ctx,sql) < 0) {
 		LOG("rt_duckdb_init()","cannot attach PostgreSQL");
 		return -2;
 	}
@@ -70,30 +71,42 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
 
 void rt_duckdb_close(rt_duckdb_t *ctx)
 {
-	if(ctx == NULL) return;
+	if(ctx == NULL || ctx->duck == NULL) return;
 
-	rt_duckdb_exec(ctx->conn,"DETACH pg;");
-	duckdb_disconnect(&ctx->conn);
-	duckdb_close(&ctx->db);
+	rt_duckdb_exec(ctx,"DETACH pg;");
+
+	db_close(ctx->duck);
+	db_free(ctx->duck);
+	ctx->duck = NULL;
 
 	LOG("rt_duckdb_close()","DuckDB closed");
 }
 
+/* run a SELECT on DuckDB and hand back the marshaled result (rows of strings).
+ * Caller must db_sql_result_free() it and null conn->result when done. */
+static db_sql_result_t *rt_duckdb_select(rt_duckdb_t *ctx,const char *sql)
+{
+	if(db_query(ctx->duck,(char *)sql,0) < 0) return NULL;
+	if(db_fetch(ctx->duck) < 0) return NULL;
+
+	return (db_sql_result_t *)ctx->duck->conn->result;
+}
+
 /*
  * The big query:
- * 1. Fetch unrated CDRs from PostgreSQL (via postgres_scanner)
- * 2. JOIN with subscriber, billing plan, rates, tariff in ONE query
+ * 1. Pin a deterministic window of unrated CDRs from PostgreSQL (postgres_scanner)
+ * 2. JOIN with subscriber, billing plan (via bill_plan_tree), rates, tariff
  * 3. Calculate prices in DuckDB SQL
- * 4. Write results back to PostgreSQL
+ * 4. Write rated rows back to PostgreSQL, mark the rest of the window as -1
  */
 int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 {
 	char sql[4096];
-	duckdb_result result;
-	duckdb_state state;
-	idx_t row_count,i;
+	int row_count = 0;
 	int rated = 0;
 	long long max_window_id = 0;
+
+	db_sql_result_t *rb;
 
 	if(ctx == NULL || pg_dbp == NULL) return 0;
 
@@ -108,25 +121,27 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"FROM pg.cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d",
 		leg,limit);
 
-	if(rt_duckdb_exec(ctx->conn,sql) < 0) {
+	if(rt_duckdb_exec(ctx,sql) < 0) {
 		LOG("rt_duckdb_rate_batch()","build batch_window failed");
 		return -1;
 	}
 
 	/* window bounds: is there work left, and the max id to scope the -1 mark */
 	{
+		db_sql_result_t *wr =
+			rt_duckdb_select(ctx,"SELECT COUNT(*), COALESCE(MAX(id),0) FROM batch_window");
 		long long win_count;
-		duckdb_result wr;
 
-		if(duckdb_query(ctx->conn,
-			"SELECT COUNT(*), COALESCE(MAX(id),0) FROM batch_window",&wr) == DuckDBError) {
-			duckdb_destroy_result(&wr);
+		if(wr == NULL || wr->rows < 1) {
+			if(wr != NULL) { db_sql_result_free(wr); ctx->duck->conn->result = NULL; }
 			return -1;
 		}
 
-		win_count     = duckdb_value_int64(&wr,0,0);
-		max_window_id = duckdb_value_int64(&wr,1,0);
-		duckdb_destroy_result(&wr);
+		win_count     = atoll(wr->cols_list[0].rows_list[0].row);
+		max_window_id = atoll(wr->cols_list[1].rows_list[0].row);
+
+		db_sql_result_free(wr);
+		ctx->duck->conn->result = NULL;
 
 		if(win_count == 0) return 0;   /* backlog drained */
 	}
@@ -177,25 +192,16 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  END AS cprice "
 		"FROM with_tariff");
 
-	/* CTAS only returns a status row (rows inserted), not the data: build the
-	 * temp table first ... */
-	if(rt_duckdb_exec(ctx->conn,sql) < 0) {
+	if(rt_duckdb_exec(ctx,sql) < 0) {
 		LOG("rt_duckdb_rate_batch()","build rated_batch failed");
 		return -1;
 	}
 
-	/* ... then read the matched rows back out of it. */
-	state = duckdb_query(ctx->conn,"SELECT * FROM rated_batch",&result);
+	rb = rt_duckdb_select(ctx,"SELECT * FROM rated_batch");
+	row_count = (rb != NULL) ? rb->rows : 0;
 
-	if(state == DuckDBError) {
-		LOG("rt_duckdb_rate_batch()","query error: %s",duckdb_result_error(&result));
-		duckdb_destroy_result(&result);
-		return -1;
-	}
-
-	row_count = duckdb_row_count(&result);
 	LOG("rt_duckdb_rate_batch()","matched: %d CDRs (window <= id %lld)",
-		(int)row_count,(long long)max_window_id);
+		row_count,(long long)max_window_id);
 
 	/*
 	 * STEP 2: Bulk INSERT rated rows into PostgreSQL and set leg = rating_id.
@@ -206,10 +212,12 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		char row_buf[512];
 		char safe_ts[64];
 		int first = 1;
+		int i;
 
 		insert_sql = (char *)mem_alloc(row_count * 300 + 1024);
 		if(insert_sql == NULL) {
-			duckdb_destroy_result(&result);
+			db_sql_result_free(rb);
+			ctx->duck->conn->result = NULL;
 			return -1;
 		}
 
@@ -220,18 +228,16 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			" VALUES ");
 
 		for(i = 0; i < row_count; i++) {
-			long long cdr_id  = duckdb_value_int64(&result,0,i);  /* cdr_id */
-			int billsec       = (int)duckdb_value_int64(&result,3,i);  /* billsec */
-			long long bacc_id = duckdb_value_int64(&result,5,i);  /* bacc_id */
-			long long rate_id = duckdb_value_int64(&result,7,i);  /* rate_id */
-			double cprice     = duckdb_value_double(&result,13,i); /* cprice */
-
-			duckdb_string start_ts_str = duckdb_value_string(&result,4,i); /* start_ts_str (CAST AS VARCHAR) */
+			long long cdr_id  = atoll(rb->cols_list[0].rows_list[i].row);  /* cdr_id */
+			int billsec       = atoi(rb->cols_list[3].rows_list[i].row);   /* billsec */
+			long long bacc_id = atoll(rb->cols_list[5].rows_list[i].row);  /* bacc_id */
+			long long rate_id = atoll(rb->cols_list[7].rows_list[i].row);  /* rate_id */
+			double cprice     = atof(rb->cols_list[13].rows_list[i].row);  /* cprice */
+			char *ts          = rb->cols_list[4].rows_list[i].row;         /* start_ts_str */
 
 			memset(safe_ts,0,sizeof(safe_ts));
-			if(start_ts_str.data != NULL && start_ts_str.size > 0) {
-				db_sql_escape(start_ts_str.data,safe_ts,sizeof(safe_ts));
-				duckdb_free(start_ts_str.data);
+			if(ts != NULL && ts[0] != '\0') {
+				db_sql_escape(ts,safe_ts,sizeof(safe_ts));
 			} else {
 				strcpy(safe_ts,"1970-01-01 00:00:00");
 			}
@@ -247,21 +253,28 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 		strcat(insert_sql," RETURNING id, call_id");
 
+		/* done reading the DuckDB result */
+		db_sql_result_free(rb);
+		ctx->duck->conn->result = NULL;
+		rb = NULL;
+
 		/* execute on PostgreSQL */
 		db_query(pg_dbp,insert_sql,0);
 		db_fetch(pg_dbp);
 
-		/* build CDR update from results */
+		/* build CDR update from RETURNING result */
 		if(pg_dbp->conn->result != NULL) {
 			db_sql_result_t *pg_result = (db_sql_result_t *)pg_dbp->conn->result;
 
 			if(pg_result->rows > 0) {
 				char *update_sql = (char *)mem_alloc(pg_result->rows * 40 + 256);
 				if(update_sql != NULL) {
+					int j;
+
 					sprintf(update_sql,
 						"UPDATE cdrs SET leg_%c = v.rid FROM (VALUES ",leg);
 
-					for(int j = 0; j < pg_result->rows; j++) {
+					for(j = 0; j < pg_result->rows; j++) {
 						char upd_row[64];
 						long long rating_id = atoll(pg_result->cols_list[0].rows_list[j].row);
 						long long cdr_id    = atoll(pg_result->cols_list[1].rows_list[j].row);
@@ -285,9 +298,10 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		}
 
 		mem_free(insert_sql);
+	} else if(rb != NULL) {
+		db_sql_result_free(rb);
+		ctx->duck->conn->result = NULL;
 	}
-
-	duckdb_destroy_result(&result);
 
 	/*
 	 * STEP 3: Mark the evaluated-but-unrated CDRs in this window as leg = -1.

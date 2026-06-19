@@ -27,6 +27,7 @@ int rt_free_duckdb(void);
 
 mod_dep_t rt_mod_dep[] = {
 	{"cdrm.so",0,1},
+	{"duckdb.so",0,1},
 	{"",0,0}
 };
 

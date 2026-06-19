@@ -2,20 +2,17 @@ include ../../config.mk
 
 MOD_NAME = rt
 
-# RatingDuckDB - DuckDB analytical batch rating (produces rt.so, drop-in)
+# RatingDuckDB - analytical batch rating (produces rt.so, drop-in for Rating).
+# DuckDB is now reached through the db_duckdb engine (duckdb.so), so this
+# module no longer links libduckdb directly. It requires duckdb.so to be
+# built/installed and loaded at runtime.
 MOD_LIB = $(MOD_NAME).so
-
-DUCKDB_DIR = lib
-DUCKDB_LIB = $(DUCKDB_DIR)/libduckdb.so
-DUCKDB_INC = -I$(DUCKDB_DIR)
 
 MOD_SRC = rating_duckdb.c rt_duckdb.c
 MOD_OBJS = $(MOD_SRC:.c=.o)
 
-CFLAGS += $(DUCKDB_INC)
-
 MOD: $(MOD_OBJS)
-	$(CC) $(LDFLAGS) -o $(MOD_LIB) $(MOD_OBJS) -L../../ $(CORE_LIB_LD) -L$(DUCKDB_DIR) -lduckdb -Wl,-rpath,'$$ORIGIN'
+	$(CC) $(LDFLAGS) -o $(MOD_LIB) $(MOD_OBJS) -L../../ $(CORE_LIB_LD)
 
 all: MOD
 
@@ -33,7 +30,6 @@ install: MOD
 	fi
 	@if [ -f $(MOD_LIB) ]; then \
 	    cp -fv $(MOD_LIB) $(MOD); \
-	    cp -fv $(DUCKDB_LIB) $(MOD); \
 	else \
 	    echo ""; \
 	    echo "Installation ERROR! The file "$(MOD_LIB)" is not found!"; \

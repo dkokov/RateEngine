@@ -1,13 +1,12 @@
 #ifndef RT_DUCKDB_H
 #define RT_DUCKDB_H
 
-#include "lib/duckdb.h"
 #include "../../db/db.h"
 #include "../Rating/rt_data.h"
 
 typedef struct rt_duckdb {
-	duckdb_database db;
-	duckdb_connection conn;
+	/* DuckDB accessed through the db_duckdb engine (duckdb.so) */
+	db_t *duck;
 
 	/* PostgreSQL connection string for postgres_scanner */
 	char pg_connstr[512];
