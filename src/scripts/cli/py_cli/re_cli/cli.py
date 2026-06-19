@@ -1,8 +1,9 @@
 """Command-line entry point — replaces RE6Commander's ``switch($opt)``.
 
-Phase 1 wires up argparse, configuration, and lazy DB connections; the actual
-import/dump/test/perf handlers are stubs filled in by later phases (MIGRATION.md §5).
-The original short flags (-f/-d/-t/-p) map to named subcommands.
+Subcommands: import (-f), dump (-d), test (-t, create test accounts), gen-cdrs
+(insert random CDRs), perf (-p, not implemented). The original short flags map to
+the named subcommands. Handlers open their DB connection lazily and import the
+relevant re7 module on demand so config/--help work without the psycopg driver.
 """
 
 from __future__ import annotations
@@ -42,8 +43,26 @@ def cmd_dump(args: argparse.Namespace, cfg: Config) -> int:
 
 
 def cmd_test(args: argparse.Namespace, cfg: Config) -> int:
-    """`-t` — testing helpers (lib.testing.php). PHP stub was empty."""
-    raise CliError("test not implemented yet (Phase 5)")
+    """`-t` — bulk-create test calling-number accounts (lib.testing.php)."""
+    from .testing import create_test_calling_number_accounts
+
+    with _open_re7(cfg) as db:
+        accounts = create_test_calling_number_accounts(
+            db, args.count, args.start, args.bill_plan,
+            amount=args.amount, prefix=args.prefix, sm_bill_plan=args.sm_bill_plan,
+        )
+    print(f"created {len(accounts)} account(s)", file=sys.stderr)
+    return 0
+
+
+def cmd_gen_cdrs(args: argparse.Namespace, cfg: Config) -> int:
+    """Insert random test CDRs into the fs_cdrs database (lib.cdrserver.php test block)."""
+    from .re7.cdrserver import insert_test_cdrs
+
+    with Database.connect(cfg.cdr, label="cdr") as db:
+        n = insert_test_cdrs(db, args.count)
+    print(f"inserted {n} test CDR(s)", file=sys.stderr)
+    return 0
 
 
 def cmd_perf(args: argparse.Namespace, cfg: Config) -> int:
@@ -67,8 +86,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_dump.add_argument("bplan", help="bill plan name")
     p_dump.set_defaults(func=cmd_dump)
 
-    p_test = sub.add_parser("test", aliases=["-t"], help="rating functions testing")
+    p_test = sub.add_parser("test", aliases=["-t"], help="create test calling-number accounts")
+    p_test.add_argument("bill_plan", help="bill plan to assign to the accounts")
+    p_test.add_argument("count", type=int, help="how many accounts to create")
+    p_test.add_argument("--start", type=int, default=0, help="starting index (default 0)")
+    p_test.add_argument("--amount", default=20, help="prepaid card amount (default 20)")
+    p_test.add_argument("--prefix", default="35910", help="number prefix (default 35910)")
+    p_test.add_argument("--sm-bill-plan", dest="sm_bill_plan", default=None,
+                        help="secondary bill plan (currently ignored)")
     p_test.set_defaults(func=cmd_test)
+
+    p_gen = sub.add_parser("gen-cdrs", help="insert random test CDRs into fs_cdrs")
+    p_gen.add_argument("--count", type=int, default=1, help="how many CDRs to insert (default 1)")
+    p_gen.set_defaults(func=cmd_gen_cdrs)
 
     p_perf = sub.add_parser("perf", aliases=["-p"], help="rating performance testing")
     p_perf.set_defaults(func=cmd_perf)

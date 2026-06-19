@@ -221,8 +221,12 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
   - [ ] **Parity gate:** import every `test_bp/*.csv` with PHP into DB-A and Python into
         DB-B; `pg_dump --data-only` both; diff. Must match (modulo serial ids).
   - [ ] Dump a known bill plan with both; diff CSV output byte-for-byte.
-- [ ] **Phase 4 — CDR server & testing** (`cdrserver.py`, `testing.py`): reimplement the
-        account-creation flow on `re7/db.py` (§4.8). Test create→read→delete cycle.
+- [x] **Phase 4 — CDR server & testing** (`cdrserver.py`, `testing.py`): **done**.
+        `insert_cdr` (53 cols, parameterized) + `make_test_cdr`/`insert_test_cdrs`;
+        `create_test_calling_number_accounts` reimplements the account-creation flow on
+        `re7/db.py` (§4.8), per-account transaction. Wired as `test` and `gen-cdrs`.
+        `sm_bill_plan` is accepted but ignored (re7 insert_rating_account has no slot).
+        Pending: run against a live DB.
 - [ ] **Phase 5 — Cutover**
   - [ ] Update `test_bp/readme` examples to the new CLI invocation.
   - [ ] Move PHP `lib/` + `RE6Commander` to `legacy_php/` (don't delete until parity signed off).
