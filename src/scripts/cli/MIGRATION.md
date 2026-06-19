@@ -210,10 +210,12 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
   - [x] `pyproject.toml`, `.env.example`, `config.py`, `database.py` (fetch helpers,
         `transaction()` context manager, `dict_row` cursors, `CliError`).
   - [x] `re7commander.py` + `cli.py` argparse skeleton (subcommands wired to stubs).
-- [ ] **Phase 2 — re7 data layer** (`re7/db.py`): port all ~120 functions per §4.3,
-        parameterized, RETURNING-based inserts. Fix FIX-1/2/3. Unit-test getters against
-        a seeded DB.
-- [ ] **Phase 3 — Import/Dump** (`importer.py`, `dumper.py`): the primary CLI workflows.
+- [~] **Phase 2 — re7 data layer** (`re7/db.py`): import + dump function sets ported
+        (parameterized, RETURNING-based inserts, dynamic identifiers via `psycopg.sql`).
+        Remaining: the rating/balance/report/CDR getters not used by import or dump, and
+        FIX-1/2/3. Unit-test getters against a seeded DB.
+- [~] **Phase 3 — Import/Dump** (`importer.py`, `dumper.py`): **code complete** — both
+        commands are wired and verified against fixtures with a fake DB. Pending:
   - [ ] **Parity gate:** import every `test_bp/*.csv` with PHP into DB-A and Python into
         DB-B; `pg_dump --data-only` both; diff. Must match (modulo serial ids).
   - [ ] Dump a known bill plan with both; diff CSV output byte-for-byte.
@@ -233,6 +235,8 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
 | FIX-1 | `lib.db.php` `find_celebr_dt_deff` | unused `$dt`, returns `$tc` — logic looks wrong | review intent before porting |
 | FIX-2 | `lib.db.php` `clear_rating` | builds query, never executes | confirm intended, then implement or drop |
 | FIX-3 | `lib.db.php:850` `get_ts` | `explode("-",$date)` — `$date` undefined | find correct source var |
+| FIX-4 | `lib.importing.php` mode 3 | `if($rating_mode <= 4)` compares the mode *name* string to an int (broken in PHP 8) | **done** — Python branches on the mode *id* (`rating_mode_id`) |
+| FIX-5 | `lib.db.php` `insert_pcard` | inserts literal string `'now()'` into a timestamp column | **done** — Python uses the SQL `now()` function; empty dates → NULL |
 | OPEN-1 | `lib.db.php` `compare_tc_ts` | `$DAYS` not defined in any present file | locate definition or mark feature dead |
 | OPEN-2 | `lib.cdrserver.php` | `lib.mycc.php` / `myCC_term` socket integration commented out | confirm if MyCC is still used |
 | SEC-1 | all libs | ~200 string-concatenated queries (SQL injection) | fixed by §3.1 parameterization |
