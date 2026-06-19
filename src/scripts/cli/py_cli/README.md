@@ -39,9 +39,14 @@ No-install alternative (needs `psycopg` importable): run `./re7commander.py ...`
 ```bash
 ./re7commander.py import ../test_bp/SMS.csv      # was: ./RE6Commander -f test_bp/SMS.csv
 ./re7commander.py dump MobilePromo1              # was: ./RE6Commander -d MobilePromo1
+./re7commander.py dump MobilePromo1 --format json   # csv (default) | json | yaml
 ./re7commander.py test MobilePromo1 100 --start 0 --amount 20   # create 100 test accounts
 ./re7commander.py gen-cdrs --count 50            # insert 50 random CDRs into fs_cdrs
 ```
+
+`--format csv` reproduces the legacy layout byte-for-byte. `json` uses the stdlib;
+`yaml` uses PyYAML if installed (`pip install -e '.[yaml]'`), otherwise a small
+built-in emitter.
 
 Short aliases `-f`/`-d`/`-t`/`-p` are accepted as subcommand names too.
 
