@@ -1,0 +1,10 @@
+# Python dependencies for the re7commander CLI.
+# Install:  pip install -r requirements.txt
+# (Authoritative source is pyproject.toml; this mirrors it for convenience.)
+
+# Required — PostgreSQL driver (import/dump/test/gen-cdrs all need it).
+psycopg[binary]>=3.1
+
+# Optional — nicer YAML output for `dump --format yaml`. Without it, a small
+# built-in emitter is used, so this is not strictly required.
+pyyaml>=6
