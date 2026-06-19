@@ -210,10 +210,12 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
   - [x] `pyproject.toml`, `.env.example`, `config.py`, `database.py` (fetch helpers,
         `transaction()` context manager, `dict_row` cursors, `CliError`).
   - [x] `re7commander.py` + `cli.py` argparse skeleton (subcommands wired to stubs).
-- [~] **Phase 2 — re7 data layer** (`re7/db.py`): import + dump function sets ported
-        (parameterized, RETURNING-based inserts, dynamic identifiers via `psycopg.sql`).
-        Remaining: the rating/balance/report/CDR getters not used by import or dump, and
-        FIX-1/2/3. Unit-test getters against a seeded DB.
+- [x] **Phase 2 — re7 data layer** (`re7/db.py`): **all ~120 lib.db.php functions ported**
+        (89 public functions; parameterized, RETURNING-based inserts, dynamic identifiers
+        via `psycopg.sql`). FIX-1/2/3/5/6 applied. PHP object-mutator functions
+        (`$process`/`$task`/`$balance`) were reshaped to return dicts/values — the only
+        structural deviation; SQL preserved. `compare_tc_ts` takes a caller-supplied `days`
+        map (OPEN-1). Pending: unit-test the getters against a seeded DB.
 - [~] **Phase 3 — Import/Dump** (`importer.py`, `dumper.py`): **code complete** — both
         commands are wired and verified against fixtures with a fake DB. Pending:
   - [ ] **Parity gate:** import every `test_bp/*.csv` with PHP into DB-A and Python into
@@ -232,12 +234,13 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
 
 | ID | Location | Issue | Action |
 |----|----------|-------|--------|
-| FIX-1 | `lib.db.php` `find_celebr_dt_deff` | unused `$dt`, returns `$tc` — logic looks wrong | review intent before porting |
-| FIX-2 | `lib.db.php` `clear_rating` | builds query, never executes | confirm intended, then implement or drop |
-| FIX-3 | `lib.db.php:850` `get_ts` | `explode("-",$date)` — `$date` undefined | find correct source var |
+| FIX-1 | `lib.db.php` `find_celebr_dt_deff` | unused `$dt`, returns undefined `$tc` | **done** — reconstructed as a celebration_dates lookup by id |
+| FIX-2 | `lib.db.php` `clear_rating` | builds DELETE, never executes | **done** — Python executes it and returns the row count |
+| FIX-3 | `lib.db.php:850` `get_ts` | `explode("-",$date)` — `$date` undefined | **done** — Python splits the date portion of the timestamp |
+| FIX-6 | `lib.db.php` `find_prefix` | `select id,prefix from order by ...` — no table name | **done** — reconstructed as `from prefix` |
 | FIX-4 | `lib.importing.php` mode 3 | `if($rating_mode <= 4)` compares the mode *name* string to an int (broken in PHP 8) | **done** — Python branches on the mode *id* (`rating_mode_id`) |
 | FIX-5 | `lib.db.php` `insert_pcard` | inserts literal string `'now()'` into a timestamp column | **done** — Python uses the SQL `now()` function; empty dates → NULL |
-| OPEN-1 | `lib.db.php` `compare_tc_ts` | `$DAYS` not defined in any present file | locate definition or mark feature dead |
+| OPEN-1 | `lib.db.php` `compare_tc_ts` | `$DAYS` not defined in any present file | mitigated — Python takes `days` as a parameter; still need the canonical weekday→id map |
 | OPEN-2 | `lib.cdrserver.php` | `lib.mycc.php` / `myCC_term` socket integration commented out | confirm if MyCC is still used |
 | SEC-1 | all libs | ~200 string-concatenated queries (SQL injection) | fixed by §3.1 parameterization |
 | SEC-2 | `config.app.php`, `lib.cdrserver.php` | hardcoded DB credentials | fixed by `.env` |
