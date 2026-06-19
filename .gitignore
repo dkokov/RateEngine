@@ -1,0 +1,8 @@
+# DuckDB SDK — fetched on demand by src/scripts/fetch_duckdb.sh, never committed.
+# (libduckdb.so ~68M / libduckdb_static.a ~77M exceed sane git limits.)
+src/mod/db_duckdb/lib/
+
+# build artifacts
+*.o
+*.so
+*.d
