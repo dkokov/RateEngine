@@ -46,6 +46,7 @@ class Database:
     def __init__(self, conn: psycopg.Connection, label: str = "db") -> None:
         self._conn = conn
         self.label = label
+        self._tx_depth = 0  # >0 while inside a transaction() block (no explicit commits)
 
     # -- lifecycle ---------------------------------------------------------------
 
@@ -82,22 +83,33 @@ class Database:
         """Atomic block: commits on success, rolls back on any exception.
 
         Replaces the manual ``re5_begin/commit/rollback`` and the goto-based fake
-        transaction in ``re5_create_account`` (MIGRATION.md §3.3, §4.4).
+        transaction in ``re5_create_account`` (MIGRATION.md §3.3, §4.4). While inside,
+        the execute/insert_returning helpers skip their own commit — psycopg forbids an
+        explicit commit() within a transaction context, and the block commits on exit.
         """
         with self._conn.transaction():
-            yield self
+            self._tx_depth += 1
+            try:
+                yield self
+            finally:
+                self._tx_depth -= 1
+
+    def _maybe_commit(self) -> None:
+        """Commit only when not inside a transaction() block."""
+        if self._tx_depth == 0:
+            self._conn.commit()
 
     # -- queries -----------------------------------------------------------------
 
     def execute(self, sql: str, params: Params = None) -> int:
-        """Run a statement, return affected row count. Auto-commits (autocommit-style).
+        """Run a statement, return affected row count.
 
-        Uses an implicit transaction per call unless wrapped in :meth:`transaction`.
+        Commits per call unless wrapped in :meth:`transaction` (then the block commits).
         """
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             rowcount = cur.rowcount
-        self._conn.commit()
+        self._maybe_commit()
         return rowcount
 
     def fetch_all(self, sql: str, params: Params = None) -> list[dict[str, Any]]:
@@ -131,7 +143,7 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             row = cur.fetchone()
-        self._conn.commit()
+        self._maybe_commit()
         if row is None:
             raise CliError("INSERT ... RETURNING produced no row")
         return next(iter(row.values()))
