@@ -33,11 +33,11 @@ def cmd_import(args: argparse.Namespace, cfg: Config) -> int:
 
 
 def cmd_dump(args: argparse.Namespace, cfg: Config) -> int:
-    """`-d bplan` — dump a bill plan to CSV (lib.dumping.php / re6_dump_bplan_settings)."""
+    """`-d bplan` — dump a bill plan (lib.dumping.php / re6_dump_bplan_settings)."""
     from .re7.dumper import dump_bplan
 
     with _open_re7(cfg) as db:
-        if not dump_bplan(db, args.bplan, sys.stdout):
+        if not dump_bplan(db, args.bplan, sys.stdout, fmt=args.format):
             raise CliError(f"bill plan not found: {args.bplan!r}")
     return 0
 
@@ -107,8 +107,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_import.add_argument("file", help="input CSV file")
     p_import.set_defaults(func=cmd_import)
 
-    p_dump = sub.add_parser("dump", help="dump a bill plan to CSV")
+    p_dump = sub.add_parser("dump", help="dump a bill plan (csv/json/yaml)")
     p_dump.add_argument("bplan", help="bill plan name")
+    p_dump.add_argument("--format", choices=["csv", "json", "yaml"], default="csv",
+                        help="output format (default: csv, the legacy layout)")
     p_dump.set_defaults(func=cmd_dump)
 
     p_test = sub.add_parser("test", help="create test calling-number accounts")
