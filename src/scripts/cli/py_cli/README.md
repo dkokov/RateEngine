@@ -17,9 +17,11 @@ py_cli/
     ├── database.py        # Database: connect, fetch_*, insert_returning, transaction
     ├── errors.py          # CliError / ConfigError  (replaces PHP exit/die)
     ├── cli.py             # argparse entry point       (was RE6Commander switch)
-    ├── re7/               # ports of lib.db/importing/dumping/cdrserver  (Phases 2,3,5)
-    └── re5/               # ports of lib.re5.php                          (Phase 4)
+    └── re7/               # ports of lib.db/importing/dumping/cdrserver  (Phases 2,3,5)
 ```
+
+The legacy `lib.re5.php` is **not** ported: its functions duplicate the re7 ones in
+`lib.db.php`. Test-account creation (Phase 5) is built on the re7 layer instead.
 
 ## Setup
 

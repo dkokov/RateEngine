@@ -66,7 +66,6 @@ class Config:
     """Full CLI configuration: the three databases, MyCC, and billing defaults."""
 
     re7: DbConfig          # current engine schema (legacy config.app.php dbname "re7")
-    re5: DbConfig          # legacy schema used by lib.re5.php
     cdr: DbConfig          # FreeSWITCH CDR store (fs_cdrs)
     mycc_host: str
     mycc_port: int
@@ -95,7 +94,6 @@ class Config:
 
         return cls(
             re7=db("RE7", "re7"),
-            re5=db("RE5"),
             cdr=db("CDR", "fs_cdrs"),
             mycc_host=get("MYCC_HOST", "127.0.0.1"),
             mycc_port=int(get("MYCC_PORT", "9090")),
