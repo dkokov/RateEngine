@@ -13,6 +13,12 @@ test-account creation is built on the re7 layer instead of the old `re5_create_a
 This document is the contract for the migration. Work it phase by phase; each phase is
 independently testable against the existing PHP using the `test_bp/*.csv` fixtures.
 
+> **Status: complete.** All phases done; every workflow (dump/import/test/gen-cdrs)
+> validated against the live re7-core database. The PHP source referenced below as
+> `lib/...` / `RE6Commander` / `config.app.php` now lives under **`legacy_php/`** (kept
+> for reference/parity, moved via `git mv`). The Python CLI is `py_cli/` — see
+> `py_cli/README.md`. `test_bp/` (shared CSV fixtures) stayed in place.
+
 ---
 
 ## 1. What we are porting
@@ -227,10 +233,12 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
         `re7/db.py` (§4.8), per-account transaction. Wired as `test` and `gen-cdrs`.
         `sm_bill_plan` is accepted but ignored (re7 insert_rating_account has no slot).
         Pending: run against a live DB.
-- [ ] **Phase 5 — Cutover**
-  - [ ] Update `test_bp/readme` examples to the new CLI invocation.
-  - [ ] Move PHP `lib/` + `RE6Commander` to `legacy_php/` (don't delete until parity signed off).
-  - [ ] Document new usage in this dir's README.
+- [x] **Phase 5 — Cutover** (done)
+  - [x] Update `test_bp/readme` examples to the new CLI invocation.
+  - [x] Move PHP `RE6Commander` + `config.app.php` + `lib/` + `readme` to `legacy_php/`
+        (kept, not deleted; `test_bp/` stays — shared CSV fixtures). `git mv` preserved history.
+  - [x] New usage documented in `py_cli/README.md`.
+  - [ ] (optional) byte-for-byte parity diff vs the PHP, if its `pgsql` ext still runs.
 
 ---
 
@@ -257,4 +265,5 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
 - PHP 8.4 is installed but the legacy `pg_*` extension may not be — verify the PHP tool
   still runs before relying on it as the parity oracle; if it doesn't, parity must be done
   against a known-good DB snapshot instead.
-- `lib.removing.php` is not a program; preserve its SQL as `notes/removing.sql` only.
+- `lib.removing.php` is not a program (pasted SQL scratch notes); it was not ported and
+  remains under `legacy_php/lib/` for reference.
