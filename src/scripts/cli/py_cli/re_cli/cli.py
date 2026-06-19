@@ -27,10 +27,13 @@ def cmd_import(args: argparse.Namespace, cfg: Config) -> int:
 
 
 def cmd_dump(args: argparse.Namespace, cfg: Config) -> int:
-    """`-d bplan` — dump a bill plan to CSV (lib.dumping.php)."""
+    """`-d bplan` — dump a bill plan to CSV (lib.dumping.php / re6_dump_bplan_settings)."""
+    from .re7.dumper import dump_bplan
+
     with _open_re7(cfg) as db:
-        # Phase 3: from .re7.dumper import dump_bplan; dump_bplan(db, args.bplan, sys.stdout)
-        raise CliError(f"dump not implemented yet (Phase 3); would dump {args.bplan!r} from {db.label}")
+        if not dump_bplan(db, args.bplan, sys.stdout):
+            raise CliError(f"bill plan not found: {args.bplan!r}")
+    return 0
 
 
 def cmd_test(args: argparse.Namespace, cfg: Config) -> int:
