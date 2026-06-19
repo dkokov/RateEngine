@@ -70,23 +70,48 @@ def cmd_perf(args: argparse.Namespace, cfg: Config) -> int:
     raise CliError("perf not implemented yet (TODO)")
 
 
+# Legacy RE6Commander flags -> sub-command names. argparse can't use dash-prefixed
+# names as positional sub-commands, so we translate them before parsing (below).
+LEGACY_FLAGS = {"-f": "import", "-d": "dump", "-t": "test", "-p": "perf"}
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    """Translate the first legacy flag (-f/-d/-t/-p) into its sub-command name.
+
+    Keeps backward compatibility with RE6Commander's ``-d bplan`` / ``-f file`` while
+    still supporting the named sub-commands. Only the first legacy flag is rewritten,
+    so a bill-plan/file argument that happens to look like a flag is left alone.
+    """
+    out: list[str] = []
+    replaced = False
+    for tok in argv:
+        if not replaced and tok in LEGACY_FLAGS:
+            out.append(LEGACY_FLAGS[tok])
+            replaced = True
+        else:
+            out.append(tok)
+    return out
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="re7commander",
         description="RateEngine V7 admin/provisioning CLI (port of RE6Commander).",
+        epilog="Legacy flags are accepted too: -f=import, -d=dump, -t=test, -p=perf "
+               "(e.g. 're7commander -d MobilePromo1').",
     )
     parser.add_argument("--env", metavar="PATH", help="path to .env file (default: py_cli/.env)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_import = sub.add_parser("import", aliases=["-f"], help="import tariff settings from CSV file")
+    p_import = sub.add_parser("import", help="import tariff settings from CSV file")
     p_import.add_argument("file", help="input CSV file")
     p_import.set_defaults(func=cmd_import)
 
-    p_dump = sub.add_parser("dump", aliases=["-d"], help="dump a bill plan to CSV")
+    p_dump = sub.add_parser("dump", help="dump a bill plan to CSV")
     p_dump.add_argument("bplan", help="bill plan name")
     p_dump.set_defaults(func=cmd_dump)
 
-    p_test = sub.add_parser("test", aliases=["-t"], help="create test calling-number accounts")
+    p_test = sub.add_parser("test", help="create test calling-number accounts")
     p_test.add_argument("bill_plan", help="bill plan to assign to the accounts")
     p_test.add_argument("count", type=int, help="how many accounts to create")
     p_test.add_argument("--start", type=int, default=0, help="starting index (default 0)")
@@ -107,8 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_normalize_argv(argv))
     try:
         cfg = Config.load(args.env)
         return args.func(args, cfg) or 0
