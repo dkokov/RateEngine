@@ -32,7 +32,9 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -e .              # installs psycopg + the "re7commander" command
 ```
 
-No-install alternative (needs `psycopg` importable): run `./re7commander.py ...`.
+Dependencies only (no console script): `pip install -r requirements.txt`, then run
+`./re7commander.py ...`. The deps are `psycopg[binary]` (required) and `pyyaml`
+(optional, for `dump --format yaml`).
 
 ## Usage
 
