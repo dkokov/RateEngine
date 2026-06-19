@@ -3,6 +3,7 @@ mod/Rating
 #mod/RatingDuckDB
 #mod/CallControl
 mod/db_pgsql
+mod/db_duckdb
 #mod/db_mysql
 #mod/db_redis
 #mod/db_mongodb
