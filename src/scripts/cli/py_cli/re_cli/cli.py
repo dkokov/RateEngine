@@ -21,9 +21,14 @@ def _open_re7(cfg: Config) -> Database:
 
 def cmd_import(args: argparse.Namespace, cfg: Config) -> int:
     """`-f file` — import tariff/account settings from CSV (lib.importing.php)."""
-    with _open_re7(cfg) as db:
-        # Phase 3: from .re7.importer import import_settings; import_settings(db, args.file)
-        raise CliError(f"import not implemented yet (Phase 3); would load {args.file!r} into {db.label}")
+    from .re7.importer import import_settings
+
+    try:
+        with _open_re7(cfg) as db:
+            import_settings(db, args.file)
+    except OSError as exc:
+        raise CliError(f"cannot read {args.file!r}: {exc}") from exc
+    return 0
 
 
 def cmd_dump(args: argparse.Namespace, cfg: Config) -> int:
