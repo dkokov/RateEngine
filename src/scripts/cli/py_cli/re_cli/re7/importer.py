@@ -25,13 +25,17 @@ Deviations from the PHP, all faithful to intent (see MIGRATION.md §6):
 from __future__ import annotations
 
 import csv
+import json
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Sequence
+from pathlib import Path
+from typing import Any, Sequence
 
 from ..database import Database
 from ..errors import CliError
 from . import db as q
+
+FORMATS = ("auto", "csv", "json", "yaml")
 
 
 def _strip_quotes(value: str) -> str:
@@ -234,3 +238,110 @@ def _mode_bill_tree(db: Database, row: Sequence[str]) -> None:
         if tree_id and root_id and not q.get_bill_tree_id(db, tree_id, root_id):
             q.insert_bill_tree(db, tree_id, root_id)
         p += 1
+
+
+# ===========================================================================
+# Format dispatch + structured (JSON/YAML) import
+# ===========================================================================
+
+def resolve_format(path: str, fmt: str) -> str:
+    """Resolve 'auto' to a concrete format from the file extension (else csv)."""
+    if fmt != "auto":
+        return fmt
+    ext = Path(path).suffix.lower()
+    if ext == ".json":
+        return "json"
+    if ext in (".yaml", ".yml"):
+        return "yaml"
+    return "csv"
+
+
+def _load_structured(path: str, fmt: str) -> dict[str, Any]:
+    """Parse a JSON or YAML bill-plan model file (the shape produced by `dump`)."""
+    text = Path(path).read_text(encoding="utf-8")
+    if fmt == "json":
+        return json.loads(text)
+    if fmt == "yaml":
+        try:
+            import yaml
+        except ImportError as exc:  # YAML has no built-in parser fallback
+            raise CliError("YAML import requires PyYAML: pip install pyyaml") from exc
+        return yaml.safe_load(text)
+    raise CliError(f"cannot parse format {fmt!r} as structured data")
+
+
+def import_file(db: Database, path: str, fmt: str = "auto") -> None:
+    """Import `path` in the given format (auto/csv/json/yaml).
+
+    CSV uses the full config_mode state machine (:func:`import_settings`); JSON/YAML
+    use the structured bill-plan model (:func:`import_model`) — the same shape `dump`
+    emits, enabling dump -> edit -> import round-trips.
+    """
+    fmt = resolve_format(path, fmt)
+    if fmt == "csv":
+        import_settings(db, path)
+    else:
+        import_model(db, _load_structured(path, fmt))
+
+
+def _fee(value: Any):
+    """Coerce a JSON/YAML fee (float/int/str) to Decimal for exact storage; None stays None."""
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def import_model(db: Database, model: dict[str, Any]) -> None:
+    """Import a structured bill-plan model (the shape produced by `dump --format json/yaml`).
+
+    Scope mirrors `dump`: bill plan(s) -> prefixes -> tariffs (+free_billsec id) -> rates
+    -> calc functions. Everything is get-or-create and keyed by *name/prefix string*, so a
+    model is portable to a fresh DB (the numeric ids in a dump are informational). Bill
+    plans are created as 'postpaid' with zero periods (the dump model carries neither).
+    Account/pcard/tree provisioning is CSV-only (config modes 3/4/5).
+    """
+    if not isinstance(model, dict):
+        raise CliError("structured import expects a mapping with a 'plans' list")
+    plans = model.get("plans")
+    if not plans:
+        raise CliError("no 'plans' found in the input model")
+
+    for plan in plans:
+        name = plan.get("name") or model.get("bill_plan")
+        if not name:
+            raise CliError("a plan entry is missing its 'name'")
+
+        bill_plan_id = q.get_bill_plan_id(db, name)
+        if not bill_plan_id:
+            type_id = q.get_bill_plan_type_id(db, "postpaid")
+            if not type_id:
+                raise CliError("unknown bill_plan_type: 'postpaid'")
+            bill_plan_id = q.insert_bill_plan(db, name, type_id, 0, 0)
+
+        for rate in plan.get("rates") or []:
+            prefix = str(rate["prefix"])
+            tariff = rate["tariff"]
+            free = rate.get("free_billsec")
+            free_id = free["id"] if free else 0
+
+            prefix_id = q.get_prefix_id(db, prefix) or q.insert_prefix(db, prefix, None)
+
+            tariff_id = q.get_tariff_id(db, bill_plan_id, tariff)
+            if not tariff_id:
+                tariff_id = q.insert_tariff(db, bill_plan_id, tariff, 0, 0, free_id)
+
+            if not q.get_rate_id(db, bill_plan_id, prefix_id, tariff_id):
+                q.insert_rate(db, bill_plan_id, prefix_id, tariff_id)
+
+            for calc in rate.get("calc_functions") or []:
+                pos = calc["pos"]
+                if q.get_calc_id(db, tariff_id, pos):
+                    continue
+                q.insert_calc_func(
+                    db, tariff_id, pos, _fee(calc.get("fee")),
+                    calc.get("delta_time"), calc.get("iterations"),
+                )
+
+            print(f"bplan({bill_plan_id}),prefix({prefix_id}),tariff({tariff_id})")

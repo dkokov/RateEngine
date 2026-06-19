@@ -40,8 +40,10 @@ Dependencies only (no console script): `pip install -r requirements.txt`, then r
 
 ```bash
 ./re7commander.py import ../test_bp/SMS.csv      # was: ./RE6Commander -f test_bp/SMS.csv
+./re7commander.py import plan.json               # csv/json/yaml auto-detected by extension
 ./re7commander.py dump MobilePromo1              # was: ./RE6Commander -d MobilePromo1
 ./re7commander.py dump MobilePromo1 --format json   # csv (default) | json | yaml
+re7commander dump P --format json > P.json && re7commander import P.json   # round-trip
 ./re7commander.py test MobilePromo1 100 --start 0 --amount 20   # create 100 test accounts
 ./re7commander.py gen-cdrs --count 50            # insert 50 random CDRs into fs_cdrs
 ```
@@ -49,6 +51,12 @@ Dependencies only (no console script): `pip install -r requirements.txt`, then r
 `--format csv` reproduces the legacy layout byte-for-byte. `json` uses the stdlib;
 `yaml` uses PyYAML if installed (`pip install -e '.[yaml]'`), otherwise a small
 built-in emitter.
+
+`import` accepts the same formats (`--format`, default auto-detect by extension). CSV
+runs the full provisioning state machine (bill plans, accounts, pcards, trees);
+JSON/YAML import the bill-plan tariff model that `dump` emits (plans → prefixes →
+tariffs → rates → calc functions), enabling **dump → edit → import** round-trips.
+YAML import requires PyYAML.
 
 Short aliases `-f`/`-d`/`-t`/`-p` are accepted as subcommand names too.
 

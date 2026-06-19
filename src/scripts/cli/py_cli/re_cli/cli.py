@@ -21,12 +21,12 @@ def _open_re7(cfg: Config) -> Database:
 
 
 def cmd_import(args: argparse.Namespace, cfg: Config) -> int:
-    """`-f file` — import tariff/account settings from CSV (lib.importing.php)."""
-    from .re7.importer import import_settings
+    """`-f file` — import settings from CSV (full) or JSON/YAML (bill-plan model)."""
+    from .re7.importer import import_file
 
     try:
         with _open_re7(cfg) as db:
-            import_settings(db, args.file)
+            import_file(db, args.file, fmt=args.format)
     except OSError as exc:
         raise CliError(f"cannot read {args.file!r}: {exc}") from exc
     return 0
@@ -103,8 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--env", metavar="PATH", help="path to .env file (default: py_cli/.env)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_import = sub.add_parser("import", help="import tariff settings from CSV file")
-    p_import.add_argument("file", help="input CSV file")
+    p_import = sub.add_parser("import", help="import settings from CSV / JSON / YAML")
+    p_import.add_argument("file", help="input file (.csv, .json or .yaml)")
+    p_import.add_argument("--format", choices=["auto", "csv", "json", "yaml"], default="auto",
+                          help="input format (default: auto-detect by extension). "
+                               "json/yaml use the bill-plan model from `dump`")
     p_import.set_defaults(func=cmd_import)
 
     p_dump = sub.add_parser("dump", help="dump a bill plan (csv/json/yaml)")
