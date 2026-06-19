@@ -1,9 +1,14 @@
 # RE6Commander CLI — PHP → Python 3 Migration Plan
 
-Full **1:1 port** of the PHP admin/provisioning CLI under `scripts/cli/` to Python 3.
-Scope: every function in every `lib/*.php` file, the `RE6Commander` entry point, and the
-`config.app.php` configuration — preserving behaviour, while fixing the structural
-problems the PHP carries (SQL injection, `goto`, `exit()`, global connection state).
+**1:1 port** of the PHP admin/provisioning CLI under `scripts/cli/` to Python 3.
+Scope: the `lib.db.php` (re7) function set, the importer/dumper/cdrserver/testing libs,
+the `RE6Commander` entry point, and the `config.app.php` configuration — preserving
+behaviour, while fixing the structural problems the PHP carries (SQL injection, `goto`,
+`exit()`, global connection state).
+
+**Out of scope:** `lib.re5.php` is **not** ported. Its ~110 `re5_*` functions duplicate
+the re7 functions in `lib.db.php`; the CLI targets the single current (re7) database, and
+test-account creation is built on the re7 layer instead of the old `re5_create_account`.
 
 This document is the contract for the migration. Work it phase by phase; each phase is
 independently testable against the existing PHP using the `test_bp/*.csv` fixtures.
@@ -14,10 +19,10 @@ independently testable against the existing PHP using the `test_bp/*.csv` fixtur
 
 | PHP file | LOC | Role | Python target |
 |----------|----:|------|---------------|
-| `RE6Commander` | ~40 | CLI entry, `switch` on `-f/-d/-t/-p` | `re6commander.py` |
+| `RE6Commander` | ~40 | CLI entry, `switch` on `-f/-d/-t/-p` | `re7commander.py` + `cli.py` |
 | `config.app.php` | 30 | DB creds, MyCC host/port, app info, opens `$dbconn` | `config.py` + `.env` |
-| `lib/lib.db.php` | 1794 | ~120 RE6 schema getters/inserters/updaters | `re6/db.py` (split, see §4) |
-| `lib/lib.re5.php` | 1958 | ~110 `re5_*` account/report/CRUD funcs, 2 DBs | `re5/*.py` |
+| `lib/lib.db.php` | 1794 | ~120 re7 schema getters/inserters/updaters | `re7/db.py` (split, see §4) |
+| ~~`lib/lib.re5.php`~~ | 1958 | ~110 `re5_*` funcs — **dropped, duplicates lib.db.php** | — (not ported) |
 | `lib/lib.importing.php` | 196 | CSV → DB dispatcher (`config_mode` 1–5, `*`) | `importer.py` |
 | `lib/lib.dumping.php` | 57 | bill plan → CSV | `dumper.py` |
 | `lib/lib.cdrserver.php` | 190 | FreeSWITCH CDR XML → `fs_cdrs` | `cdrserver.py` |
@@ -31,32 +36,30 @@ independently testable against the existing PHP using the `test_bp/*.csv` fixtur
 ## 2. Target architecture
 
 ```
-scripts/cli/
-├── re6commander.py          # argparse entry point (replaces RE6Commander + switch)
+scripts/cli/py_cli/
+├── re7commander.py          # argparse entry point (replaces RE6Commander + switch)
 ├── pyproject.toml           # deps: psycopg[binary]>=3.1
 ├── .env.example             # DB creds template (replaces hardcoded config.app.php)
 ├── re_cli/
 │   ├── __init__.py
-│   ├── config.py            # loads .env -> Config dataclass (RE6 + RE5 + MyCC + RE globals)
-│   ├── database.py          # Database class: connection, fetch_one/val/all, exec_returning
-│   ├── re6/
+│   ├── config.py            # loads .env -> Config dataclass (RE7 + CDR + MyCC + RE globals)
+│   ├── database.py          # Database class: connect, fetch_one/val/all, insert_returning
+│   ├── errors.py            # CliError / ConfigError (replaces PHP exit/die)
+│   ├── cli.py               # argparse entry point logic
+│   ├── re7/
 │   │   ├── db.py            # all lib.db.php functions, grouped (see §4.3)
 │   │   ├── importer.py      # lib.importing.php
 │   │   ├── dumper.py        # lib.dumping.php
 │   │   └── cdrserver.py     # lib.cdrserver.php
-│   ├── re5/
-│   │   ├── accounts.py      # billing/rating account CRUD
-│   │   ├── balances.py      # balance + pcard
-│   │   ├── reports.py       # tariff/rating/operator reports
-│   │   └── orchestration.py # re5_create_account()
-│   └── testing.py           # lib.testing.php
+│   └── testing.py           # lib.testing.php  (built on re7/db.py)
 ├── notes/removing.sql       # ex-lib.removing.php (reference only)
 └── MIGRATION.md             # this file
 ```
 
-Two databases exist (RE6 = `re7`/`fs_cdrs`, RE5 = legacy). Model them as **two `Database`
-instances** held on the `Config`, not module globals. `re6_*`/`re5_*` functions take a
-`db` argument (or live as methods on a class bound to one connection).
+Two databases are used: **RE7** (`re7`, the engine schema) and **CDR** (`fs_cdrs`, the
+FreeSWITCH CDR store used by `lib.cdrserver.php`). Model them as `Database` instances held
+on the `Config`, not module globals; ported functions take a `db` argument. The legacy RE5
+database and its `re5_*`/`re6_*` connection helpers are dropped.
 
 ---
 
@@ -75,8 +78,8 @@ mechanically.
 3. **`goto` insert-retry → `INSERT ... RETURNING id`.** The PHP pattern
    `check_N: id = get_x(); if(!id){ insert_x(); goto check_N; }` collapses to a single
    `INSERT ... ON CONFLICT DO NOTHING RETURNING id` (or `get` then insert-returning).
-   Affects: `lib.importing.php` (`check_2..check_6`) and `lib.re5.php`
-   `re5_create_account()` (lines ~1876–1955).
+   Affects: `lib.importing.php` (`check_2..check_6`) and the reimplemented
+   test-account creation flow (§4.8, ex-`re5_create_account`).
 4. **`exit()` → exceptions.** Define `CliError(Exception)`. Replace every `exit;` /
    `die()` with `raise CliError(msg)`; the entry point catches and prints + sets exit code.
    Affects `lib.db.php` inserters (`insert_time_condition`, `insert_rating_account*`),
@@ -99,7 +102,7 @@ mechanically.
 
 ## 4. File-by-file mapping
 
-### 4.1 `RE6Commander` → `re6commander.py`
+### 4.1 `RE6Commander` → `re7commander.py` + `re_cli/cli.py`
 Replace the `switch($opt)` with `argparse` subcommands:
 
 | PHP | Python |
@@ -113,14 +116,13 @@ Keep the original short flags as aliases if you want muscle-memory compatibility
 
 ### 4.2 `config.app.php` → `config.py` + `.env`
 - Move all creds to `.env` (gitignored); commit `.env.example`.
-- `Config` dataclass fields: `re6_{host,name,user,pass}`, `re5_{...}`, `cc_host`,
-  `cc_port`, `billing_day`, `credit_limit`, `rounding`.
-- **Gap to resolve:** the PHP reads `$RE6[...]` (lib.re5.php:48) and a `$DAYS` array
-  (lib.db.php `compare_tc_ts`) that are **not defined in any file present**. Locate their
-  real definitions (other include, or runtime) before porting `re5_conn`/`compare_tc_ts`,
-  or these features are dead. Track as **OPEN-1**.
+- `Config` dataclass fields: `re7` + `cdr` (`DbConfig`), `mycc_host`, `mycc_port`,
+  `billing_day`, `credit_limit`, `rounding`.
+- **Gap to resolve:** `lib.db.php` `compare_tc_ts` reads a `$DAYS` array that is **not
+  defined in any file present**. Locate its real definition (other include, or runtime)
+  before porting `compare_tc_ts`, or treat that feature as dead. Track as **OPEN-1**.
 
-### 4.3 `lib.db.php` → `re6/db.py`
+### 4.3 `lib.db.php` → `re7/db.py`
 ~120 functions. Port grouped (one module section or class per group). Spot-fixes flagged.
 
 - **Connection:** `conn()` → `Database.connect()`.
@@ -154,29 +156,14 @@ Keep the original short flags as aliases if you want muscle-memory compatibility
 - **Dead code to drop:** commented `find_rate()`, the duplicated block ~733–751,
   duplicate `get_tc_name_2`.
 
-### 4.4 `lib.re5.php` → `re5/` package
-~110 `re5_*` functions across two DB connections (`$RE`, `$RE6`). Split:
-- `re5/database.py` — `re5_conn/close/query/begin/commit/rollback`,
-  `re6_conn/close/query` → `Re5Db`/`Re6Db` classes with real
-  `with db.transaction():` context managers (replaces manual BEGIN/COMMIT/ROLLBACK).
-- `re5/accounts.py` — all `re5_get_bacc*`, `re5_insert/update/delete_billing_account*`,
-  rating-account family (`re5_get_racc*`, `re5_insert_rating_account(_2)`,
-  `re5_delete_racc*`, `re5_insert_clg_history`).
-- `re5/balances.py` — balance family (`re5_get_balance*`, `re5_*_balances`,
-  `re5_update_balance_*`, `re5_get_bill_file`, free-billsec-balance) + pcard family
-  (`re5_get_pcard*`, `re5_insert_pcard(_2)`, `re5_update_pcard*`, `re5_*_credit_limit*`,
-  `re5_pcard_deactive`, `re5_delete_pcard*`).
-- `re5/reports.py` — `re5_get_tariff_report`, `re5_get_rating_stat`,
-  `re5_get_rated_calls_report(_2)`, `re5_get_operator_*`, `re5_get_nsg_counters`,
-  `re5_get_tariff_name`, lookups (`re5_get_rating_modes/mode/mode_id`, `re5_get_prefix`,
-  `re5_get_currency`, `re5_get_cdr_servers`, `re5_get_round_modes`, bill-plan getters).
-- `re5/orchestration.py` — `re5_create_account()` (the goto-retry orchestrator) +
-  `re6_insert_sms_cdr`/`re6_get_id_sms_cdr`. Rewrite as a single transaction:
-  get-or-create billing account → rating account → pcard, using `RETURNING`, wrapped in
-  `with re5db.transaction():` so failure rolls back atomically (the PHP "transaction" was
-  fake — it used flags + goto, never rolled back).
+### 4.4 `lib.re5.php` — NOT PORTED
+Dropped. Its ~110 `re5_*` functions duplicate the re7 equivalents in `lib.db.php`
+(`re5_get_bill_plan_id` ≈ `get_bill_plan_id`, `re5_insert_billing_account` ≈
+`insert_billing_account`, `re5_get_pcard*` ≈ `get_pcard*`, etc.) and operate on the legacy
+RE5/RE6 databases the V7 CLI no longer targets. Anything genuinely needed from it (e.g. the
+account-creation orchestration) is reimplemented on `re7/db.py` — see §4.8.
 
-### 4.5 `lib.importing.php` → `re6/importer.py`
+### 4.5 `lib.importing.php` → `re7/importer.py`
 Dispatch on the first CSV column (`config_mode`). Keep the state machine but use `csv`:
 
 | mode | meaning | PHP retry → Python |
@@ -192,45 +179,47 @@ Carry the cross-row state (current `bill_plan_id`, `tariff_id`, `billing_account
 an explicit object, not loop-scoped PHP vars. The commented free_billsec/time_condition
 blocks (modes 2) are disabled in PHP — replicate as-is, leave TODO.
 
-### 4.6 `lib.dumping.php` → `re6/dumper.py`
+### 4.6 `lib.dumping.php` → `re7/dumper.py`
 `dump_bplan(db, name)`: resolve id → tree or single plan → for each: rates → free billsec
 → calc functions → write CSV rows. Use `csv.writer` to a stream; preserve the exact header
 and column layout so dump output stays diff-comparable with the PHP.
 
-### 4.7 `lib.cdrserver.php` → `re6/cdrserver.py`
+### 4.7 `lib.cdrserver.php` → `re7/cdrserver.py`
 `insert_cdr(arr)` — port the nested-key validation with `dict.get(...)` chains; the
 INSERT (30+ cols) parameterized. Migrate `date()/mktime()/mt_rand()`. The commented
 `objectsIntoArray()` / `myCC_term()` / `lib.mycc.php` socket bits: port only if MyCC
 integration is actually used (track as **OPEN-2**); otherwise omit.
 
 ### 4.8 `lib.testing.php` → `testing.py`
-`create_test_calling_number_racc(num, start, bplan, sm_bplan)` — straight port over the
-`re5/orchestration.py` create path. Replace `define()` constants with module constants /
-argparse args. Reads `testing_phone_number.csv`.
+`create_test_calling_number_racc(num, start, bplan, sm_bplan)` — port the bulk
+test-account generator. The PHP called `re5_create_account()`; reimplement that
+get-or-create flow (billing account → rating account → pcard) directly on `re7/db.py`
+inserters, wrapped in a single `with db.transaction():` so a failure rolls back atomically
+(the PHP "transaction" was fake — flags + goto, never rolled back). Replace `define()`
+constants with module constants / argparse args. Reads `testing_phone_number.csv`.
 
 ---
 
 ## 5. Phased execution checklist
 
 - [ ] **Phase 0 — Setup & open questions**
-  - [ ] Resolve OPEN-1 (`$RE6`/`$DAYS` real source), OPEN-2 (MyCC used?).
+  - [ ] Resolve OPEN-1 (`$DAYS` real source), OPEN-2 (MyCC used?).
   - [ ] Confirm target Python/psycopg version (env has Python 3.13; psycopg not yet installed).
   - [ ] Snapshot a scratch DB schema for parity testing.
-- [ ] **Phase 1 — Foundation**
-  - [ ] `pyproject.toml`, `.env.example`, `config.py`, `database.py` (fetch helpers,
+- [x] **Phase 1 — Foundation** (committed)
+  - [x] `pyproject.toml`, `.env.example`, `config.py`, `database.py` (fetch helpers,
         `transaction()` context manager, `dict_row` cursors, `CliError`).
-  - [ ] `re6commander.py` argparse skeleton (subcommands wired to stubs).
-- [ ] **Phase 2 — RE6 data layer** (`re6/db.py`): port all ~120 functions per §4.3,
+  - [x] `re7commander.py` + `cli.py` argparse skeleton (subcommands wired to stubs).
+- [ ] **Phase 2 — re7 data layer** (`re7/db.py`): port all ~120 functions per §4.3,
         parameterized, RETURNING-based inserts. Fix FIX-1/2/3. Unit-test getters against
         a seeded DB.
 - [ ] **Phase 3 — Import/Dump** (`importer.py`, `dumper.py`): the primary CLI workflows.
   - [ ] **Parity gate:** import every `test_bp/*.csv` with PHP into DB-A and Python into
         DB-B; `pg_dump --data-only` both; diff. Must match (modulo serial ids).
   - [ ] Dump a known bill plan with both; diff CSV output byte-for-byte.
-- [ ] **Phase 4 — RE5 package** (`re5/*`): accounts, balances, reports, orchestration.
-        Rewrite `re5_create_account` as a real transaction. Test create→read→delete cycle.
-- [ ] **Phase 5 — CDR server & testing** (`cdrserver.py`, `testing.py`).
-- [ ] **Phase 6 — Cutover**
+- [ ] **Phase 4 — CDR server & testing** (`cdrserver.py`, `testing.py`): reimplement the
+        account-creation flow on `re7/db.py` (§4.8). Test create→read→delete cycle.
+- [ ] **Phase 5 — Cutover**
   - [ ] Update `test_bp/readme` examples to the new CLI invocation.
   - [ ] Move PHP `lib/` + `RE6Commander` to `legacy_php/` (don't delete until parity signed off).
   - [ ] Document new usage in this dir's README.
@@ -244,7 +233,7 @@ argparse args. Reads `testing_phone_number.csv`.
 | FIX-1 | `lib.db.php` `find_celebr_dt_deff` | unused `$dt`, returns `$tc` — logic looks wrong | review intent before porting |
 | FIX-2 | `lib.db.php` `clear_rating` | builds query, never executes | confirm intended, then implement or drop |
 | FIX-3 | `lib.db.php:850` `get_ts` | `explode("-",$date)` — `$date` undefined | find correct source var |
-| OPEN-1 | `lib.re5.php:48`, `compare_tc_ts` | `$RE6`/`$DAYS` not defined in any present file | locate definition or mark feature dead |
+| OPEN-1 | `lib.db.php` `compare_tc_ts` | `$DAYS` not defined in any present file | locate definition or mark feature dead |
 | OPEN-2 | `lib.cdrserver.php` | `lib.mycc.php` / `myCC_term` socket integration commented out | confirm if MyCC is still used |
 | SEC-1 | all libs | ~200 string-concatenated queries (SQL injection) | fixed by §3.1 parameterization |
 | SEC-2 | `config.app.php`, `lib.cdrserver.php` | hardcoded DB credentials | fixed by `.env` |
