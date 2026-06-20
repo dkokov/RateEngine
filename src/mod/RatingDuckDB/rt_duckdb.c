@@ -201,7 +201,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	 */
 	snprintf(sql,sizeof(sql),
 		"CREATE OR REPLACE TEMP TABLE batch_window AS "
-		"SELECT id, calling_number, called_number, billsec, start_ts, cdr_server_id, "
+		"SELECT id, calling_number, called_number, billsec, billusec, start_ts, cdr_server_id, "
 		"cdr_rec_type_id, account_code, src_context, dst_context, src_tgroup, dst_tgroup, "
 		"clg_nadi, cld_nadi "
 		"FROM pg.cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d",
@@ -253,7 +253,16 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"), "
 		"matched AS ( "
 		"  SELECT "
-		"    c.id AS cdr_id, c.calling_number, c.called_number, c.billsec, c.start_ts, "
+		"    c.id AS cdr_id, c.calling_number, c.called_number, "
+		/* round_billsec: round_mode 1=ceil, 2=floor of billusec; only override
+		 * billsec when the rounded value is nonzero (matches round_billsec.c). */
+		"    CASE "
+		"      WHEN a.round_mode_id = 1 AND CAST(CEIL(c.billusec / 1000000.0) AS BIGINT) <> 0 "
+		"        THEN CAST(CEIL(c.billusec / 1000000.0) AS BIGINT) "
+		"      WHEN a.round_mode_id = 2 AND CAST(FLOOR(c.billusec / 1000000.0) AS BIGINT) <> 0 "
+		"        THEN CAST(FLOOR(c.billusec / 1000000.0) AS BIGINT) "
+		"      ELSE c.billsec END AS billsec, "
+		"    c.start_ts, "
 		"    a.bacc_id, a.round_mode_id, "
 		"    rt.id AS rate_id, rt.tariff_id, pr.prefix, pr.id AS prefix_id, "
 		"    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY LENGTH(pr.prefix) DESC) AS rn "
