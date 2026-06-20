@@ -93,6 +93,89 @@ static db_sql_result_t *rt_duckdb_select(rt_duckdb_t *ctx,const char *sql)
 }
 
 /*
+ * Account-resolution modes — mirrors rt_main -> rt_racc_* -> rt_data_q_racc_sql
+ * in the Rating module. For each cdr_rec_type_id and leg, the engine tries a
+ * sequence of lookups (calling_number, account_code, src/dst_context,
+ * src/dst_tgroup, sms) in fallback order; the first that resolves an account
+ * wins. We model that set-based: build every applicable lookup, tag it with the
+ * fallback priority, and pick the lowest-priority match per CDR.
+ *
+ * rec types (cdr.h): unkn=0 isup=1 sms=2 voip_a=3 voip_v=4(not rated) voip_t=5.
+ * For each mode the lookup table and the CDR match column share a name, and the
+ * bill-plan column is bill_plan_id (or sm_bill_plan_id for SMS). tgroup modes
+ * additionally match clg_nadi/cld_nadi.
+ */
+typedef struct rt_acct_mode {
+	char        leg;       /* 'a' or 'b' */
+	int         rec_type;  /* cdr_rec_type_id */
+	int         prio;      /* fallback order (1 = tried first) */
+	const char *tbl;       /* lookup table; CDR match column has the same name */
+	const char *bpcol;     /* bill_plan_id | sm_bill_plan_id */
+	int         nadi;      /* 1 -> also match clg_nadi/cld_nadi (tgroup modes) */
+} rt_acct_mode_t;
+
+static const rt_acct_mode_t rt_acct_modes[] = {
+	/* leg a */
+	{'a',0,1,"calling_number","bill_plan_id",   0},  /* unkn:  clg  */
+	{'a',0,2,"account_code",  "bill_plan_id",   0},  /* unkn:  acode */
+	{'a',0,3,"src_context",   "bill_plan_id",   0},  /* unkn:  srcc */
+	{'a',0,4,"src_tgroup",    "bill_plan_id",   1},  /* unkn:  srctg */
+	{'a',1,1,"src_tgroup",    "bill_plan_id",   1},  /* isup:  srctg */
+	{'a',2,1,"calling_number","sm_bill_plan_id",0},  /* sms */
+	{'a',3,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
+	{'a',3,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
+	{'a',5,1,"account_code",  "bill_plan_id",   0},  /* voip_t: acode */
+	{'a',5,2,"src_context",   "bill_plan_id",   0},  /* voip_t: srcc */
+	/* leg b */
+	{'b',0,1,"dst_context",   "bill_plan_id",   0},  /* unkn:  dstc */
+	{'b',0,2,"dst_tgroup",    "bill_plan_id",   1},  /* unkn:  dsttg */
+	{'b',1,1,"dst_tgroup",    "bill_plan_id",   1},  /* isup:  dsttg */
+	{'b',2,1,"calling_number","sm_bill_plan_id",0},  /* sms */
+	{'b',3,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
+	{'b',3,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
+	{'b',5,1,"dst_context",   "bill_plan_id",   0},  /* voip_t: dstc */
+	{0,0,0,NULL,NULL,0}
+};
+
+/* Build the UNION ALL of per-mode account lookups for the given leg into buf.
+ * Returns the number of modes emitted (0 = none for this leg). */
+static int rt_build_acct_union(char leg,char *buf,int buflen)
+{
+	int i,n = 0,len = 0;
+
+	buf[0] = '\0';
+
+	for(i = 0; rt_acct_modes[i].tbl != NULL; i++) {
+		const rt_acct_mode_t *m = &rt_acct_modes[i];
+
+		if(m->leg != leg) continue;
+
+		len += snprintf(buf+len,buflen-len,
+			"%s SELECT c.id AS cdr_id, %d AS prio, ba.id AS bacc_id, "
+			"ba.round_mode_id, bp.id AS bplan_id "
+			"FROM batch_window c "
+			"JOIN pg.%s t ON t.%s = c.%s "
+			"JOIN pg.%s_deff df ON df.%s_id = t.id "
+			"JOIN pg.billing_account ba ON ba.id = t.billing_account_id "
+			"  AND ba.cdr_server_id = c.cdr_server_id "
+			"JOIN pg.bill_plan bp ON bp.id = df.%s "
+			"WHERE c.cdr_rec_type_id = %d%s ",
+			(n ? "UNION ALL" : ""),
+			m->prio,
+			m->tbl,m->tbl,m->tbl,
+			m->tbl,m->tbl,
+			m->bpcol,
+			m->rec_type,
+			(m->nadi ? " AND df.clg_nadi = c.clg_nadi AND df.cld_nadi = c.cld_nadi" : ""));
+
+		if(len >= buflen) return -1;   /* truncated */
+		n++;
+	}
+
+	return n;
+}
+
+/*
  * The big query:
  * 1. Pin a deterministic window of unrated CDRs from PostgreSQL (postgres_scanner)
  * 2. JOIN with subscriber, billing plan (via bill_plan_tree), rates, tariff
@@ -101,7 +184,8 @@ static db_sql_result_t *rt_duckdb_select(rt_duckdb_t *ctx,const char *sql)
  */
 int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 {
-	char sql[4096];
+	char sql[8192];
+	char acct_union[6144];
 	int row_count = 0;
 	int rated = 0;
 	long long max_window_id = 0;
@@ -117,7 +201,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	 */
 	snprintf(sql,sizeof(sql),
 		"CREATE OR REPLACE TEMP TABLE batch_window AS "
-		"SELECT id, calling_number, called_number, billsec, start_ts, cdr_server_id "
+		"SELECT id, calling_number, called_number, billsec, start_ts, cdr_server_id, "
+		"cdr_rec_type_id, account_code, src_context, dst_context, src_tgroup, dst_tgroup, "
+		"clg_nadi, cld_nadi "
 		"FROM pg.cdrs WHERE leg_%c = 0 ORDER BY id LIMIT %d",
 		leg,limit);
 
@@ -147,28 +233,34 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	}
 
 	/*
-	 * STEP 1: Big JOIN over the window - match CDRs to subscribers, rates, tariffs.
-	 * Rates are reached through bill_plan_tree (nested plans); COALESCE falls back
-	 * to the plan itself for flat (non-nested) plans - mirrors rt_data_q rate sql.
-	 * Longest matching prefix wins via
-	 * ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY LENGTH(prefix) DESC).
+	 * STEP 1: resolve each CDR's account via the applicable lookup modes
+	 * (calling_number / account_code / contexts / tgroups / sms) in fallback
+	 * priority, then match rates through bill_plan_tree (COALESCE falls back to
+	 * the plan itself for flat plans) and the longest matching prefix.
 	 */
+	if(rt_build_acct_union(leg,acct_union,sizeof(acct_union)) <= 0) {
+		LOG("rt_duckdb_rate_batch()","no account modes for leg %c",leg);
+		return -1;
+	}
+
 	snprintf(sql,sizeof(sql),
 		"CREATE OR REPLACE TEMP TABLE rated_batch AS "
-		"WITH matched AS ( "
+		"WITH acct_all AS ( %s ), "
+		"acct AS ( "
+		"  SELECT cdr_id, bacc_id, round_mode_id, bplan_id FROM ( "
+		"    SELECT *, ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY prio) AS arn FROM acct_all "
+		"  ) WHERE arn = 1 "
+		"), "
+		"matched AS ( "
 		"  SELECT "
 		"    c.id AS cdr_id, c.calling_number, c.called_number, c.billsec, c.start_ts, "
-		"    ba.id AS bacc_id, ba.round_mode_id, "
+		"    a.bacc_id, a.round_mode_id, "
 		"    rt.id AS rate_id, rt.tariff_id, pr.prefix, pr.id AS prefix_id, "
 		"    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY LENGTH(pr.prefix) DESC) AS rn "
 		"  FROM batch_window c "
-		"  JOIN pg.calling_number clg ON clg.calling_number = c.calling_number "
-		"  JOIN pg.calling_number_deff cd ON cd.calling_number_id = clg.id "
-		"  JOIN pg.billing_account ba ON ba.id = clg.billing_account_id "
-		"    AND ba.cdr_server_id = c.cdr_server_id "
-		"  JOIN pg.bill_plan bp ON bp.id = cd.bill_plan_id "
-		"  LEFT JOIN pg.bill_plan_tree tree ON tree.root_bplan_id = bp.id "
-		"  JOIN pg.rate rt ON rt.bill_plan_id = COALESCE(tree.bill_plan_id, bp.id) "
+		"  JOIN acct a ON a.cdr_id = c.id "
+		"  LEFT JOIN pg.bill_plan_tree tree ON tree.root_bplan_id = a.bplan_id "
+		"  JOIN pg.rate rt ON rt.bill_plan_id = COALESCE(tree.bill_plan_id, a.bplan_id) "
 		"  JOIN pg.prefix pr ON pr.id = rt.prefix_id "
 		"    AND c.called_number LIKE pr.prefix || '%%' "
 		"  JOIN pg.tariff tr ON tr.id = rt.tariff_id "
@@ -190,7 +282,8 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"    WHEN iterations = 0 THEN fee * CEIL(CAST(billsec AS DOUBLE) / delta_time) "
 		"    ELSE fee * iterations "
 		"  END AS cprice "
-		"FROM with_tariff");
+		"FROM with_tariff",
+		acct_union);
 
 	if(rt_duckdb_exec(ctx,sql) < 0) {
 		LOG("rt_duckdb_rate_batch()","build rated_batch failed");
