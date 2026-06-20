@@ -184,7 +184,7 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
  */
 int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 {
-	char sql[8192];
+	char sql[16384];
 	char acct_union[6144];
 	int row_count = 0;
 	int rated = 0;
@@ -245,7 +245,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 	snprintf(sql,sizeof(sql),
 		"CREATE OR REPLACE TEMP TABLE rated_batch AS "
-		"WITH acct_all AS ( %s ), "
+		"WITH RECURSIVE acct_all AS ( %s ), "
 		"acct AS ( "
 		"  SELECT cdr_id, bacc_id, round_mode_id, bplan_id FROM ( "
 		"    SELECT *, ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY prio) AS arn FROM acct_all "
@@ -268,21 +268,63 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"best_match AS ( "
 		"  SELECT * FROM matched WHERE rn = 1 "
 		"), "
-		"with_tariff AS ( "
-		"  SELECT bm.*, cf.delta_time, cf.fee, cf.iterations "
-		"  FROM best_match bm "
-		"  JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id "
-		"  WHERE cf.pos = 1 "
+		/*
+		 * Multi-tier pricing — faithful set-based replica of calc_cprice_2:
+		 * walk the tariff steps (calc_function by pos) carrying remaining seconds
+		 * (rem), accumulating price and billed seconds (bsec). Per step, with
+		 * u = ceil(rem/delta) blocks needed (delta=0 -> SMS flat: 1 block):
+		 *   charge = (iterations=0 OR u<=iterations) ? u : iterations
+		 *   done   = iterations=0 OR delta=0 OR u=1
+		 * (the u=1-only break is calc_cprice_2's exact control flow). The free/
+		 * paid split that yields negative prices is free_billsec (a later phase).
+		 */
+		"price_walk(cdr_id, pos, rem, price, bsec, done) AS ( "
+		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		"         CAST(cs - charge*d AS BIGINT), CAST(charge*f AS DOUBLE), CAST(charge*d AS BIGINT), "
+		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
+		"  FROM ( "
+		"    SELECT cdr_id, pos, d, f, it, cs, u, "
+		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
+		"    FROM ( "
+		"      SELECT bm.cdr_id, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
+		"             bm.billsec AS cs, "
+		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(bm.billsec::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
+		"      FROM best_match bm "
+		"      JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id AND cf.pos = 1 "
+		"    ) "
+		"  ) "
+		"  UNION ALL "
+		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		"         CAST(cs - charge*d AS BIGINT), CAST(pprice + charge*f AS DOUBLE), "
+		"         CAST(pbsec + charge*d AS BIGINT), "
+		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
+		"  FROM ( "
+		"    SELECT cdr_id, pos, d, f, it, cs, u, pprice, pbsec, "
+		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
+		"    FROM ( "
+		"      SELECT p.cdr_id, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
+		"             p.rem AS cs, p.price AS pprice, p.bsec AS pbsec, "
+		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(p.rem::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
+		"      FROM price_walk p "
+		"      JOIN best_match bm ON bm.cdr_id = p.cdr_id "
+		"      JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id AND cf.pos = p.pos + 1 "
+		"      WHERE p.done = 0 "
+		"    ) "
+		"  ) "
+		"), "
+		"final AS ( "
+		"  SELECT cdr_id, price AS cprice, bsec AS billsec_out, "
+		"         ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY pos DESC) AS frn "
+		"  FROM price_walk "
 		") "
-		"SELECT CAST(cdr_id AS BIGINT) AS cdr_id, calling_number, called_number, CAST(billsec AS BIGINT) AS billsec, "
-		"  CAST(start_ts AS VARCHAR) AS start_ts_str, "
-		"  CAST(bacc_id AS BIGINT) AS bacc_id, round_mode_id, CAST(rate_id AS BIGINT) AS rate_id, tariff_id, prefix_id, "
-		"  delta_time, fee, iterations, "
-		"  CASE "
-		"    WHEN iterations = 0 THEN fee * CEIL(CAST(billsec AS DOUBLE) / delta_time) "
-		"    ELSE fee * iterations "
-		"  END AS cprice "
-		"FROM with_tariff",
+		"SELECT CAST(bm.cdr_id AS BIGINT) AS cdr_id, bm.calling_number, bm.called_number, "
+		"  CAST(fp.billsec_out AS BIGINT) AS billsec, "
+		"  CAST(bm.start_ts AS VARCHAR) AS start_ts_str, "
+		"  CAST(bm.bacc_id AS BIGINT) AS bacc_id, bm.round_mode_id, CAST(bm.rate_id AS BIGINT) AS rate_id, "
+		"  bm.tariff_id, bm.prefix_id, 0 AS delta_time, 0 AS fee, 0 AS iterations, "
+		"  fp.cprice AS cprice "
+		"FROM best_match bm "
+		"JOIN final fp ON fp.cdr_id = bm.cdr_id AND fp.frn = 1",
 		acct_union);
 
 	if(rt_duckdb_exec(ctx,sql) < 0) {
