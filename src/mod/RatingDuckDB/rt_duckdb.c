@@ -176,6 +176,87 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
 }
 
 /*
+ * STEP 2.5 — balance accumulation (the period bill), mirrors rt_balance_exec.
+ *
+ * Balance is keyed by (billing_account_id, start_date, end_date, active='t')
+ * and accumulates cprice. The period comes from the account's active pcard
+ * (pcard_status_id=1):
+ *   credit card (type 2) -> the billing_day monthly window (start = the most
+ *     recent billing_day boundary <= call date, end = +1 month);
+ *   debit card  (type 1) -> the card's own start_date/end_date, when it covers
+ *     the call date.
+ * Accounts with no active pcard get no balance (as in /Rating). We aggregate
+ * SUM(cprice) per (account, period) and UPDATE-or-INSERT balance — incremental,
+ * so it stays correct across the per-window batches.
+ */
+static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
+{
+	db_sql_result_t *bd;
+	int i;
+
+	if(rt_duckdb_exec(ctx,
+		"CREATE OR REPLACE TEMP TABLE bal_delta AS "
+		"WITH pc AS ( "
+		"  SELECT rb.cdr_id, rb.bacc_id, rb.cprice, "
+		"         CAST(rb.start_ts_str AS TIMESTAMP) AS cts, "
+		"         CASE WHEN ba.billing_day IS NULL OR ba.billing_day = 0 THEN 1 ELSE ba.billing_day END AS bday, "
+		"         p.pcard_type_id, p.start_date AS cstart, p.end_date AS cend, "
+		"         ROW_NUMBER() OVER (PARTITION BY rb.cdr_id ORDER BY p.start_date DESC) AS prn "
+		"  FROM rated_batch rb "
+		"  JOIN pg.billing_account ba ON ba.id = rb.bacc_id "
+		"  JOIN pg.pcard p ON p.billing_account_id = rb.bacc_id AND p.pcard_status_id = 1 "
+		"    AND ( p.pcard_type_id = 2 "
+		"       OR (p.pcard_type_id = 1 "
+		"           AND CAST(p.start_date AS DATE) <= CAST(rb.start_ts_str AS DATE) "
+		"           AND CAST(p.end_date AS DATE) >  CAST(rb.start_ts_str AS DATE)) ) "
+		"), "
+		"per AS ( "
+		"  SELECT bacc_id, cprice, pcard_type_id, cstart, cend, "
+		"         CASE WHEN EXTRACT(DAY FROM cts) >= bday "
+		"              THEN (date_trunc('month',cts) + to_days(bday-1))::DATE "
+		"              ELSE (date_trunc('month',cts) - INTERVAL 1 MONTH + to_days(bday-1))::DATE END AS win_start "
+		"  FROM pc WHERE prn = 1 "
+		") "
+		"SELECT bacc_id, "
+		"  CAST(CASE WHEN pcard_type_id = 2 THEN win_start ELSE CAST(cstart AS DATE) END AS VARCHAR) AS start_date, "
+		"  CAST(CASE WHEN pcard_type_id = 2 THEN (win_start + INTERVAL 1 MONTH)::DATE ELSE CAST(cend AS DATE) END AS VARCHAR) AS end_date, "
+		"  SUM(cprice) AS amount "
+		"FROM per GROUP BY ALL") < 0) {
+		LOG("rt_duckdb_balance()","build bal_delta failed");
+		return;
+	}
+
+	bd = rt_duckdb_select(ctx,"SELECT bacc_id, start_date, end_date, amount FROM bal_delta");
+	if(bd == NULL) return;
+
+	for(i = 0; i < bd->rows; i++) {
+		char up[2048];
+		long long bacc = atoll(bd->cols_list[0].rows_list[i].row);
+		char *s        = bd->cols_list[1].rows_list[i].row;
+		char *e        = bd->cols_list[2].rows_list[i].row;
+		double amt     = atof(bd->cols_list[3].rows_list[i].row);
+
+		/* update the period's balance, or create it if absent (one statement) */
+		snprintf(up,sizeof(up),
+			"WITH upd AS ( "
+			"  UPDATE balance SET amount = amount + %f, last_update = now() "
+			"  WHERE billing_account_id = %lld AND start_date = '%s' AND end_date = '%s' AND active = 't' "
+			"  RETURNING id "
+			") "
+			"INSERT INTO balance (billing_account_id,start_date,end_date,active,amount,last_update) "
+			"SELECT %lld,'%s','%s','t',%f,now() WHERE NOT EXISTS (SELECT 1 FROM upd)",
+			amt,bacc,s,e,bacc,s,e,amt);
+
+		db_query(pg_dbp,up,1);
+	}
+
+	LOG("rt_duckdb_balance()","balance updated for %d account-periods",bd->rows);
+
+	db_sql_result_free(bd);
+	ctx->duck->conn->result = NULL;
+}
+
+/*
  * The big query:
  * 1. Pin a deterministic window of unrated CDRs from PostgreSQL (postgres_scanner)
  * 2. JOIN with subscriber, billing plan (via bill_plan_tree), rates, tariff
@@ -471,6 +552,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		db_sql_result_free(rb);
 		ctx->duck->conn->result = NULL;
 	}
+
+	/* STEP 2.5: accumulate the rated cprice into the period balance (the bill). */
+	if(rated > 0) rt_duckdb_balance(ctx,pg_dbp);
 
 	/*
 	 * STEP 3: Mark the evaluated-but-unrated CDRs in this window as leg = -1.
