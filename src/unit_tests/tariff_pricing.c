@@ -82,6 +82,49 @@ static void cte(int billsec,const int *delta,const double *fee,const int *iter,
 	*out_bsec   = bsec;
 }
 
+/* Phase D free-pool drawdown: the clamp formula (free_sec = clamp(0, billsec,
+ * limit - (history + running SUM of prior billsec))) used by the DuckDB window
+ * must equal the sequential drawdown (consume free per call until the pool is
+ * empty). Compares per-call free_sec over fuzzed call sequences. */
+static int test_free_split(void)
+{
+	int fails = 0,seed;
+
+	for(seed = 1; seed < 80000; seed++) {
+		unsigned int st = (unsigned int)seed;
+		int n     = 1 + rand_r(&st) % 8;
+		int limit = rand_r(&st) % 600;
+		int hist  = rand_r(&st) % 200;
+		int bs[8],i;
+		int consumed = hist;     /* sequential: history + free consumed so far */
+		long cum = 0;            /* clamp: history + cumulative full billsec    */
+
+		for(i = 0; i < n; i++) bs[i] = rand_r(&st) % 300;
+
+		for(i = 0; i < n; i++) {
+			int rem_seq  = limit - consumed;
+			int free_seq = bs[i];
+			if(free_seq > (rem_seq > 0 ? rem_seq : 0)) free_seq = (rem_seq > 0 ? rem_seq : 0);
+			consumed += free_seq;
+
+			long rem_my  = (long)limit - (hist + cum);
+			int  free_my = bs[i];
+			if((long)free_my > (rem_my > 0 ? rem_my : 0)) free_my = (int)(rem_my > 0 ? rem_my : 0);
+			cum += bs[i];
+
+			if(free_seq != free_my) {
+				if(fails < 5)
+					printf("FREE MISMATCH seed=%d limit=%d hist=%d call=%d bs=%d: seq=%d clamp=%d\n",
+					       seed,limit,hist,i,bs[i],free_seq,free_my);
+				fails++;
+			}
+		}
+	}
+
+	printf("free_split: %s\n",fails ? "FAIL" : "OK");
+	return fails;
+}
+
 static int check(int bs,const int *d,const double *f,const int *it,int n,const char *tag)
 {
 	double c1,c2; int b1,b2;
@@ -145,6 +188,8 @@ int main(void)
 			tested++;
 		}
 	}
+
+	fails += test_free_split();
 
 	printf("tariff_pricing: tested=%d  failures=%d  -> %s\n",
 	       tested,fails,fails ? "FAIL" : "OK");
