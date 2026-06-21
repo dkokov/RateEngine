@@ -209,6 +209,7 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 		"       OR (p.pcard_type_id = 1 "
 		"           AND CAST(p.start_date AS DATE) <= CAST(rb.start_ts_str AS DATE) "
 		"           AND CAST(p.end_date AS DATE) >  CAST(rb.start_ts_str AS DATE)) ) "
+		"  WHERE rb.is_free = FALSE "   /* free portions are not charged to balance */
 		"), "
 		"per AS ( "
 		"  SELECT bacc_id, cprice, pcard_type_id, cstart, cend, "
@@ -393,53 +394,107 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		 * (the u=1-only break is calc_cprice_2's exact control flow). The free/
 		 * paid split that yields negative prices is free_billsec (a later phase).
 		 */
-		"price_walk(cdr_id, pos, rem, price, bsec, done) AS ( "
-		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		/*
+		 * Phase D — free_billsec split (double_rating). A tariff with a free
+		 * allowance (free_billsec via tariff.free_billsec_id) gives each subscriber
+		 * a pool of free seconds per balance period. Calls draw from it in id order
+		 * (as /Rating fetches), seeded from history (prior free seconds in this
+		 * period = rating rows with call_price < 0). Per call:
+		 *   before = history_used + running SUM(billsec of earlier calls in period)
+		 *   free_sec = clamp(0, billsec, limit - before)   [== sequential drawdown]
+		 * A boundary call splits into a free portion (negative price) and a paid
+		 * portion -> two rating rows. Each portion is priced by the tier walk.
+		 */
+		"fb AS ( "
+		"  SELECT bm.cdr_id, bm.billsec, bm.start_ts, bm.bacc_id, bm.rate_id, bm.tariff_id, "
+		"         t.free_billsec_id AS fbid, COALESCE(f.free_billsec,0) AS fb_limit, "
+		"         CASE WHEN EXTRACT(DAY FROM bm.start_ts) >= (CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END) "
+		"              THEN (date_trunc('month',bm.start_ts) + to_days((CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END)-1))::DATE "
+		"              ELSE (date_trunc('month',bm.start_ts) - INTERVAL 1 MONTH + to_days((CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END)-1))::DATE END AS pstart "
+		"  FROM best_match bm "
+		"  JOIN pg.tariff t ON t.id = bm.tariff_id "
+		"  JOIN pg.billing_account ba ON ba.id = bm.bacc_id "
+		"  LEFT JOIN pg.free_billsec f ON f.id = t.free_billsec_id "
+		"), "
+		"hist AS ( "
+		"  SELECT r.billing_account_id AS bacc_id, r.free_billsec_id AS fbid, "
+		"         CASE WHEN EXTRACT(DAY FROM r.call_ts) >= (CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END) "
+		"              THEN (date_trunc('month',r.call_ts) + to_days((CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END)-1))::DATE "
+		"              ELSE (date_trunc('month',r.call_ts) - INTERVAL 1 MONTH + to_days((CASE WHEN ba.billing_day IS NULL OR ba.billing_day=0 THEN 1 ELSE ba.billing_day END)-1))::DATE END AS pstart, "
+		"         SUM(r.call_billsec) AS used "
+		"  FROM pg.rating r "
+		"  JOIN pg.billing_account ba ON ba.id = r.billing_account_id "
+		"  WHERE r.call_price < 0 AND r.free_billsec_id <> 0 "
+		"    AND r.billing_account_id IN (SELECT DISTINCT bacc_id FROM fb WHERE fbid <> 0 AND fb_limit > 0) "
+		"  GROUP BY 1,2,3 "
+		"), "
+		"split AS ( "
+		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.fbid, "
+		"         GREATEST(0, LEAST(fb.billsec, fb.fb_limit - (COALESCE(h.used,0) "
+		"           + COALESCE(SUM(fb.billsec) OVER (PARTITION BY fb.bacc_id, fb.fbid, fb.pstart "
+		"               ORDER BY fb.cdr_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0)))) AS free_sec "
+		"  FROM fb LEFT JOIN hist h ON h.bacc_id=fb.bacc_id AND h.fbid=fb.fbid AND h.pstart=fb.pstart "
+		"  WHERE fb.fbid <> 0 AND fb.fb_limit > 0 "
+		"), "
+		"portions AS ( "
+		"  SELECT cdr_id, 'P' AS kind, billsec AS sec, tariff_id, 1 AS sgn, CAST(0 AS BIGINT) AS fbid_out, start_ts, bacc_id, rate_id "
+		"  FROM fb WHERE NOT (fbid <> 0 AND fb_limit > 0) "
+		"  UNION ALL "
+		"  SELECT cdr_id, 'P', (billsec - free_sec), tariff_id, 1, CAST(0 AS BIGINT), start_ts, bacc_id, rate_id "
+		"  FROM split WHERE (billsec - free_sec) > 0 "
+		"  UNION ALL "
+		"  SELECT cdr_id, 'F', free_sec, tariff_id, -1, CAST(fbid AS BIGINT), start_ts, bacc_id, rate_id "
+		"  FROM split WHERE free_sec > 0 "
+		"), "
+		"price_walk(cdr_id, kind, pos, rem, price, bsec, done) AS ( "
+		"  SELECT CAST(cdr_id AS BIGINT), kind, CAST(pos AS INTEGER), "
 		"         CAST(cs - charge*d AS BIGINT), CAST(charge*f AS DOUBLE), CAST(charge*d AS BIGINT), "
 		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
 		"  FROM ( "
-		"    SELECT cdr_id, pos, d, f, it, cs, u, "
+		"    SELECT cdr_id, kind, pos, d, f, it, cs, u, "
 		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
 		"    FROM ( "
-		"      SELECT bm.cdr_id, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
-		"             bm.billsec AS cs, "
-		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(bm.billsec::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
-		"      FROM best_match bm "
-		"      JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id AND cf.pos = 1 "
+		"      SELECT pt.cdr_id, pt.kind, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
+		"             pt.sec AS cs, "
+		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(pt.sec::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
+		"      FROM portions pt "
+		"      JOIN pg.calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = 1 "
 		"    ) "
 		"  ) "
 		"  UNION ALL "
-		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		"  SELECT CAST(cdr_id AS BIGINT), kind, CAST(pos AS INTEGER), "
 		"         CAST(cs - charge*d AS BIGINT), CAST(pprice + charge*f AS DOUBLE), "
 		"         CAST(pbsec + charge*d AS BIGINT), "
 		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
 		"  FROM ( "
-		"    SELECT cdr_id, pos, d, f, it, cs, u, pprice, pbsec, "
+		"    SELECT cdr_id, kind, pos, d, f, it, cs, u, pprice, pbsec, "
 		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
 		"    FROM ( "
-		"      SELECT p.cdr_id, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
+		"      SELECT p.cdr_id, p.kind, cf.pos, cf.delta_time AS d, cf.fee AS f, cf.iterations AS it, "
 		"             p.rem AS cs, p.price AS pprice, p.bsec AS pbsec, "
 		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(p.rem::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
 		"      FROM price_walk p "
-		"      JOIN best_match bm ON bm.cdr_id = p.cdr_id "
-		"      JOIN pg.calc_function cf ON cf.tariff_id = bm.tariff_id AND cf.pos = p.pos + 1 "
+		"      JOIN portions pt ON pt.cdr_id = p.cdr_id AND pt.kind = p.kind "
+		"      JOIN pg.calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = p.pos + 1 "
 		"      WHERE p.done = 0 "
 		"    ) "
 		"  ) "
 		"), "
 		"final AS ( "
-		"  SELECT cdr_id, price AS cprice, bsec AS billsec_out, "
-		"         ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY pos DESC) AS frn "
+		"  SELECT cdr_id, kind, price AS cprice, bsec AS billsec_out, "
+		"         ROW_NUMBER() OVER (PARTITION BY cdr_id, kind ORDER BY pos DESC) AS frn "
 		"  FROM price_walk "
 		") "
-		"SELECT CAST(bm.cdr_id AS BIGINT) AS cdr_id, bm.calling_number, bm.called_number, "
+		"SELECT CAST(pt.cdr_id AS BIGINT) AS cdr_id, "
 		"  CAST(fp.billsec_out AS BIGINT) AS billsec, "
-		"  CAST(bm.start_ts AS VARCHAR) AS start_ts_str, "
-		"  CAST(bm.bacc_id AS BIGINT) AS bacc_id, bm.round_mode_id, CAST(bm.rate_id AS BIGINT) AS rate_id, "
-		"  bm.tariff_id, bm.prefix_id, 0 AS delta_time, 0 AS fee, 0 AS iterations, "
-		"  fp.cprice AS cprice "
-		"FROM best_match bm "
-		"JOIN final fp ON fp.cdr_id = bm.cdr_id AND fp.frn = 1",
+		"  CAST(pt.start_ts AS VARCHAR) AS start_ts_str, "
+		"  CAST(pt.bacc_id AS BIGINT) AS bacc_id, "
+		"  CAST(pt.rate_id AS BIGINT) AS rate_id, "
+		"  (pt.sgn * fp.cprice) AS cprice, "
+		"  CAST(pt.fbid_out AS BIGINT) AS free_billsec_id, "
+		"  (pt.kind = 'F') AS is_free "
+		"FROM portions pt "
+		"JOIN final fp ON fp.cdr_id = pt.cdr_id AND fp.kind = pt.kind AND fp.frn = 1",
 		acct_union);
 
 	if(rt_duckdb_exec(ctx,sql) < 0) {
@@ -478,12 +533,15 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			" VALUES ");
 
 		for(i = 0; i < row_count; i++) {
-			long long cdr_id  = atoll(rb->cols_list[0].rows_list[i].row);  /* cdr_id */
-			int billsec       = atoi(rb->cols_list[3].rows_list[i].row);   /* billsec */
-			long long bacc_id = atoll(rb->cols_list[5].rows_list[i].row);  /* bacc_id */
-			long long rate_id = atoll(rb->cols_list[7].rows_list[i].row);  /* rate_id */
-			double cprice     = atof(rb->cols_list[13].rows_list[i].row);  /* cprice */
-			char *ts          = rb->cols_list[4].rows_list[i].row;         /* start_ts_str */
+			/* rated_batch cols: 0 cdr_id,1 billsec,2 start_ts,3 bacc_id,
+			 * 4 rate_id,5 cprice(signed),6 free_billsec_id,7 is_free */
+			long long cdr_id  = atoll(rb->cols_list[0].rows_list[i].row);
+			int billsec       = atoi(rb->cols_list[1].rows_list[i].row);
+			char *ts          = rb->cols_list[2].rows_list[i].row;
+			long long bacc_id = atoll(rb->cols_list[3].rows_list[i].row);
+			long long rate_id = atoll(rb->cols_list[4].rows_list[i].row);
+			double cprice     = atof(rb->cols_list[5].rows_list[i].row);
+			long long fbid    = atoll(rb->cols_list[6].rows_list[i].row);
 
 			memset(safe_ts,0,sizeof(safe_ts));
 			if(ts != NULL && ts[0] != '\0') {
@@ -493,9 +551,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			}
 
 			snprintf(row_buf,sizeof(row_buf),
-				"%s(%f,%d,%lld,%lld,%lld,1,0,0,'%s','now()',0)",
+				"%s(%f,%d,%lld,%lld,%lld,1,0,0,'%s','now()',%lld)",
 				(first ? "" : ","),
-				cprice,billsec,rate_id,bacc_id,cdr_id,safe_ts);
+				cprice,billsec,rate_id,bacc_id,cdr_id,safe_ts,fbid);
 
 			strcat(insert_sql,row_buf);
 			first = 0;
