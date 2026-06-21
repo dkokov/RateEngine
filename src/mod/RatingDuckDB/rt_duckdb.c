@@ -109,6 +109,7 @@ typedef struct rt_acct_mode {
 	char        leg;       /* 'a' or 'b' */
 	int         rec_type;  /* cdr_rec_type_id */
 	int         prio;      /* fallback order (1 = tried first) */
+	int         mode_id;   /* rating_mode.id (1=clg 2=acode 3=srcc 4=dstc 5=srctg 6=dsttg 7=sms) */
 	const char *tbl;       /* lookup table; CDR match column has the same name */
 	const char *bpcol;     /* bill_plan_id | sm_bill_plan_id */
 	int         nadi;      /* 1 -> also match clg_nadi/cld_nadi (tgroup modes) */
@@ -116,25 +117,25 @@ typedef struct rt_acct_mode {
 
 static const rt_acct_mode_t rt_acct_modes[] = {
 	/* leg a */
-	{'a',0,1,"calling_number","bill_plan_id",   0},  /* unkn:  clg  */
-	{'a',0,2,"account_code",  "bill_plan_id",   0},  /* unkn:  acode */
-	{'a',0,3,"src_context",   "bill_plan_id",   0},  /* unkn:  srcc */
-	{'a',0,4,"src_tgroup",    "bill_plan_id",   1},  /* unkn:  srctg */
-	{'a',1,1,"src_tgroup",    "bill_plan_id",   1},  /* isup:  srctg */
-	{'a',2,1,"calling_number","sm_bill_plan_id",0},  /* sms */
-	{'a',3,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
-	{'a',3,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
-	{'a',5,1,"account_code",  "bill_plan_id",   0},  /* voip_t: acode */
-	{'a',5,2,"src_context",   "bill_plan_id",   0},  /* voip_t: srcc */
+	{'a',0,1,1,"calling_number","bill_plan_id",   0},  /* unkn:  clg  */
+	{'a',0,2,2,"account_code",  "bill_plan_id",   0},  /* unkn:  acode */
+	{'a',0,3,3,"src_context",   "bill_plan_id",   0},  /* unkn:  srcc */
+	{'a',0,4,5,"src_tgroup",    "bill_plan_id",   1},  /* unkn:  srctg */
+	{'a',1,1,5,"src_tgroup",    "bill_plan_id",   1},  /* isup:  srctg */
+	{'a',2,1,7,"calling_number","sm_bill_plan_id",0},  /* sms */
+	{'a',3,1,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
+	{'a',3,2,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
+	{'a',5,1,2,"account_code",  "bill_plan_id",   0},  /* voip_t: acode */
+	{'a',5,2,3,"src_context",   "bill_plan_id",   0},  /* voip_t: srcc */
 	/* leg b */
-	{'b',0,1,"dst_context",   "bill_plan_id",   0},  /* unkn:  dstc */
-	{'b',0,2,"dst_tgroup",    "bill_plan_id",   1},  /* unkn:  dsttg */
-	{'b',1,1,"dst_tgroup",    "bill_plan_id",   1},  /* isup:  dsttg */
-	{'b',2,1,"calling_number","sm_bill_plan_id",0},  /* sms */
-	{'b',3,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
-	{'b',3,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
-	{'b',5,1,"dst_context",   "bill_plan_id",   0},  /* voip_t: dstc */
-	{0,0,0,NULL,NULL,0}
+	{'b',0,1,4,"dst_context",   "bill_plan_id",   0},  /* unkn:  dstc */
+	{'b',0,2,6,"dst_tgroup",    "bill_plan_id",   1},  /* unkn:  dsttg */
+	{'b',1,1,6,"dst_tgroup",    "bill_plan_id",   1},  /* isup:  dsttg */
+	{'b',2,1,7,"calling_number","sm_bill_plan_id",0},  /* sms */
+	{'b',3,1,1,"calling_number","bill_plan_id",   0},  /* voip_a: clg */
+	{'b',3,2,2,"account_code",  "bill_plan_id",   0},  /* voip_a: acode */
+	{'b',5,1,4,"dst_context",   "bill_plan_id",   0},  /* voip_t: dstc */
+	{0,0,0,0,NULL,NULL,0}
 };
 
 /* Build the UNION ALL of per-mode account lookups for the given leg into buf.
@@ -151,7 +152,7 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
 		if(m->leg != leg) continue;
 
 		len += snprintf(buf+len,buflen-len,
-			"%s SELECT c.id AS cdr_id, %d AS prio, ba.id AS bacc_id, "
+			"%s SELECT c.id AS cdr_id, %d AS prio, %d AS rating_mode_id, ba.id AS bacc_id, "
 			"ba.round_mode_id, bp.id AS bplan_id "
 			"FROM batch_window c "
 			"JOIN pg.%s t ON t.%s = c.%s "
@@ -162,6 +163,7 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
 			"WHERE c.cdr_rec_type_id = %d%s ",
 			(n ? "UNION ALL" : ""),
 			m->prio,
+			m->mode_id,
 			m->tbl,m->tbl,m->tbl,
 			m->tbl,m->tbl,
 			m->bpcol,
@@ -329,7 +331,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"CREATE OR REPLACE TEMP TABLE rated_batch AS "
 		"WITH RECURSIVE acct_all AS ( %s ), "
 		"acct AS ( "
-		"  SELECT cdr_id, bacc_id, round_mode_id, bplan_id FROM ( "
+		"  SELECT cdr_id, bacc_id, round_mode_id, bplan_id, rating_mode_id FROM ( "
 		"    SELECT *, ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY prio) AS arn FROM acct_all "
 		"  ) WHERE arn = 1 "
 		"), "
@@ -345,7 +347,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"        THEN CAST(FLOOR(c.billusec / 1000000.0) AS BIGINT) "
 		"      ELSE c.billsec END AS billsec, "
 		"    c.start_ts, "
-		"    a.bacc_id, a.round_mode_id, "
+		"    a.bacc_id, a.round_mode_id, a.rating_mode_id, "
 		"    rt.id AS rate_id, rt.tariff_id, pr.prefix, pr.id AS prefix_id, "
 		"    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY LENGTH(pr.prefix) DESC) AS rn "
 		"  FROM batch_window c "
@@ -408,7 +410,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		 * portion -> two rating rows. Each portion is priced by the tier walk.
 		 */
 		"fb AS ( "
-		"  SELECT bm.cdr_id, bm.billsec, bm.start_ts, bm.bacc_id, bm.rate_id, bm.tariff_id, "
+		"  SELECT bm.cdr_id, bm.billsec, bm.start_ts, bm.bacc_id, bm.rate_id, bm.tariff_id, bm.rating_mode_id, "
 		"         t.free_billsec_id AS fbid, COALESCE(f.free_billsec,0) AS fb_limit, "
 		"         CASE WHEN EXTRACT(DAY FROM bm.start_ts) >= (COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)) "
 		"              THEN (date_trunc('month',bm.start_ts) + to_days((COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1))-1))::DATE "
@@ -431,7 +433,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  GROUP BY 1,2,3 "
 		"), "
 		"split AS ( "
-		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.fbid, "
+		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.rating_mode_id, fb.fbid, "
 		"         GREATEST(0, LEAST(fb.billsec, fb.fb_limit - (COALESCE(h.used,0) "
 		"           + COALESCE(SUM(fb.billsec) OVER (PARTITION BY fb.bacc_id, fb.fbid, fb.pstart "
 		"               ORDER BY fb.cdr_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0)))) AS free_sec "
@@ -439,13 +441,13 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  WHERE fb.fbid <> 0 AND fb.fb_limit > 0 "
 		"), "
 		"portions AS ( "
-		"  SELECT cdr_id, 'P' AS kind, billsec AS sec, tariff_id, 1 AS sgn, CAST(0 AS BIGINT) AS fbid_out, start_ts, bacc_id, rate_id "
+		"  SELECT cdr_id, 'P' AS kind, billsec AS sec, tariff_id, 1 AS sgn, CAST(0 AS BIGINT) AS fbid_out, start_ts, bacc_id, rate_id, rating_mode_id "
 		"  FROM fb WHERE NOT (fbid <> 0 AND fb_limit > 0) "
 		"  UNION ALL "
-		"  SELECT cdr_id, 'P', (billsec - free_sec), tariff_id, 1, CAST(0 AS BIGINT), start_ts, bacc_id, rate_id "
+		"  SELECT cdr_id, 'P', (billsec - free_sec), tariff_id, 1, CAST(0 AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id "
 		"  FROM split WHERE (billsec - free_sec) > 0 "
 		"  UNION ALL "
-		"  SELECT cdr_id, 'F', free_sec, tariff_id, -1, CAST(fbid AS BIGINT), start_ts, bacc_id, rate_id "
+		"  SELECT cdr_id, 'F', free_sec, tariff_id, -1, CAST(fbid AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id "
 		"  FROM split WHERE free_sec > 0 "
 		"), "
 		"price_walk(cdr_id, kind, pos, rem, price, bsec, done) AS ( "
@@ -494,7 +496,8 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  CAST(pt.rate_id AS BIGINT) AS rate_id, "
 		"  (pt.sgn * fp.cprice) AS cprice, "
 		"  CAST(pt.fbid_out AS BIGINT) AS free_billsec_id, "
-		"  (pt.kind = 'F') AS is_free "
+		"  (pt.kind = 'F') AS is_free, "
+		"  CAST(pt.rating_mode_id AS INTEGER) AS rating_mode_id "
 		"FROM portions pt "
 		"JOIN final fp ON fp.cdr_id = pt.cdr_id AND fp.kind = pt.kind AND fp.frn = 1",
 		acct_union);
@@ -536,7 +539,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 		for(i = 0; i < row_count; i++) {
 			/* rated_batch cols: 0 cdr_id,1 billsec,2 start_ts,3 bacc_id,
-			 * 4 rate_id,5 cprice(signed),6 free_billsec_id,7 is_free */
+			 * 4 rate_id,5 cprice(signed),6 free_billsec_id,7 is_free,8 rating_mode_id */
 			long long cdr_id  = atoll(rb->cols_list[0].rows_list[i].row);
 			int billsec       = atoi(rb->cols_list[1].rows_list[i].row);
 			char *ts          = rb->cols_list[2].rows_list[i].row;
@@ -544,6 +547,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			long long rate_id = atoll(rb->cols_list[4].rows_list[i].row);
 			double cprice     = atof(rb->cols_list[5].rows_list[i].row);
 			long long fbid    = atoll(rb->cols_list[6].rows_list[i].row);
+			int rmode         = atoi(rb->cols_list[8].rows_list[i].row);
 
 			memset(safe_ts,0,sizeof(safe_ts));
 			if(ts != NULL && ts[0] != '\0') {
@@ -553,9 +557,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			}
 
 			snprintf(row_buf,sizeof(row_buf),
-				"%s(%f,%d,%lld,%lld,%lld,1,0,0,'%s','now()',%lld)",
+				"%s(%f,%d,%lld,%lld,%lld,%d,0,0,'%s','now()',%lld)",
 				(first ? "" : ","),
-				cprice,billsec,rate_id,bacc_id,cdr_id,safe_ts,fbid);
+				cprice,billsec,rate_id,bacc_id,cdr_id,rmode,safe_ts,fbid);
 
 			strcat(insert_sql,row_buf);
 			first = 0;
