@@ -274,8 +274,33 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"    AND c.called_number LIKE pr.prefix || '%%' "
 		"  JOIN pg.tariff tr ON tr.id = rt.tariff_id "
 		"), "
+		/*
+		 * Time conditions (tc_ts_cmp): a tariff that has time_condition rows only
+		 * applies if start_ts matches one — by tc_date, or day-of-week range, each
+		 * optionally gated by an hours range (with midnight wrap). A tariff with no
+		 * conditions always applies (so this is a no-op when unused). Match factors
+		 * to: hours_match AND (tc_date matches OR isodow in [d1,d2]).
+		 */
 		"best_match AS ( "
-		"  SELECT * FROM matched WHERE rn = 1 "
+		"  SELECT m.* FROM matched m WHERE m.rn = 1 AND ( "
+		"    NOT EXISTS (SELECT 1 FROM pg.time_condition tc WHERE tc.tariff_id = m.tariff_id) "
+		"    OR EXISTS ( "
+		"      SELECT 1 FROM pg.time_condition tc "
+		"      JOIN pg.time_condition_deff df ON df.id = tc.time_condition_id "
+		"      WHERE tc.tariff_id = m.tariff_id "
+		"      AND ( COALESCE(df.hours,'') = '' "
+		"         OR (CAST(split_part(df.hours,'-',1) AS TIME) <  CAST(split_part(df.hours,'-',2) AS TIME) "
+		"             AND CAST(split_part(df.hours,'-',1) AS TIME) <  CAST(m.start_ts AS TIME) "
+		"             AND CAST(split_part(df.hours,'-',2) AS TIME) >= CAST(m.start_ts AS TIME)) "
+		"         OR (CAST(split_part(df.hours,'-',1) AS TIME) >= CAST(split_part(df.hours,'-',2) AS TIME) "
+		"             AND (CAST(m.start_ts AS TIME) >  CAST(split_part(df.hours,'-',1) AS TIME) "
+		"               OR CAST(m.start_ts AS TIME) <= CAST(split_part(df.hours,'-',2) AS TIME))) ) "
+		"      AND ( (COALESCE(df.tc_date,'') <> '' AND CAST(df.tc_date AS DATE) = CAST(m.start_ts AS DATE)) "
+		"         OR isodow(m.start_ts) BETWEEN "
+		"            CASE lower(split_part(df.days_week,'-',1)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END "
+		"        AND CASE lower(split_part(df.days_week,'-',2)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END ) "
+		"    ) "
+		"  ) "
 		"), "
 		/*
 		 * Multi-tier pricing — faithful set-based replica of calc_cprice_2:
