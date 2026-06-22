@@ -366,27 +366,38 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		 * to: hours_match AND (tc_date matches OR isodow in [d1,d2]).
 		 */
 		"best_match AS ( "
-		"  SELECT m.* FROM matched m WHERE m.rn = 1 AND ( "
-		"    NOT EXISTS (SELECT 1 FROM pg.time_condition tc WHERE tc.tariff_id = m.tariff_id) "
-		"    OR EXISTS ( "
-		"      SELECT 1 FROM pg.time_condition tc "
-		"      JOIN pg.time_condition_deff df ON df.id = tc.time_condition_id "
-		"      WHERE tc.tariff_id = m.tariff_id "
-		/* hours compared lexically vs the call time string, like tc_ts_cmp's
-		 * strcmp (df.hours may be "HH-HH" or "HH:MM:SS-HH:MM:SS"). */
-		"      AND ( COALESCE(df.hours,'') = '' "
-		"         OR (split_part(df.hours,'-',1) <  split_part(df.hours,'-',2) "
-		"             AND split_part(df.hours,'-',1) <  CAST(CAST(m.start_ts AS TIME) AS VARCHAR) "
-		"             AND split_part(df.hours,'-',2) >= CAST(CAST(m.start_ts AS TIME) AS VARCHAR)) "
-		"         OR (split_part(df.hours,'-',1) >= split_part(df.hours,'-',2) "
-		"             AND (split_part(df.hours,'-',1) <  CAST(CAST(m.start_ts AS TIME) AS VARCHAR) "
-		"               OR split_part(df.hours,'-',2) >= CAST(CAST(m.start_ts AS TIME) AS VARCHAR))) ) "
-		"      AND ( (COALESCE(df.tc_date,'') <> '' AND TRY_CAST(df.tc_date AS DATE) = CAST(m.start_ts AS DATE)) "
-		"         OR isodow(m.start_ts) BETWEEN "
-		"            CASE lower(split_part(df.days_week,'-',1)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END "
-		"        AND CASE lower(split_part(df.days_week,'-',2)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END ) "
-		"    ) "
-		"  ) "
+		"  SELECT cdr_id, calling_number, called_number, billsec, start_ts, bacc_id, round_mode_id, "
+		"         rating_mode_id, rate_id, tariff_id, prefix_id, "
+		"         COALESCE(tc_match_id, 0) AS tc_id, COALESCE(pcard_id, 0) AS pcard_id "
+		"  FROM ( "
+		"    SELECT m.*, "
+		"      EXISTS (SELECT 1 FROM pg.time_condition tc WHERE tc.tariff_id = m.tariff_id) AS has_tc, "
+		/* matched time_condition (highest tc.prior); df.id is what /Rating stores
+		 * as time_condition_id. hours compared lexically like tc_ts_cmp's strcmp. */
+		"      (SELECT df.id FROM pg.time_condition tc "
+		"         JOIN pg.time_condition_deff df ON df.id = tc.time_condition_id "
+		"        WHERE tc.tariff_id = m.tariff_id "
+		"        AND ( COALESCE(df.hours,'') = '' "
+		"           OR (split_part(df.hours,'-',1) <  split_part(df.hours,'-',2) "
+		"               AND split_part(df.hours,'-',1) <  CAST(CAST(m.start_ts AS TIME) AS VARCHAR) "
+		"               AND split_part(df.hours,'-',2) >= CAST(CAST(m.start_ts AS TIME) AS VARCHAR)) "
+		"           OR (split_part(df.hours,'-',1) >= split_part(df.hours,'-',2) "
+		"               AND (split_part(df.hours,'-',1) <  CAST(CAST(m.start_ts AS TIME) AS VARCHAR) "
+		"                 OR split_part(df.hours,'-',2) >= CAST(CAST(m.start_ts AS TIME) AS VARCHAR))) ) "
+		"        AND ( (COALESCE(df.tc_date,'') <> '' AND TRY_CAST(df.tc_date AS DATE) = CAST(m.start_ts AS DATE)) "
+		"           OR isodow(m.start_ts) BETWEEN "
+		"              CASE lower(split_part(df.days_week,'-',1)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END "
+		"          AND CASE lower(split_part(df.days_week,'-',2)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END ) "
+		"        ORDER BY tc.prior DESC LIMIT 1) AS tc_match_id, "
+		/* active pcard id (same selection as the balance period) */
+		"      (SELECT p.id FROM pg.pcard p "
+		"        WHERE p.billing_account_id = m.bacc_id AND p.pcard_status_id = 1 "
+		"          AND ( p.pcard_type_id = 2 "
+		"             OR (p.pcard_type_id = 1 AND TRY_CAST(p.start_date AS DATE) <= CAST(m.start_ts AS DATE) "
+		"                                    AND TRY_CAST(p.end_date AS DATE) >  CAST(m.start_ts AS DATE)) ) "
+		"        ORDER BY p.start_date DESC LIMIT 1) AS pcard_id "
+		"    FROM matched m WHERE m.rn = 1 "
+		"  ) WHERE has_tc = FALSE OR tc_match_id IS NOT NULL "
 		"), "
 		/*
 		 * Multi-tier pricing — faithful set-based replica of calc_cprice_2:
@@ -411,6 +422,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		 */
 		"fb AS ( "
 		"  SELECT bm.cdr_id, bm.billsec, bm.start_ts, bm.bacc_id, bm.rate_id, bm.tariff_id, bm.rating_mode_id, "
+		"         bm.tc_id, bm.pcard_id, "
 		"         t.free_billsec_id AS fbid, COALESCE(f.free_billsec,0) AS fb_limit, "
 		"         CASE WHEN EXTRACT(DAY FROM bm.start_ts) >= (COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)) "
 		"              THEN (date_trunc('month',bm.start_ts) + to_days((COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1))-1))::DATE "
@@ -433,7 +445,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  GROUP BY 1,2,3 "
 		"), "
 		"split AS ( "
-		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.rating_mode_id, fb.fbid, "
+		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.rating_mode_id, fb.tc_id, fb.pcard_id, fb.fbid, "
 		"         GREATEST(0, LEAST(fb.billsec, fb.fb_limit - (COALESCE(h.used,0) "
 		"           + COALESCE(SUM(fb.billsec) OVER (PARTITION BY fb.bacc_id, fb.fbid, fb.pstart "
 		"               ORDER BY fb.cdr_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0)))) AS free_sec "
@@ -441,13 +453,13 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  WHERE fb.fbid <> 0 AND fb.fb_limit > 0 "
 		"), "
 		"portions AS ( "
-		"  SELECT cdr_id, 'P' AS kind, billsec AS sec, tariff_id, 1 AS sgn, CAST(0 AS BIGINT) AS fbid_out, start_ts, bacc_id, rate_id, rating_mode_id "
+		"  SELECT cdr_id, 'P' AS kind, billsec AS sec, tariff_id, 1 AS sgn, CAST(0 AS BIGINT) AS fbid_out, start_ts, bacc_id, rate_id, rating_mode_id, tc_id, pcard_id "
 		"  FROM fb WHERE NOT (fbid <> 0 AND fb_limit > 0) "
 		"  UNION ALL "
-		"  SELECT cdr_id, 'P', (billsec - free_sec), tariff_id, 1, CAST(0 AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id "
+		"  SELECT cdr_id, 'P', (billsec - free_sec), tariff_id, 1, CAST(0 AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id, tc_id, pcard_id "
 		"  FROM split WHERE (billsec - free_sec) > 0 "
 		"  UNION ALL "
-		"  SELECT cdr_id, 'F', free_sec, tariff_id, -1, CAST(fbid AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id "
+		"  SELECT cdr_id, 'F', free_sec, tariff_id, -1, CAST(fbid AS BIGINT), start_ts, bacc_id, rate_id, rating_mode_id, tc_id, pcard_id "
 		"  FROM split WHERE free_sec > 0 "
 		"), "
 		"price_walk(cdr_id, kind, pos, rem, price, bsec, done) AS ( "
@@ -497,7 +509,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"  (pt.sgn * fp.cprice) AS cprice, "
 		"  CAST(pt.fbid_out AS BIGINT) AS free_billsec_id, "
 		"  (pt.kind = 'F') AS is_free, "
-		"  CAST(pt.rating_mode_id AS INTEGER) AS rating_mode_id "
+		"  CAST(pt.rating_mode_id AS INTEGER) AS rating_mode_id, "
+		"  CAST(pt.pcard_id AS BIGINT) AS pcard_id, "
+		"  CAST(pt.tc_id AS BIGINT) AS time_condition_id "
 		"FROM portions pt "
 		"JOIN final fp ON fp.cdr_id = pt.cdr_id AND fp.kind = pt.kind AND fp.frn = 1",
 		acct_union);
@@ -538,8 +552,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			" VALUES ");
 
 		for(i = 0; i < row_count; i++) {
-			/* rated_batch cols: 0 cdr_id,1 billsec,2 start_ts,3 bacc_id,
-			 * 4 rate_id,5 cprice(signed),6 free_billsec_id,7 is_free,8 rating_mode_id */
+			/* rated_batch cols: 0 cdr_id,1 billsec,2 start_ts,3 bacc_id,4 rate_id,
+			 * 5 cprice(signed),6 free_billsec_id,7 is_free,8 rating_mode_id,
+			 * 9 pcard_id,10 time_condition_id */
 			long long cdr_id  = atoll(rb->cols_list[0].rows_list[i].row);
 			int billsec       = atoi(rb->cols_list[1].rows_list[i].row);
 			char *ts          = rb->cols_list[2].rows_list[i].row;
@@ -548,6 +563,8 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			double cprice     = atof(rb->cols_list[5].rows_list[i].row);
 			long long fbid    = atoll(rb->cols_list[6].rows_list[i].row);
 			int rmode         = atoi(rb->cols_list[8].rows_list[i].row);
+			long long pcard   = atoll(rb->cols_list[9].rows_list[i].row);
+			long long tcid    = atoll(rb->cols_list[10].rows_list[i].row);
 
 			memset(safe_ts,0,sizeof(safe_ts));
 			if(ts != NULL && ts[0] != '\0') {
@@ -557,9 +574,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			}
 
 			snprintf(row_buf,sizeof(row_buf),
-				"%s(%f,%d,%lld,%lld,%lld,%d,0,0,'%s','now()',%lld)",
+				"%s(%f,%d,%lld,%lld,%lld,%d,%lld,%lld,'%s','now()',%lld)",
 				(first ? "" : ","),
-				cprice,billsec,rate_id,bacc_id,cdr_id,rmode,safe_ts,fbid);
+				cprice,billsec,rate_id,bacc_id,cdr_id,rmode,pcard,tcid,safe_ts,fbid);
 
 			strcat(insert_sql,row_buf);
 			first = 0;
