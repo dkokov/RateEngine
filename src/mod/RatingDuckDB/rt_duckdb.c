@@ -260,6 +260,75 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 }
 
 /*
+ * STEP 2.6 — maintain free_billsec_balance (consumed free seconds per period),
+ * mirrors free_billsec_exec / free_billsec_balance_v2. For each (account,
+ * free_billsec_id) that consumed free seconds this batch, recompute the period
+ * total from rating (call_price < 0) and SET it on the period's
+ * free_billsec_balance row, keyed by the balance row's id. This is the shared
+ * state CallControl / /Rating read for free-allowance subscribers. Only periods
+ * with a matching balance row (billing_day window) are written.
+ */
+static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
+{
+	db_sql_result_t *fd;
+	int i;
+
+	if(rt_duckdb_exec(ctx,
+		"CREATE OR REPLACE TEMP TABLE fbb_delta AS "
+		"SELECT d.free_billsec_id, "
+		"  (SELECT COALESCE(SUM(r.call_billsec),0) FROM pg.rating r "
+		"     WHERE r.call_price < 0 AND r.free_billsec_id = d.free_billsec_id "
+		"       AND r.billing_account_id = d.bacc_id "
+		"       AND CAST(r.call_ts AS DATE) >= d.pstart AND CAST(r.call_ts AS DATE) < d.pend) AS used, "
+		"  (SELECT b.id FROM pg.balance b "
+		"     WHERE b.billing_account_id = d.bacc_id AND b.active = 't' "
+		"       AND b.start_date = CAST(d.pstart AS VARCHAR) AND b.end_date = CAST(d.pend AS VARCHAR) "
+		"     LIMIT 1) AS balance_id "
+		"FROM ( "
+		"  SELECT DISTINCT rb.bacc_id, rb.free_billsec_id, "
+		"    CASE WHEN EXTRACT(DAY FROM CAST(rb.start_ts_str AS TIMESTAMP)) >= COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1) "
+		"         THEN (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE "
+		"         ELSE (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) - INTERVAL 1 MONTH + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE END AS pstart, "
+		"    ((CASE WHEN EXTRACT(DAY FROM CAST(rb.start_ts_str AS TIMESTAMP)) >= COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1) "
+		"         THEN (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE "
+		"         ELSE (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) - INTERVAL 1 MONTH + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE END) + INTERVAL 1 MONTH)::DATE AS pend "
+		"  FROM rated_batch rb "
+		"  JOIN pg.billing_account ba ON ba.id = rb.bacc_id "
+		"  WHERE rb.is_free = TRUE AND rb.free_billsec_id <> 0 "
+		") d") < 0) {
+		LOG("rt_duckdb_free_balance()","build fbb_delta failed");
+		return;
+	}
+
+	fd = rt_duckdb_select(ctx,
+		"SELECT balance_id, free_billsec_id, used FROM fbb_delta WHERE balance_id IS NOT NULL");
+	if(fd == NULL) return;
+
+	for(i = 0; i < fd->rows; i++) {
+		char up[1024];
+		long long bal  = atoll(fd->cols_list[0].rows_list[i].row);
+		long long fbid = atoll(fd->cols_list[1].rows_list[i].row);
+		long long used = atoll(fd->cols_list[2].rows_list[i].row);
+
+		snprintf(up,sizeof(up),
+			"WITH upd AS ( "
+			"  UPDATE free_billsec_balance SET free_billsec = %lld, last_update = now() "
+			"  WHERE balance_id = %lld AND free_billsec_id = %lld RETURNING id "
+			") "
+			"INSERT INTO free_billsec_balance (balance_id,free_billsec_id,free_billsec) "
+			"SELECT %lld,%lld,%lld WHERE NOT EXISTS (SELECT 1 FROM upd)",
+			used,bal,fbid,bal,fbid,used);
+
+		db_query(pg_dbp,up,1);
+	}
+
+	LOG("rt_duckdb_free_balance()","free_billsec_balance updated for %d rows",fd->rows);
+
+	db_sql_result_free(fd);
+	ctx->duck->conn->result = NULL;
+}
+
+/*
  * The big query:
  * 1. Pin a deterministic window of unrated CDRs from PostgreSQL (postgres_scanner)
  * 2. JOIN with subscriber, billing plan (via bill_plan_tree), rates, tariff
@@ -636,6 +705,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 
 	/* STEP 2.5: accumulate the rated cprice into the period balance (the bill). */
 	if(rated > 0) rt_duckdb_balance(ctx,pg_dbp);
+
+	/* STEP 2.6: maintain free_billsec_balance (consumed free seconds per period). */
+	if(rated > 0) rt_duckdb_free_balance(ctx,pg_dbp);
 
 	/*
 	 * STEP 3: Mark the evaluated-but-unrated CDRs in this window as leg = -1.
