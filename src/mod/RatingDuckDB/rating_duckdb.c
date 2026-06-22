@@ -19,6 +19,7 @@ static rt_duckdb_t duckdb_ctx;
 static db_t *pg_dbp;
 static int rating_interval = 300;
 static int batch_limit = 5000;
+static int rating_threads = 0;   /* 0 = DuckDB default (all cores) */
 static char leg = 'a';
 static char active = 'f';
 
@@ -60,7 +61,7 @@ int rt_init_duckdb(void)
 	}
 
 	/* init DuckDB with PostgreSQL scanner */
-	ret = rt_duckdb_init(&duckdb_ctx,mcfg->dbhost,mcfg->dbname,mcfg->dbuser,mcfg->dbpass,mcfg->dbport);
+	ret = rt_duckdb_init(&duckdb_ctx,mcfg->dbhost,mcfg->dbname,mcfg->dbuser,mcfg->dbpass,mcfg->dbport,rating_threads);
 	if(ret < 0) {
 		LOG("rt_init_duckdb()","DuckDB init failed: %d",ret);
 		return -2;
@@ -104,6 +105,7 @@ void *RateEngine(void *dt)
 				}
 				if(strcmp(params->name,"RatingInterval") == 0) rating_interval = atoi(params->value);
 				if(strcmp(params->name,"BatchLimit") == 0) batch_limit = atoi(params->value);
+				if(strcmp(params->name,"RatingThreads") == 0) rating_threads = atoi(params->value);
 				if(strcmp(params->name,"leg") == 0) leg = params->value[0];
 				params = params->next_param;
 			}

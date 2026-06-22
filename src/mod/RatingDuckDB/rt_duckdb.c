@@ -20,7 +20,7 @@ static int rt_duckdb_exec(rt_duckdb_t *ctx,const char *sql)
 }
 
 int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
-                   const char *pg_user,const char *pg_pass,int pg_port)
+                   const char *pg_user,const char *pg_pass,int pg_port,int threads)
 {
 	char sql[1024];
 
@@ -44,6 +44,14 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
 	if(db_connect(ctx->duck) < 0) {
 		LOG("rt_duckdb_init()","cannot open DuckDB");
 		return -1;
+	}
+
+	/* cap DuckDB's worker threads for server load control (RatingThreads).
+	 * 0/unset -> DuckDB default (all cores). */
+	if(threads > 0) {
+		snprintf(sql,sizeof(sql),"SET threads TO %d;",threads);
+		rt_duckdb_exec(ctx,sql);
+		LOG("rt_duckdb_init()","DuckDB threads set to %d",threads);
 	}
 
 	/* build PostgreSQL connection string */
