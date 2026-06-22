@@ -90,6 +90,36 @@ void daemonize(char *rundir, char *pidfile)
     if (getppid() == 1) {
         exit(EXIT_FAILURE);
     }
+
+    /* Single-instance guard: if the pid file names a process that is still
+     * alive, refuse to start a second instance (clear message on the tty).
+     * A stale pid file (process gone) is ignored and gets overwritten below. */
+    {
+        int pf = open(pidfile, O_RDONLY, 0600);
+
+        if(pf >= 0) {
+            char pbuf[16];
+            int rpid;
+
+            bzero(pbuf,sizeof(pbuf));
+
+            if(read(pf,pbuf,sizeof(pbuf)-1) > 0) {
+                rpid = atoi(pbuf);
+
+                if(rpid > 0 && kill(rpid,0) == 0) {
+                    close(pf);
+                    fprintf(stderr,"\nRateEngine is already running (PID %d)! "
+                                   "Cannot start a second instance.\n",rpid);
+                    LOG("daemonize()","RateEngine is already running (PID %d), "
+                                      "refusing to start a second instance",rpid);
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            close(pf);
+        }
+    }
+
     /* Set signal mask - signals we want to block */
     sigemptyset(&newSigSet);
     sigaddset(&newSigSet, SIGCHLD);  			/* ignore child - i.e. we don't need to wait for it */
