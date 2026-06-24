@@ -27,53 +27,76 @@ static int rt_duckdb_exec(rt_duckdb_t *ctx,const char *sql)
  * the local copies (unqualified names) instead of pg.*. cdrs/rating/balance
  * stay live (pg.*) since they change continuously.
  */
-static const char *rt_dim_tables[] = {
+/* small, (near-)static config tables — cheap to cache, cached unless mode=NONE */
+static const char *rt_dim_static[] = {
+	"bill_plan","bill_plan_tree","rate","prefix","tariff","calc_function",
+	"time_condition","time_condition_deff","free_billsec",
+	NULL
+};
+
+/* tables that scale with subscribers/accounts — the memory cost; cached only
+ * in mode=ALL, otherwise live (view over pg.*) */
+static const char *rt_dim_account[] = {
 	"calling_number","calling_number_deff",
 	"account_code","account_code_deff",
 	"src_context","src_context_deff",
 	"dst_context","dst_context_deff",
 	"src_tgroup","src_tgroup_deff",
 	"dst_tgroup","dst_tgroup_deff",
-	"billing_account","bill_plan","bill_plan_tree",
-	"rate","prefix","tariff","calc_function",
-	"time_condition","time_condition_deff",
-	"free_billsec","pcard",
+	"billing_account","pcard",
 	NULL
 };
 
-/* (re)load the dimension snapshots from PostgreSQL into local DuckDB tables */
-int rt_duckdb_load_dims(rt_duckdb_t *ctx)
+/* Create a local snapshot (TABLE) or a live passthrough (VIEW) per table so the
+ * queries can always use the unqualified name regardless of cache mode. */
+static int rt_dim_make(rt_duckdb_t *ctx,const char *name,int as_table)
 {
 	char sql[256];
-	int i,ok = 0;
+
+	snprintf(sql,sizeof(sql),"CREATE OR REPLACE %s %s AS SELECT * FROM pg.%s",
+		as_table ? "TABLE" : "VIEW",name,name);
+
+	return rt_duckdb_exec(ctx,sql);
+}
+
+/*
+ * (re)build the dimension lookups in DuckDB according to ctx->cache_mode:
+ *   ALL    - everything snapshotted to local TABLEs (fastest, most RAM)
+ *   STATIC - small config tables cached; account tables as live VIEWs
+ *   NONE   - everything as live VIEWs (least RAM)
+ */
+int rt_duckdb_load_dims(rt_duckdb_t *ctx)
+{
+	int i,tbl = 0,vw = 0;
 
 	if(ctx == NULL || ctx->duck == NULL) return -1;
 
-	for(i = 0; rt_dim_tables[i] != NULL; i++) {
-		snprintf(sql,sizeof(sql),
-			"CREATE OR REPLACE TABLE %s AS SELECT * FROM pg.%s",
-			rt_dim_tables[i],rt_dim_tables[i]);
-
-		if(rt_duckdb_exec(ctx,sql) < 0) {
-			LOG("rt_duckdb_load_dims()","failed to cache '%s'",rt_dim_tables[i]);
-		} else {
-			ok++;
-		}
+	for(i = 0; rt_dim_static[i] != NULL; i++) {
+		int as_table = (ctx->cache_mode != RT_DIMCACHE_NONE);
+		if(rt_dim_make(ctx,rt_dim_static[i],as_table) == 0) { if(as_table) tbl++; else vw++; }
 	}
 
-	LOG("rt_duckdb_load_dims()","dimension cache loaded (%d tables)",ok);
+	for(i = 0; rt_dim_account[i] != NULL; i++) {
+		int as_table = (ctx->cache_mode == RT_DIMCACHE_ALL);
+		if(rt_dim_make(ctx,rt_dim_account[i],as_table) == 0) { if(as_table) tbl++; else vw++; }
+	}
+
+	LOG("rt_duckdb_load_dims()","dimensions ready (mode %d): %d cached, %d live",
+		ctx->cache_mode,tbl,vw);
 
 	return 0;
 }
 
 int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
-                   const char *pg_user,const char *pg_pass,int pg_port,int threads)
+                   const char *pg_user,const char *pg_pass,int pg_port,int threads,int cache_mode)
 {
 	char sql[1024];
 
 	if(ctx == NULL) return -1;
 
 	memset(ctx,0,sizeof(rt_duckdb_t));
+
+	ctx->cache_mode = cache_mode;
 
 	/* open an in-memory DuckDB through the db_duckdb engine (duckdb.so) */
 	ctx->duck = db_init();
