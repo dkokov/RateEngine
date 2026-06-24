@@ -666,6 +666,12 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		ctx->duck->conn->result = NULL;
 		rb = NULL;
 
+		/* Atomic: INSERT rating + UPDATE cdrs.leg in ONE transaction, so a crash
+		 * can never leave rating rows whose CDR is still leg=0 -> re-rated ->
+		 * duplicate rating rows. Either both commit or both roll back (a failed
+		 * INSERT aborts the tx, so the COMMIT below rolls back). */
+		db_query(pg_dbp,"BEGIN",1);
+
 		/* execute on PostgreSQL */
 		db_query(pg_dbp,insert_sql,0);
 		db_fetch(pg_dbp);
@@ -704,6 +710,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 			db_sql_result_free(pg_result);
 			pg_dbp->conn->result = NULL;
 		}
+
+		/* commit rating+leg together (rolls back if the INSERT failed) */
+		db_query(pg_dbp,"COMMIT",1);
 
 		mem_free(insert_sql);
 	} else if(rb != NULL) {
