@@ -20,6 +20,10 @@ services:
       - re7_network
     volumes:
        - re7_pgdata:/var/lib/postgresql/data
+    # PostgreSQL parallel workers (queries + VACUUM ANALYZE) allocate dynamic
+    # shared memory in /dev/shm; Docker's 64M default is too small and causes
+    # "could not resize shared memory segment ... No space left on device".
+    shm_size: "512m"
     hostname: re7-db
     container_name: re7-db
     environment:
