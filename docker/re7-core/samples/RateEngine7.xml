@@ -31,6 +31,11 @@
     <param name="leg" value="a" />
     <param name="RatingInterval" value="300" />
     <param name="waitRatingInterval" value="500" />
+    <!-- DuckDB module: CDRs rated per cycle (1..50000). Tune to find the best
+         throughput/latency ratio for your data + DB. -->
+    <param name="BatchLimit" value="5000" />
+    <!-- DuckDB worker threads (server load control). 0 = all CPU cores. -->
+    <param name="RatingThreads" value="4" />
     <param name="UsePCard" value="no" />
     <param name="PCardSortKey" value="start_date" />
     <param name="PCardSortMode" value="desc" />
