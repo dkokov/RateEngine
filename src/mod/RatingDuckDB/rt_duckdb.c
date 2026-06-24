@@ -720,6 +720,12 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		ctx->duck->conn->result = NULL;
 	}
 
+	/* STEP 2.5-3 run in ONE transaction: balance + free_billsec_balance + the
+	 * -1 mark -> a single fsync for all post-rating writes (less WAL/commit
+	 * overhead, smoother cycles). They read the rating rows already committed by
+	 * STEP 2 (via the read-only scanner connection), so this is safe. */
+	db_query(pg_dbp,"BEGIN",1);
+
 	/* STEP 2.5: accumulate the rated cprice into the period balance (the bill). */
 	if(rated > 0) rt_duckdb_balance(ctx,pg_dbp);
 
@@ -743,6 +749,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		LOG("rt_duckdb_rate_batch()","marked unmatched CDRs as -1 (id <= %lld)",
 			(long long)max_window_id);
 	}
+
+	/* commit balance + free_billsec_balance + the -1 mark together */
+	db_query(pg_dbp,"COMMIT",1);
 
 	LOG("rt_duckdb_rate_batch()","batch complete: %d rated",rated);
 
