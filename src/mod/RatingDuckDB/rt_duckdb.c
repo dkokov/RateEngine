@@ -19,6 +19,53 @@ static int rt_duckdb_exec(rt_duckdb_t *ctx,const char *sql)
 	return 0;
 }
 
+/*
+ * Dimension tables cached locally in DuckDB. These are (near-)static lookups
+ * the rating JOIN would otherwise re-pull from PostgreSQL via postgres_scanner
+ * EVERY cycle (the ~3-4s fixed per-cycle cost). We snapshot them into local
+ * DuckDB tables once at init and refresh periodically; the queries then JOIN
+ * the local copies (unqualified names) instead of pg.*. cdrs/rating/balance
+ * stay live (pg.*) since they change continuously.
+ */
+static const char *rt_dim_tables[] = {
+	"calling_number","calling_number_deff",
+	"account_code","account_code_deff",
+	"src_context","src_context_deff",
+	"dst_context","dst_context_deff",
+	"src_tgroup","src_tgroup_deff",
+	"dst_tgroup","dst_tgroup_deff",
+	"billing_account","bill_plan","bill_plan_tree",
+	"rate","prefix","tariff","calc_function",
+	"time_condition","time_condition_deff",
+	"free_billsec","pcard",
+	NULL
+};
+
+/* (re)load the dimension snapshots from PostgreSQL into local DuckDB tables */
+int rt_duckdb_load_dims(rt_duckdb_t *ctx)
+{
+	char sql[256];
+	int i,ok = 0;
+
+	if(ctx == NULL || ctx->duck == NULL) return -1;
+
+	for(i = 0; rt_dim_tables[i] != NULL; i++) {
+		snprintf(sql,sizeof(sql),
+			"CREATE OR REPLACE TABLE %s AS SELECT * FROM pg.%s",
+			rt_dim_tables[i],rt_dim_tables[i]);
+
+		if(rt_duckdb_exec(ctx,sql) < 0) {
+			LOG("rt_duckdb_load_dims()","failed to cache '%s'",rt_dim_tables[i]);
+		} else {
+			ok++;
+		}
+	}
+
+	LOG("rt_duckdb_load_dims()","dimension cache loaded (%d tables)",ok);
+
+	return 0;
+}
+
 int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
                    const char *pg_user,const char *pg_pass,int pg_port,int threads)
 {
@@ -71,6 +118,10 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
 		LOG("rt_duckdb_init()","cannot attach PostgreSQL");
 		return -2;
 	}
+
+	/* snapshot the static dimension tables into local DuckDB tables so the
+	 * rating JOIN doesn't re-pull them from PG every cycle */
+	rt_duckdb_load_dims(ctx);
 
 	LOG("rt_duckdb_init()","DuckDB initialized, PostgreSQL attached");
 
@@ -163,11 +214,11 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
 			"%s SELECT c.id AS cdr_id, %d AS prio, %d AS rating_mode_id, ba.id AS bacc_id, "
 			"ba.round_mode_id, bp.id AS bplan_id "
 			"FROM batch_window c "
-			"JOIN pg.%s t ON t.%s = c.%s "
-			"JOIN pg.%s_deff df ON df.%s_id = t.id "
-			"JOIN pg.billing_account ba ON ba.id = t.billing_account_id "
+			"JOIN %s t ON t.%s = c.%s "
+			"JOIN %s_deff df ON df.%s_id = t.id "
+			"JOIN billing_account ba ON ba.id = t.billing_account_id "
 			"  AND ba.cdr_server_id = c.cdr_server_id "
-			"JOIN pg.bill_plan bp ON bp.id = df.%s "
+			"JOIN bill_plan bp ON bp.id = df.%s "
 			"WHERE c.cdr_rec_type_id = %d%s ",
 			(n ? "UNION ALL" : ""),
 			m->prio,
@@ -213,8 +264,8 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 		"         p.pcard_type_id, p.start_date AS cstart, p.end_date AS cend, "
 		"         ROW_NUMBER() OVER (PARTITION BY rb.cdr_id ORDER BY p.start_date DESC) AS prn "
 		"  FROM rated_batch rb "
-		"  JOIN pg.billing_account ba ON ba.id = rb.bacc_id "
-		"  JOIN pg.pcard p ON p.billing_account_id = rb.bacc_id AND p.pcard_status_id = 1 "
+		"  JOIN billing_account ba ON ba.id = rb.bacc_id "
+		"  JOIN pcard p ON p.billing_account_id = rb.bacc_id AND p.pcard_status_id = 1 "
 		"    AND ( p.pcard_type_id = 2 "
 		"       OR (p.pcard_type_id = 1 "
 		"           AND TRY_CAST(p.start_date AS DATE) <= CAST(rb.start_ts_str AS DATE) "
@@ -301,7 +352,7 @@ static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 		"         THEN (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE "
 		"         ELSE (date_trunc('month',CAST(rb.start_ts_str AS TIMESTAMP)) - INTERVAL 1 MONTH + to_days(COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1)-1))::DATE END) + INTERVAL 1 MONTH)::DATE AS pend "
 		"  FROM rated_batch rb "
-		"  JOIN pg.billing_account ba ON ba.id = rb.bacc_id "
+		"  JOIN billing_account ba ON ba.id = rb.bacc_id "
 		"  WHERE rb.is_free = TRUE AND rb.free_billsec_id <> 0 "
 		") d") < 0) {
 		LOG("rt_duckdb_free_balance()","build fbb_delta failed");
@@ -429,11 +480,11 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY LENGTH(pr.prefix) DESC) AS rn "
 		"  FROM batch_window c "
 		"  JOIN acct a ON a.cdr_id = c.id "
-		"  LEFT JOIN pg.bill_plan_tree tree ON tree.root_bplan_id = a.bplan_id "
-		"  JOIN pg.rate rt ON rt.bill_plan_id = COALESCE(tree.bill_plan_id, a.bplan_id) "
-		"  JOIN pg.prefix pr ON pr.id = rt.prefix_id "
+		"  LEFT JOIN bill_plan_tree tree ON tree.root_bplan_id = a.bplan_id "
+		"  JOIN rate rt ON rt.bill_plan_id = COALESCE(tree.bill_plan_id, a.bplan_id) "
+		"  JOIN prefix pr ON pr.id = rt.prefix_id "
 		"    AND c.called_number LIKE pr.prefix || '%%' "
-		"  JOIN pg.tariff tr ON tr.id = rt.tariff_id "
+		"  JOIN tariff tr ON tr.id = rt.tariff_id "
 		"), "
 		/*
 		 * Time conditions (tc_ts_cmp): a tariff that has time_condition rows only
@@ -448,11 +499,11 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"         COALESCE(tc_match_id, 0) AS tc_id, COALESCE(pcard_id, 0) AS pcard_id "
 		"  FROM ( "
 		"    SELECT m.*, "
-		"      EXISTS (SELECT 1 FROM pg.time_condition tc WHERE tc.tariff_id = m.tariff_id) AS has_tc, "
+		"      EXISTS (SELECT 1 FROM time_condition tc WHERE tc.tariff_id = m.tariff_id) AS has_tc, "
 		/* matched time_condition (highest tc.prior); df.id is what /Rating stores
 		 * as time_condition_id. hours compared lexically like tc_ts_cmp's strcmp. */
-		"      (SELECT df.id FROM pg.time_condition tc "
-		"         JOIN pg.time_condition_deff df ON df.id = tc.time_condition_id "
+		"      (SELECT df.id FROM time_condition tc "
+		"         JOIN time_condition_deff df ON df.id = tc.time_condition_id "
 		"        WHERE tc.tariff_id = m.tariff_id "
 		"        AND ( COALESCE(df.hours,'') = '' "
 		"           OR (split_part(df.hours,'-',1) <  split_part(df.hours,'-',2) "
@@ -467,7 +518,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"          AND CASE lower(split_part(df.days_week,'-',2)) WHEN 'mon' THEN 1 WHEN 'tue' THEN 2 WHEN 'wed' THEN 3 WHEN 'thu' THEN 4 WHEN 'fri' THEN 5 WHEN 'sat' THEN 6 WHEN 'sun' THEN 7 END ) "
 		"        ORDER BY tc.prior DESC LIMIT 1) AS tc_match_id, "
 		/* active pcard id (same selection as the balance period) */
-		"      (SELECT p.id FROM pg.pcard p "
+		"      (SELECT p.id FROM pcard p "
 		"        WHERE p.billing_account_id = m.bacc_id AND p.pcard_status_id = 1 "
 		"          AND ( p.pcard_type_id = 2 "
 		"             OR (p.pcard_type_id = 1 AND TRY_CAST(p.start_date AS DATE) <= CAST(m.start_ts AS DATE) "
@@ -505,9 +556,9 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"              THEN (date_trunc('month',bm.start_ts) + to_days((COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1))-1))::DATE "
 		"              ELSE (date_trunc('month',bm.start_ts) - INTERVAL 1 MONTH + to_days((COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1))-1))::DATE END AS pstart "
 		"  FROM best_match bm "
-		"  JOIN pg.tariff t ON t.id = bm.tariff_id "
-		"  JOIN pg.billing_account ba ON ba.id = bm.bacc_id "
-		"  LEFT JOIN pg.free_billsec f ON f.id = t.free_billsec_id "
+		"  JOIN tariff t ON t.id = bm.tariff_id "
+		"  JOIN billing_account ba ON ba.id = bm.bacc_id "
+		"  LEFT JOIN free_billsec f ON f.id = t.free_billsec_id "
 		"), "
 		"hist AS ( "
 		"  SELECT r.billing_account_id AS bacc_id, r.free_billsec_id AS fbid, "
@@ -516,7 +567,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"              ELSE (date_trunc('month',r.call_ts) - INTERVAL 1 MONTH + to_days((COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1))-1))::DATE END AS pstart, "
 		"         SUM(r.call_billsec) AS used "
 		"  FROM pg.rating r "
-		"  JOIN pg.billing_account ba ON ba.id = r.billing_account_id "
+		"  JOIN billing_account ba ON ba.id = r.billing_account_id "
 		"  WHERE r.call_price < 0 AND r.free_billsec_id <> 0 "
 		"    AND r.billing_account_id IN (SELECT DISTINCT bacc_id FROM fb WHERE fbid <> 0 AND fb_limit > 0) "
 		"  GROUP BY 1,2,3 "
@@ -551,7 +602,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"             pt.sec AS cs, "
 		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(pt.sec::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
 		"      FROM portions pt "
-		"      JOIN pg.calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = 1 "
+		"      JOIN calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = 1 "
 		"    ) "
 		"  ) "
 		"  UNION ALL "
@@ -568,7 +619,7 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(p.rem::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
 		"      FROM price_walk p "
 		"      JOIN portions pt ON pt.cdr_id = p.cdr_id AND pt.kind = p.kind "
-		"      JOIN pg.calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = p.pos + 1 "
+		"      JOIN calc_function cf ON cf.tariff_id = pt.tariff_id AND cf.pos = p.pos + 1 "
 		"      WHERE p.done = 0 "
 		"    ) "
 		"  ) "
