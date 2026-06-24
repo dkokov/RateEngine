@@ -128,6 +128,8 @@ void *RateEngine(void *dt)
 		goto _end;
 	}
 
+	int dim_cycles = 0;   /* drive periodic dimension-cache refresh */
+
 	loop:
 	{
 		struct timeval t1,t2;
@@ -158,7 +160,14 @@ void *RateEngine(void *dt)
 		}
 
 		if(active == 't') {
-			if(batch_count > 0) goto loop;
+			if(batch_count > 0) {
+				/* periodic refresh during a long continuous drain */
+				if(++dim_cycles % 1000 == 0) rt_duckdb_load_dims(&duckdb_ctx);
+				goto loop;
+			}
+			/* idle: refresh the dimension cache so subscriber/rate/tariff
+			 * changes propagate before the next poll */
+			rt_duckdb_load_dims(&duckdb_ctx);
 			sleep(rating_interval);
 			goto loop;
 		} else {

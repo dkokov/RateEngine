@@ -19,6 +19,9 @@ int rt_duckdb_init(rt_duckdb_t *ctx,const char *pg_host,const char *pg_dbname,
                    const char *pg_user,const char *pg_pass,int pg_port,int threads);
 void rt_duckdb_close(rt_duckdb_t *ctx);
 
+/* (re)load the static dimension tables into local DuckDB tables */
+int rt_duckdb_load_dims(rt_duckdb_t *ctx);
+
 /* rate a batch of CDRs using DuckDB — returns number rated */
 int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit);
 
