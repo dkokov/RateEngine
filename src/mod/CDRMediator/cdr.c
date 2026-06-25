@@ -349,29 +349,27 @@ int cdr_get_cdr_id(db_t *dbp,cdr_t *the_cdr)
 			db_sql_result_free(result);
 			dbp->conn->result = NULL;
 		}
-	} else if(dbp->t == nosql) { 
+	} else if(dbp->t == nosql) {
 		sprintf(str,"get %s%s",CDR_JSON_HDR_PATTERN,the_cdr->call_uid);
-		
+
 		ret = db_get(dbp,str);
 		if(ret < 0) {
+			/* Missing key => CDR not present yet (caller may insert).
+			 * Any other error must NOT be treated as "not found",
+			 * otherwise a transient failure causes a duplicate insert. */
+			if(ret == DB_ERR_NOSQL_RES_NUL) return 0;
+
 			db_error(ret);
-			
-/*			memset(str,0,DB_BUF_LEN);
-			sprintf(str,"get %s%s",CDR_JSON_HDR_PATTERN_R,the_cdr->call_uid);
-
-			ret = db_get(dbp,str);
-			if(ret == DB_OK) return 1; */
-
-			return 0; // ??? ne e sigurno,moje da e nqkakva gre6ka ...reply = null ili reply->str = null ???
+			return -1;
 		}
-					
+
 		db_free_result(dbp);
 		db_nosql_result_free((db_nosql_result_t *)dbp->conn->result);
 		dbp->conn->result = NULL;
-		
+
 		return 1;
 	} else return -1;
-    
+
     return id;
 }
 
@@ -554,10 +552,16 @@ int cdr_add_in_db(db_t *dbp,cdr_t *cdr_pt,filter *filters)
 	}
 			
     if(filters != NULL) cdr_called_number_filtering_match(filters,cdr_pt);
-	
-	if(cdr_get_cdr_id(dbp,cdr_pt) == 0) {
+
+	int exists = cdr_get_cdr_id(dbp,cdr_pt);
+
+	if(exists == 0) {
+		/* Not present yet -> insert */
 		if(dbp->t == sql) return cdr_add_in_db_query(dbp,cdr_pt);
 		else if(dbp->t == nosql) return cdr_add_in_db_set(dbp,cdr_pt);
+	} else if(exists < 0) {
+		/* Lookup failed - skip insert to avoid duplicates on transient errors */
+		LOG("cdr_add_in_db()","CDR lookup failed (%s); skipping insert",cdr_pt->call_uid);
 	}
 
 	return -1;
@@ -569,8 +573,10 @@ int cdr_add_in_db_set(db_t *dbp,cdr_t *cdr_pt)
 	cdrm_json_t cdr_json_pt;
 	char buf[CDR_JSON_BUF_LEN];
 		
-	cdr_pt->cdr_server_id = 1; // temp patch ???
-		
+	/* NoSQL local store has no cdr_servers id table; keep a safe default
+	 * only when the caller did not supply a real cdr_server_id. */
+	if(cdr_pt->cdr_server_id == 0) cdr_pt->cdr_server_id = 1;
+
 	if((cdr_pt->start_epoch == 0)&&(strlen(cdr_pt->start_ts) > 0)) cdr_pt->start_epoch = convert_ts_to_epoch(cdr_pt->start_ts);
 	if((cdr_pt->answer_epoch == 0)&&(strlen(cdr_pt->answer_ts) > 0)) cdr_pt->answer_epoch = convert_ts_to_epoch(cdr_pt->answer_ts);
 	if((cdr_pt->end_epoch == 0)&&(strlen(cdr_pt->end_ts) > 0)) cdr_pt->end_epoch = convert_ts_to_epoch(cdr_pt->end_ts);

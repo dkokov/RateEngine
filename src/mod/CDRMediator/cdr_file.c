@@ -309,8 +309,10 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 		return 1;
 	}
 	
-	profile->cdr_server_id = 1; // temp patch !!!!
-	
+	/* Honor the configured/resolved cdr_server_id; fall back to 1 only when
+	 * it was never resolved (e.g. local store without a cdr_servers table). */
+	if(profile->cdr_server_id == 0) profile->cdr_server_id = 1;
+
 	arr = NULL;
 	hdr = profile->hdr;
 	
@@ -331,11 +333,10 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 	/* Inserted rows */
 	ins_rows = 0;
 	
-	while(!feof(fp)) {
-		/* Get a row from a file and put in the READBUF */
-		bzero(readbuf,READBUF_LEN);
-		fgets(readbuf,READBUF_LEN,fp);
-
+	/* Read row by row. Driving the loop on fgets() (not feof) avoids
+	 * processing a phantom final iteration on a stale buffer. */
+	bzero(readbuf,READBUF_LEN);
+	while(fgets(readbuf,READBUF_LEN,fp) != NULL) {
 		file_field_num = 0;
 
 		if((readbuf[0]) == (profile->hdr_comm)) {

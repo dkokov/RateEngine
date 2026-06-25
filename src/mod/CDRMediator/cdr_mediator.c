@@ -162,13 +162,15 @@ void *CDRMediatorEngine(void *dt)
     cfg = cdr_cfg_main(mcfg->cfg_filename);
 
 	if(cfg != NULL) {
+		/* Thread handles must outlive the loop so every active profile
+		 * thread stays tracked (declaring them inside the loop lost the
+		 * handle of each active profile on the next iteration). */
+		int rc[cfg->profiles_number];
+		pthread_t th[cfg->profiles_number];
+
 		profiles = cfg->profiles;
 
 		for(i=0;i<cfg->profiles_number;i++) {
-			/* Threads init */
-			int rc[cfg->profiles_number];
-			pthread_t th[cfg->profiles_number];
-			
 			/* Starting profile ... */
 			profiles[i].dbp = db_init();
 				

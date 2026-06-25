@@ -223,7 +223,15 @@ void cdr_profile_cfg_get(cdr_profile_cfg_t *cfg)
 				if(strcmp(params->name,"sql-col-where") == 0) {
 					strcpy(cfg->profile_db_type->sql_col_where,params->value);
 				}
-				
+
+				/* Type of the 'sql-col-where' column: "epoch" (integer) or
+				 * "ts" (timestamp literal, default). Controls how the
+				 * incremental watermark is compared in the remote query. */
+				if(strcmp(params->name,"sql-col-type") == 0) {
+					if(strcmp(params->value,"epoch") == 0) cfg->profile_db_type->sql_col_t = epoch;
+					else cfg->profile_db_type->sql_col_t = ts;
+				}
+
 				if(strcmp(params->name,"sql-where-const") == 0) {
 					strcpy(cfg->profile_db_type->sql_where_const,params->value);
 				}
