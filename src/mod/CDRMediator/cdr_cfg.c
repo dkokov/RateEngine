@@ -460,9 +460,13 @@ int cdr_cfg_get_cdr_profile_id(db_t *dbp,char *profile_name)
 	profile_id = 0;
 
 	if(dbp->t == sql) {
+		char e_profile_name[PROF_NAME_LEN*2+1];
+
+		db_sql_escape(profile_name,e_profile_name,sizeof(e_profile_name));
+
 		bzero(str,sizeof(str));
-		sprintf(str,"select id from cdr_profiles where profile_name = '%s';",profile_name);
-	
+		sprintf(str,"select id from cdr_profiles where profile_name = '%s';",e_profile_name);
+
 		db_select(dbp,str);
 		db_fetch(dbp);
 		
@@ -510,9 +514,13 @@ int cdr_cfg_insert_profile(cdr_profile_cfg_t *cfg)
 	if(cfg->dbp == NULL) return -1;
 
 	if(cfg->dbp->t == sql) {
+		char e_profile_name[PROF_NAME_LEN*2+1];
+
+		db_sql_escape(cfg->profile_name,e_profile_name,sizeof(e_profile_name));
+
 		bzero(str,sizeof(str));
 
-		sprintf(str,"insert into cdr_profiles (profile_name,profile_version) values ('%s',%d)",cfg->profile_name,cfg->profile_version);
+		sprintf(str,"insert into cdr_profiles (profile_name,profile_version) values ('%s',%d)",e_profile_name,cfg->profile_version);
 
 		db_insert(cfg->dbp,str);
 		
@@ -605,13 +613,19 @@ int cdr_cfg_insert_filters(cdr_profile_cfg_t *profile)
 	if(profile->filters == NULL) return -2;
 	
 	if(profile->dbp->t == sql) {
+		char e_prefix[sizeof(profile->filters[0].filtering_prefix)*2+1];
+		char e_replace[sizeof(profile->filters[0].replace_str)*2+1];
+
 		i=0;
 		while(strcmp(profile->filters[i].filtering_prefix,"")) {
 			bzero(str,sizeof(str));
-		
+
+			db_sql_escape(profile->filters[i].filtering_prefix,e_prefix,sizeof(e_prefix));
+			db_sql_escape(profile->filters[i].replace_str,e_replace,sizeof(e_replace));
+
 			sprintf(str,"insert into prefix_filter (cdr_profiles_id,cdr_server_id,filtering_prefix,filtering_number,replace_str,len) values (%d,%d,'%s',%d,'%s',%d)",
-					profile->cdr_profile_id,profile->cdr_server_id,profile->filters[i].filtering_prefix,profile->filters[i].filtering_number,
-					profile->filters[i].replace_str,profile->filters[i].len);
+					profile->cdr_profile_id,profile->cdr_server_id,e_prefix,profile->filters[i].filtering_number,
+					e_replace,profile->filters[i].len);
 
 			if(db_insert(profile->dbp,str) < 0) return -4;
 						
