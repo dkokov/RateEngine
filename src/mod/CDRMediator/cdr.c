@@ -553,15 +553,20 @@ int cdr_add_in_db(db_t *dbp,cdr_t *cdr_pt,filter *filters)
 			
     if(filters != NULL) cdr_called_number_filtering_match(filters,cdr_pt);
 
-	int exists = cdr_get_cdr_id(dbp,cdr_pt);
+	if(dbp->t == sql) {
+		/* No per-CDR dedup SELECT: the cdrs table has a UNIQUE(call_uid)
+		 * constraint and the insert is conflict-tolerant (ON CONFLICT /
+		 * INSERT IGNORE), so duplicates are skipped by the DB in one
+		 * round-trip instead of two. */
+		return cdr_add_in_db_query(dbp,cdr_pt);
+	} else if(dbp->t == nosql) {
+		int exists = cdr_get_cdr_id(dbp,cdr_pt);
 
-	if(exists == 0) {
-		/* Not present yet -> insert */
-		if(dbp->t == sql) return cdr_add_in_db_query(dbp,cdr_pt);
-		else if(dbp->t == nosql) return cdr_add_in_db_set(dbp,cdr_pt);
-	} else if(exists < 0) {
-		/* Lookup failed - skip insert to avoid duplicates on transient errors */
-		LOG("cdr_add_in_db()","CDR lookup failed (%s); skipping insert",cdr_pt->call_uid);
+		if(exists == 0) return cdr_add_in_db_set(dbp,cdr_pt);
+		else if(exists < 0) {
+			/* Lookup failed - skip to avoid duplicates on transient errors */
+			LOG("cdr_add_in_db()","CDR lookup failed (%s); skipping insert",cdr_pt->call_uid);
+		}
 	}
 
 	return -1;
@@ -631,8 +636,20 @@ int cdr_add_in_db_query(db_t *dbp,cdr_t *cdr_pt)
 	db_sql_escape(cdr_pt->dst_context,e_dst_ctx,sizeof(e_dst_ctx));
 	db_sql_escape(cdr_pt->dst_tgroup,e_dst_tg,sizeof(e_dst_tg));
 
+	/* Conflict-tolerant insert: rely on the cdrs UNIQUE(call_uid) constraint
+	 * to skip duplicates in the DB (one round-trip, no pre-SELECT). MySQL uses
+	 * INSERT IGNORE; PostgreSQL/DuckDB use a trailing ON CONFLICT DO NOTHING
+	 * (valid even without a matching constraint - it simply never fires). */
+	const char *verb     = "insert into";
+	const char *conflict = " on conflict do nothing";
+
+	if(strcmp(dbp->conn->enginename,"mysql") == 0) {
+		verb     = "insert ignore into";
+		conflict = "";
+	}
+
 		snprintf(str,sizeof(str),
-			"insert into %s "
+			"%s %s "
 			"(cdr_server_id,cdr_rec_type_id,leg_a,leg_b,"
 			"call_uid,start_ts,answer_ts,end_ts,start_epoch,answer_epoch,end_epoch,"
 			"src,dst,calling_number,clg_nadi,called_number,cld_nadi,"
@@ -645,14 +662,15 @@ int cdr_add_in_db_query(db_t *dbp,cdr_t *cdr_pt)
 			"'%s','%s','%s',%d,'%s',%d,"
 			"'%s',%d,'%s',%d,%d,"
 			"'%s','%s','%s','%s','%s',"
-			"%d,%d,%d,%d)",
-			CDR_TABLE_NAME,
+			"%d,%d,%d,%d)%s",
+			verb,CDR_TABLE_NAME,
 			cdr_pt->cdr_server_id,cdr_pt->cdr_rec_type_id,cdr_pt->leg_a,cdr_pt->leg_b,
 			e_call_uid,e_start_ts,e_answer_ts,e_end_ts,cdr_pt->start_epoch,cdr_pt->answer_epoch,cdr_pt->end_epoch,
 			e_src,e_dst,e_calling,cdr_pt->clg_nadi,e_called,cdr_pt->cld_nadi,
 			e_rdnis,cdr_pt->rdnis_nadi,e_ocn,cdr_pt->ocn_nadi,cdr_pt->prefix_filter_id,
 			e_acc,e_src_ctx,e_src_tg,e_dst_ctx,e_dst_tg,
-			cdr_pt->billsec,cdr_pt->duration,cdr_pt->uduration,cdr_pt->billusec);
+			cdr_pt->billsec,cdr_pt->duration,cdr_pt->uduration,cdr_pt->billusec,
+			conflict);
 
 		ret = db_insert(dbp,str);
 
