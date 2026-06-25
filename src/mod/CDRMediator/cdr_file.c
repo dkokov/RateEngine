@@ -332,7 +332,13 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 	
 	/* Inserted rows */
 	ins_rows = 0;
-	
+
+	/* One transaction for the whole file: a single commit/fsync instead of
+	 * one per row. Conflict-tolerant inserts keep the transaction unpoisoned. */
+	int tx = (profile->dbp->t == sql);
+
+	if(tx) db_query(profile->dbp,"BEGIN",1);
+
 	/* Read row by row. Driving the loop on fgets() (not feof) avoids
 	 * processing a phantom final iteration on a stale buffer. */
 	bzero(readbuf,READBUF_LEN);
@@ -350,7 +356,9 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 					
 				if(arr == NULL) {
 					LOG("cdr_file_parser()","An 'arr' pointer is null!");
-					return 3;			
+					if(tx) db_query(profile->dbp,"COMMIT",1);
+					fclose(fp);
+					return 3;
 				}
 			} else {
 				continue;
@@ -399,7 +407,9 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 			}
 		}
 	}
-	
+
+	if(tx) db_query(profile->dbp,"COMMIT",1);
+
 	LOG("cdr_file_parser()","all rows: %d,parse rows: %d(%.2f%),inserted rows: %d(%.2f%)",
 						all_rows,parse_rows,(((float)parse_rows/(float)all_rows)*100),
 						ins_rows,(((float)ins_rows/(float)parse_rows)*100));

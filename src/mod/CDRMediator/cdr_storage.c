@@ -113,19 +113,28 @@ int cdr_storage_get_remote_cdrs(cdr_storage_profile_t *profile)
 			result = (db_sql_result_t *)profile->rem_dbp->conn->result;
 			
 			if(result->rows > 0) {
+				/* One transaction for the whole batch: a single commit/fsync
+				 * instead of one per CDR. Conflict-tolerant inserts mean
+				 * duplicates don't error, so the transaction is never poisoned. */
+				int tx = (profile->dbp->t == sql);
+
+				if(tx) db_query(profile->dbp,"BEGIN",1);
+
 				for (i = 0; i < result->rows ;i++) {
 					memset(&the_cdr,0,sizeof(the_cdr));
-					
+
 					the_cdr.cdr_server_id = profile->cdr_server_id;
 					the_cdr.cdr_rec_type_id = profile->cdr_rec_type_id;
-						
+
 					for(c = 0;c < (profile->cols_num - 1);c++) {
 						(*cols[c].func)(&the_cdr,result->cols_list[c].rows_list[i].row);
 					}
-			
+
 					strcpy(the_cdr.profile_name,profile->profile_name);
 					if(cdr_add_in_db(profile->dbp,&the_cdr,profile->filters) == 0) p++;
 				}
+
+				if(tx) db_query(profile->dbp,"COMMIT",1);
 			}
 			
 			LOG("cdr_storage_get_romote_cdrs()",
