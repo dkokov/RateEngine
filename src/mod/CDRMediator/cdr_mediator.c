@@ -12,18 +12,6 @@
 #include "cdr_storage.h"
 #include "cdr_cfg.h"
 
-/*
-mod_t cdrm_mod_t = {
-	.mod_name = "",
-	.ver      = 1,
-	.init     = NULL,
-	.destroy  = NULL,
-	.depends  = NULL,
-	.handle   = NULL,
-	.next     = NULL
-};
-*/
-// shte se izpolzali ... sega se 4ete ot profil faila !!!!
 void mcdr_filters_init(cdr_profile_cfg_t *profile)
 {	
 	if((profile->called_number_filtering == 't')) {
@@ -80,22 +68,6 @@ void mcdr_cfg_free(cdr_cfg_t *cfg)
 	}
 }
 
-void mcdr_cfg_profile_free(cdr_profile_cfg_t *profile)
-{	
-	switch(profile->t) {
-		case file:
-				mem_free(profile->profile_file_type->hdr);
-				mem_free(profile->profile_file_type);
-				profile = NULL;
-				break;
-		case db:
-				mem_free(profile->profile_db_type->cols);
-				mem_free(profile->profile_db_type);
-				profile = NULL;		
-				break;
-	}
-}
-
 /* Thread per profile */
 void *CDRMediatorThread(void *dt)
 {
@@ -135,10 +107,6 @@ void *CDRMediatorThread(void *dt)
 			sleep(profile->cdr_interval);
 			goto loop;
 		}
-	
-//		if(profile->filters != NULL) mem_free(profile->filters);
-		
-//		mcdr_cfg_profile_free(profile);
 	} else {
 		LOG("CDRMediatorThread()","A 'profile' pointer is null!");
 	}

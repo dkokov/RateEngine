@@ -124,13 +124,12 @@ void cdr_file_field_free_arr(cdr_file_field_t *pt)
 cdr_file_header_t *cdr_file_header_init(int num)
 {
 	size_t mem;
-	cdr_file_header_t *hdr = NULL;
-	
-	if(num > 0) mem = sizeof(cdr_file_header_t)*(num + 1);
-	
-	hdr = (cdr_file_header_t *)mem_alloc(mem);
-	
-	return hdr;
+
+	if(num <= 0) return NULL;
+
+	mem = sizeof(cdr_file_header_t)*(num + 1);
+
+	return (cdr_file_header_t *)mem_alloc(mem);
 }
 
 cdr_file_profile_t *cdr_file_profile_init(void)

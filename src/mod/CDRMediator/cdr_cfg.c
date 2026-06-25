@@ -689,36 +689,39 @@ cdr_cfg_t *cdr_cfg_main(char *xmlFileName)
 				
 				if(strcmp(cfg->cdr_profiles_dir,"") == 0) {
 					LOG("cdr_cfg_main()","A 'CDRProfilesDIR' is empty");
+					xml_cfg_free_doc(cfg->doc);
+					mem_free(cfg->node);
 					mem_free(cfg);
 					cfg = NULL;
-				} else { 
+				} else {
 					cdr_profiles_list_get(cfg);
 				
 					if(cfg->list != NULL) {
 						cfg->profiles = cdr_profile_cfg_init(cfg->profiles_number);
-					
-						for(i=0;i<(cfg->profiles_number);i++) {				
-							profile = &cfg->profiles[i];
-							
-							if(profile != NULL) {
+
+						if(cfg->profiles != NULL) {
+							for(i=0;i<(cfg->profiles_number);i++) {
+								profile = &cfg->profiles[i];
+
 								profile->doc = xml_cfg_doc(cfg->list[i].filename);
-								strcpy(profile->filename,cfg->list[i].filename); 
+								strcpy(profile->filename,cfg->list[i].filename);
 
 								if(profile->doc != NULL) {
 									profile->root = xml_cfg_root(profile->doc);
-									
+
 									if(profile->root != NULL) {
 										cdr_profile_cfg_get(profile);
 									}
 								}
-							
+
 								xml_cfg_free_doc(profile->doc);
-							} else {
-								LOG("cdr_cfg_main()","A 'profile' pointer is null!");
-								xml_cfg_free_doc(cfg->doc);
-								mem_free(cfg);
-								cfg = NULL;
 							}
+						} else {
+							LOG("cdr_cfg_main()","A 'profiles' pointer is null!");
+							xml_cfg_free_doc(cfg->doc);
+							mem_free(cfg->node);
+							mem_free(cfg);
+							cfg = NULL;
 						}
 					} else {
 						LOG("cdr_cfg_main()","A 'list' pointer is null!");

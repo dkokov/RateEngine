@@ -13,13 +13,12 @@
 cdr_storage_col_t *cdr_storage_col_init(int num)
 {
 	size_t mem;
-	cdr_storage_col_t *cols = NULL;
-	
-	if(num > 0) mem = sizeof(cdr_storage_col_t)*(num + 1);
-	
-	cols = (cdr_storage_col_t *)mem_alloc(mem);
-	
-	return cols;
+
+	if(num <= 0) return NULL;
+
+	mem = sizeof(cdr_storage_col_t)*(num + 1);
+
+	return (cdr_storage_col_t *)mem_alloc(mem);
 }
 
 cdr_storage_profile_t *cdr_storage_profile_init(void)
