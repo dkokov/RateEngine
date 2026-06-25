@@ -99,7 +99,18 @@ void cdr_init(cdr_t *cdr_pt)
 cdr_t *cdr_mem_init(int num)
 {
 	return (cdr_t *)mem_alloc_arr(num,sizeof(cdr_t));
-} 
+}
+
+/* Bounded copy into a fixed-size CDR field.
+ * CDR string fields come from external sources (CSV files,remote DB columns)
+ * and must never be copied unbounded - truncate instead of overflowing. */
+static void cdr_field_set(char *dst,const char *src,size_t dst_size)
+{
+	if((dst == NULL)||(src == NULL)||(dst_size == 0)) return;
+
+	strncpy(dst,src,dst_size - 1);
+	dst[dst_size - 1] = '\0';
+}
 
 /* Put in the CDR struct functions */
 void cdr_add_id(cdr_t *cdr_ptr,char *txt) 
@@ -132,24 +143,24 @@ void cdr_add_cdr_rec_type(cdr_t *cdr_ptr,char *txt)
 	cdr_ptr->cdr_rec_type_id = atoi(txt);
 }
 
-void cdr_add_call_uid(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_call_uid(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->call_uid,txt);
+	cdr_field_set(cdr_ptr->call_uid,txt,sizeof(cdr_ptr->call_uid));
 }
 
-void cdr_add_start_ts(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_start_ts(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->start_ts,txt);
+	cdr_field_set(cdr_ptr->start_ts,txt,sizeof(cdr_ptr->start_ts));
 }
 
-void cdr_add_answer_ts(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_answer_ts(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->answer_ts,txt);
+	cdr_field_set(cdr_ptr->answer_ts,txt,sizeof(cdr_ptr->answer_ts));
 }
 
-void cdr_add_end_ts(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_end_ts(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->end_ts,txt);
+	cdr_field_set(cdr_ptr->end_ts,txt,sizeof(cdr_ptr->end_ts));
 }
 
 void cdr_add_start_epoch(cdr_t *cdr_ptr,char *txt) 
@@ -167,19 +178,19 @@ void cdr_add_end_epoch(cdr_t *cdr_ptr,char *txt)
 	cdr_ptr->end_epoch = atoi(txt);
 }
 
-void cdr_add_src(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_src(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->src,txt);
+	cdr_field_set(cdr_ptr->src,txt,sizeof(cdr_ptr->src));
 }
 
-void cdr_add_dst(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_dst(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->dst,txt);
+	cdr_field_set(cdr_ptr->dst,txt,sizeof(cdr_ptr->dst));
 }
 
-void cdr_add_calling_number(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_calling_number(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->calling_number,txt);
+	cdr_field_set(cdr_ptr->calling_number,txt,sizeof(cdr_ptr->calling_number));
 }
 
 void cdr_add_clg_nadi(cdr_t *cdr_ptr,char *txt) 
@@ -187,9 +198,9 @@ void cdr_add_clg_nadi(cdr_t *cdr_ptr,char *txt)
 	cdr_ptr->clg_nadi = atoi(txt);
 }
 
-void cdr_add_called_number(cdr_t *cdr_ptr,char *txt) 
+void cdr_add_called_number(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->called_number,txt);
+	cdr_field_set(cdr_ptr->called_number,txt,sizeof(cdr_ptr->called_number));
 }
 
 void cdr_add_cld_nadi(cdr_t *cdr_ptr,char *txt) 
@@ -199,7 +210,7 @@ void cdr_add_cld_nadi(cdr_t *cdr_ptr,char *txt)
 
 void cdr_add_rdnis(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->rdnis,txt);
+	cdr_field_set(cdr_ptr->rdnis,txt,sizeof(cdr_ptr->rdnis));
 }
 
 void cdr_add_rdnis_nadi(cdr_t *cdr_ptr,char *txt) 
@@ -209,7 +220,7 @@ void cdr_add_rdnis_nadi(cdr_t *cdr_ptr,char *txt)
 
 void cdr_add_ocn(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->ocn,txt);
+	cdr_field_set(cdr_ptr->ocn,txt,sizeof(cdr_ptr->ocn));
 }
 
 void cdr_add_ocn_nadi(cdr_t *cdr_ptr,char *txt) 
@@ -219,27 +230,27 @@ void cdr_add_ocn_nadi(cdr_t *cdr_ptr,char *txt)
 
 void cdr_add_account_code(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->account_code,txt);
+	cdr_field_set(cdr_ptr->account_code,txt,sizeof(cdr_ptr->account_code));
 }
 
 void cdr_add_src_context(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->src_context,txt);
+	cdr_field_set(cdr_ptr->src_context,txt,sizeof(cdr_ptr->src_context));
 }
 
 void cdr_add_src_tgroup(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->src_tgroup,txt);
+	cdr_field_set(cdr_ptr->src_tgroup,txt,sizeof(cdr_ptr->src_tgroup));
 }
 
 void cdr_add_dst_context(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->dst_context,txt);
+	cdr_field_set(cdr_ptr->dst_context,txt,sizeof(cdr_ptr->dst_context));
 }
 
 void cdr_add_dst_tgroup(cdr_t *cdr_ptr,char *txt)
 {
-	strcpy(cdr_ptr->dst_tgroup,txt);
+	cdr_field_set(cdr_ptr->dst_tgroup,txt,sizeof(cdr_ptr->dst_tgroup));
 }
 
 void cdr_add_billsec(cdr_t *cdr_ptr,char *txt) 
@@ -320,8 +331,12 @@ int cdr_get_cdr_id(db_t *dbp,cdr_t *the_cdr)
 	id = 0;
 
 	if(dbp->t == sql) {
+		char e_call_uid[CALL_UID_LEN*2+1];
+
+		db_sql_escape(the_cdr->call_uid,e_call_uid,sizeof(e_call_uid));
+
 		sprintf(str,"select id from %s where call_uid = '%s' and cdr_server_id = %d",
-				CDR_TABLE_NAME,the_cdr->call_uid,the_cdr->cdr_server_id);
+				CDR_TABLE_NAME,e_call_uid,the_cdr->cdr_server_id);
 
 		db_select(dbp,str);
 		db_fetch(dbp);
@@ -582,9 +597,35 @@ int cdr_add_in_db_set(db_t *dbp,cdr_t *cdr_pt)
 int cdr_add_in_db_query(db_t *dbp,cdr_t *cdr_pt)
 {
 	int ret;
-    char str[SQL_BUF_LEN];
-		
-		sprintf(str,
+    char str[SQL_BUF_LEN*2]; /* escaped fields can ~double - size for worst case */
+
+	/* Escape every string field - CDR data is externally sourced */
+	char e_call_uid[CALL_UID_LEN*2+1];
+	char e_start_ts[TS_LEN*2+1],e_answer_ts[TS_LEN*2+1],e_end_ts[TS_LEN*2+1];
+	char e_src[CLG_NUM_LEN*2+1],e_dst[CLD_NUM_LEN*2+1];
+	char e_calling[CLG_NUM_LEN*2+1],e_called[CLD_NUM_LEN*2+1];
+	char e_rdnis[CLD_NUM_LEN*2+1],e_ocn[CLD_NUM_LEN*2+1];
+	char e_acc[ACC_CODE_LEN*2+1];
+	char e_src_ctx[CONTEXT_LEN*2+1],e_src_tg[TGROUP_LEN*2+1];
+	char e_dst_ctx[CONTEXT_LEN*2+1],e_dst_tg[TGROUP_LEN*2+1];
+
+	db_sql_escape(cdr_pt->call_uid,e_call_uid,sizeof(e_call_uid));
+	db_sql_escape(cdr_pt->start_ts,e_start_ts,sizeof(e_start_ts));
+	db_sql_escape(cdr_pt->answer_ts,e_answer_ts,sizeof(e_answer_ts));
+	db_sql_escape(cdr_pt->end_ts,e_end_ts,sizeof(e_end_ts));
+	db_sql_escape(cdr_pt->src,e_src,sizeof(e_src));
+	db_sql_escape(cdr_pt->dst,e_dst,sizeof(e_dst));
+	db_sql_escape(cdr_pt->calling_number,e_calling,sizeof(e_calling));
+	db_sql_escape(cdr_pt->called_number,e_called,sizeof(e_called));
+	db_sql_escape(cdr_pt->rdnis,e_rdnis,sizeof(e_rdnis));
+	db_sql_escape(cdr_pt->ocn,e_ocn,sizeof(e_ocn));
+	db_sql_escape(cdr_pt->account_code,e_acc,sizeof(e_acc));
+	db_sql_escape(cdr_pt->src_context,e_src_ctx,sizeof(e_src_ctx));
+	db_sql_escape(cdr_pt->src_tgroup,e_src_tg,sizeof(e_src_tg));
+	db_sql_escape(cdr_pt->dst_context,e_dst_ctx,sizeof(e_dst_ctx));
+	db_sql_escape(cdr_pt->dst_tgroup,e_dst_tg,sizeof(e_dst_tg));
+
+		snprintf(str,sizeof(str),
 			"insert into %s "
 			"(cdr_server_id,cdr_rec_type_id,leg_a,leg_b,"
 			"call_uid,start_ts,answer_ts,end_ts,start_epoch,answer_epoch,end_epoch,"
@@ -601,13 +642,13 @@ int cdr_add_in_db_query(db_t *dbp,cdr_t *cdr_pt)
 			"%d,%d,%d,%d)",
 			CDR_TABLE_NAME,
 			cdr_pt->cdr_server_id,cdr_pt->cdr_rec_type_id,cdr_pt->leg_a,cdr_pt->leg_b,
-			cdr_pt->call_uid,cdr_pt->start_ts,cdr_pt->answer_ts,cdr_pt->end_ts,cdr_pt->start_epoch,cdr_pt->answer_epoch,cdr_pt->end_epoch,
-			cdr_pt->src,cdr_pt->dst,cdr_pt->calling_number,cdr_pt->clg_nadi,cdr_pt->called_number,cdr_pt->cld_nadi,
-			cdr_pt->rdnis,cdr_pt->rdnis_nadi,cdr_pt->ocn,cdr_pt->ocn_nadi,cdr_pt->prefix_filter_id,
-			cdr_pt->account_code,cdr_pt->src_context,cdr_pt->src_tgroup,cdr_pt->dst_context,cdr_pt->dst_tgroup,
+			e_call_uid,e_start_ts,e_answer_ts,e_end_ts,cdr_pt->start_epoch,cdr_pt->answer_epoch,cdr_pt->end_epoch,
+			e_src,e_dst,e_calling,cdr_pt->clg_nadi,e_called,cdr_pt->cld_nadi,
+			e_rdnis,cdr_pt->rdnis_nadi,e_ocn,cdr_pt->ocn_nadi,cdr_pt->prefix_filter_id,
+			e_acc,e_src_ctx,e_src_tg,e_dst_ctx,e_dst_tg,
 			cdr_pt->billsec,cdr_pt->duration,cdr_pt->uduration,cdr_pt->billusec);
 
 		ret = db_insert(dbp,str);
-	
+
 	return ret;
 }

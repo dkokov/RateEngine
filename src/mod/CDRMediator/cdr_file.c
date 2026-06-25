@@ -13,13 +13,16 @@
 int cdr_file_chk_readbuf(char *readbuf)
 {
 	int len;
-	
+
 	len = strlen(readbuf);
-	
-	if(len == READBUF_LEN) {
-		if(readbuf[READBUF_LEN] != '\0') return 1;
+
+	/* fgets() writes at most READBUF_LEN-1 chars + NUL.
+	 * If the buffer is full and does not end in a line break,the source
+	 * line was longer than the buffer and got truncated. */
+	if(len == (READBUF_LEN - 1)) {
+		if(readbuf[len - 1] != '\n') return 1;
 	}
-	
+
 	return 0;
 }
 
@@ -234,9 +237,13 @@ void cdr_file_add_in_tbl(db_t *dbp,char *filename,int cdr_server_id)
 	current_datetime(ts);
 	
 	if(dbp->t == sql) {
+		char e_filename[512];
+
+		db_sql_escape(filename,e_filename,sizeof(e_filename));
+
 		bzero(str,sizeof(str));
-		sprintf(str,"insert into cdr_files (cdr_server_id,filename,last_update) "
-					"values (%d,'%s','%s')",cdr_server_id,filename,ts);
+		snprintf(str,sizeof(str),"insert into cdr_files (cdr_server_id,filename,last_update) "
+					"values (%d,'%s','%s')",cdr_server_id,e_filename,ts);
 
 		db_insert(dbp,str);
 	}
@@ -253,8 +260,12 @@ int cdr_file_get_from_tbl(db_t *dbp,char *filename,int cdr_server_id)
 	id = 0; 
 
 	if(dbp->t == sql) {
+		char e_filename[512];
+
+		db_sql_escape(filename,e_filename,sizeof(e_filename));
+
 		bzero(str,sizeof(str));
-		sprintf(str,"select id from cdr_files where cdr_server_id = %d and filename = '%s'",cdr_server_id,filename);
+		snprintf(str,sizeof(str),"select id from cdr_files where cdr_server_id = %d and filename = '%s'",cdr_server_id,e_filename);
 
 		db_select(dbp,str);
 		db_fetch(dbp);
