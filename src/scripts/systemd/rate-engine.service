@@ -1,0 +1,51 @@
+[Unit]
+# RateEngine - calls/messages rating and online call control engine
+# author: Dimitar Kokov
+#
+# This is the systemd equivalent of scripts/init.d/RateEngine.
+# RateEngine daemonizes itself ("-d" forks into the background and writes its
+# own PID file), so the service uses Type=forking with an explicit PIDFile.
+#
+# The PIDFile path below MUST match <System><param name="PIDFile" .../></System>
+# in your RateEngine XML, resolved against <param name="DIR" .../>.
+# Default config: DIR=/usr/local/RateEngine/  PIDFile=logs/rate_engine.pid
+Description=RateEngine - rating and call control engine
+Documentation=https://github.com/dkokov/RateEngine
+After=network-online.target postgresql.service mysqld.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/usr/local/RateEngine/logs/rate_engine.pid
+
+# Adjust the config file name/path to your install (RateEngine7.xml is the
+# default sample shipped under config/).
+Environment=RE_CONF=/usr/local/RateEngine/config/RateEngine7.xml
+
+# Start (daemonize) and stop (send SIGTERM via the PID file + clear stat shmem).
+ExecStart=/usr/local/RateEngine/bin/RateEngine -c ${RE_CONF} -d
+ExecStop=/usr/local/RateEngine/bin/RateEngine -c ${RE_CONF} -k
+
+# Run as root by default (raw sockets / call-control). To run as a dedicated
+# user, create one and uncomment the next two lines (make sure that user owns
+# /usr/local/RateEngine/logs/ so the PID file and logs can be written).
+#User=rateengine
+#Group=rateengine
+
+# Resource limits - the systemd equivalent of the ulimit calls in the init.d
+# script (core dumps for post-mortem debugging, plenty of open files/procs).
+LimitCORE=infinity
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitMEMLOCK=infinity
+LimitDATA=infinity
+
+# Restart the daemon if it dies unexpectedly.
+Restart=on-failure
+RestartSec=5s
+
+# Give the daemon time to flush balances / close DB connections on stop.
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target
