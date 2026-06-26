@@ -8,57 +8,76 @@
     <param name="getCDRsReplies" value="2" />
     <!-- Filtering -->
     <param name="CalledNumberFiltering" value="yes" />
-<!--    <param name="PrefixFilterNumber" value="25" /> -->
-    <!-- file,db -->
+    <!-- CDR source mode: file -->
     <param name="cdr-type" value="file" />
-    <!-- Get CDR 'db' config -->
-    <param name="dbhost" value="your_hostname" />
-    <param name="dbuser" value="your_username" />
-    <param name="dbpass" value="your_password" />
-    <param name="dbname" value="your_dbname" />
-    <!-- DB type (pgsql,mysql,oracle,...) -->
-    <param name="dbtype" value="db_engine" />
-    <!-- SQL Query into the remote db server -->
-    <param name="cdr-table" value="cdrs" />
-    <!-- 'timestamp' or 'integer(epoch)' type -->
-    <param name="sql-col-where" value="ts" />
-    <!-- 'ts' or 'epoch' -->
-    <param name="sql-col-where-type" value="ts" />
-    <param name="sql-where-const" value="billsec > 0" />
-    <!-- Start scheduler timestamp (start date) -->
-    <param name="SchedTS" value="2017-10-19 15:00:00" />
-    <!-- unkn, isup, sms, voip-audio, voip-video ,voip-trunk -->
+    <!-- Directory to read CSV files from (MUST end with '/') -->
+    <param name="src-dir" value="/usr/local/RateEngine/cdr/in/" />
+    <!-- Directory to move processed files to (MUST end with '/') -->
+    <param name="dst-dir" value="/usr/local/RateEngine/cdr/done/" />
+    <!-- Column separator inside a CSV row -->
+    <param name="cols-separator" value=";" />
+    <!-- Optional quote/delimiter wrapping a field (empty if none) -->
+    <param name="col-delimiter" value="" />
+    <!-- Line terminator -->
+    <param name="line-end" value="\n" />
+    <!-- Exact number of columns per CSV row (rows with a different count are skipped) -->
+    <param name="file-field-num" value="6" />
+    <!-- unkn, isup, sms, voip-audio, voip-video, voip-trunk -->
     <param name="cdr-rec-type" value="voip-audio" />
   </General>
-  <!-- CDR fields in the DB (matching in the DB cols ) -->
+
+  <!--
+    CDRFormat: maps a CDR field to its column index in the CSV row.
+    The value is the 0-BASED column position (0 = first column, 1 = second, ...).
+    Leave a field empty to skip it.
+
+    This sample expects 6 columns per row, in this order:
+      col 0: call_uid          (unique call id)
+      col 1: start_ts          (2026-06-26 12:00:00)
+      col 2: calling_number    (A-number / src)
+      col 3: called_number     (B-number / dst)
+      col 4: billsec           (billed seconds, must be > 0)
+      col 5: duration          (total seconds)
+
+    Minimum data required to insert a row:
+      call_uid, called_number, billsec > 0  (cdr_server_id is set by the engine)
+  -->
   <CDRFormat>
-	<param name="call_uid" value="call_uid" />
-	<param name="start_ts" value="ts" />
-	<param name="answer_ts" value="" />
-	<param name="end_ts" value="" />
-	<param name="start_epoch" value="" />
-	<param name="answer_epoch" value="" />
-	<param name="end_epoch" value="" />
-	<param name="src" value="" />
-	<param name="dst" value="" />
-	<param name="calling_number" value="src" />
-	<param name="clg_nadi" value="" />
-	<param name="called_number" value="dst" />
-	<param name="cld_nadi" value="" />
-	<param name="rdnis" value="" />
-	<param name="rdnis_nadi" value="" />
-	<param name="ocn" value="" />
-	<param name="ocn_nadi" value="" />
-	<param name="account_code" value="" />
-	<param name="src_context" value="src_context" />
-	<param name="src_tgroup" value="src_tgroup" />
-	<param name="dst_context" value="dst_context" />
-	<param name="dst_tgroup" value="dst_tgroup" />
-	<param name="billsec" value="billsec" />
-	<param name="duration" value="duration" />
-	<param name="uduration" value="" />
-	<param name="billusec" value="" />
+    <param name="call_uid"       value="0" />
+    <param name="start_ts"       value="1" />
+    <param name="answer_ts"      value="" />
+    <param name="end_ts"         value="" />
+    <param name="start_epoch"    value="" />
+    <param name="answer_epoch"   value="" />
+    <param name="end_epoch"      value="" />
+    <param name="src"            value="" />
+    <param name="dst"            value="" />
+    <param name="calling_number" value="2" />
+    <param name="clg_nadi"       value="" />
+    <param name="called_number"  value="3" />
+    <param name="cld_nadi"       value="" />
+    <param name="rdnis"          value="" />
+    <param name="rdnis_nadi"     value="" />
+    <param name="ocn"            value="" />
+    <param name="ocn_nadi"       value="" />
+    <param name="account_code"   value="" />
+    <param name="src_context"    value="" />
+    <param name="src_tgroup"     value="" />
+    <param name="dst_context"    value="" />
+    <param name="dst_tgroup"     value="" />
+    <param name="billsec"        value="4" />
+    <param name="duration"       value="5" />
+    <param name="uduration"      value="" />
+    <param name="billusec"       value="" />
   </CDRFormat>
+
+  <!--
+    Optional called-number rewriting (applied before insert).
+    prefix  : leading digits to match on the called_number
+    num     : how many leading chars to cut
+    replace : string to prepend after the cut
+    len     : only apply when the number has exactly this length (0 = any)
+  -->
   <PrefixFiltering>
     <filter prefix="2" num="1" replace="359429372" len="3" />
     <filter prefix="4" num="1" replace="359241194" len="3" />
