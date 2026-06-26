@@ -131,7 +131,8 @@ CREATE TABLE cdr_dbstorage (
     dbuser character varying(128),
     dbpass character varying(128),
     cdr_table character varying(128) NOT NULL,
-    dbstorage_type_id integer NOT NULL
+    dbstorage_type_id integer NOT NULL,
+    dbport integer
 );
 
 ---

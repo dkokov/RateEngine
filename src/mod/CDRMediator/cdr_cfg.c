@@ -227,7 +227,7 @@ void cdr_profile_cfg_get(cdr_profile_cfg_t *cfg)
 				/* Type of the 'sql-col-where' column: "epoch" (integer) or
 				 * "ts" (timestamp literal, default). Controls how the
 				 * incremental watermark is compared in the remote query. */
-				if(strcmp(params->name,"sql-col-type") == 0) {
+				if(strcmp(params->name,"sql-col-where-type") == 0) {
 					if(strcmp(params->value,"epoch") == 0) cfg->profile_db_type->sql_col_t = epoch;
 					else cfg->profile_db_type->sql_col_t = ts;
 				}
@@ -368,59 +368,75 @@ void cdr_cfg_storage_profile_xml(cdr_profile_cfg_t *cfg)
 	}
 }
 
+/* Read a string attribute of an XML element into a bounded buffer. */
+static void cdr_cfg_filter_attr(xmlNode *node,const char *attr,char *dst,size_t dst_size)
+{
+	xmlChar *val = xmlGetProp(node,(const xmlChar *)attr);
+
+	dst[0] = '\0';
+
+	if(val != NULL) {
+		strncpy(dst,(char *)val,dst_size - 1);
+		dst[dst_size - 1] = '\0';
+		xmlFree(val);
+	}
+}
+
+static int cdr_cfg_filter_attr_int(xmlNode *node,const char *attr)
+{
+	int ret = 0;
+	xmlChar *val = xmlGetProp(node,(const xmlChar *)attr);
+
+	if(val != NULL) {
+		ret = atoi((char *)val);
+		xmlFree(val);
+	}
+
+	return ret;
+}
+
 void cdr_cfg_profile_filters_xml(cdr_profile_cfg_t *cfg)
 {
-	int i;
-	xml_node_t *child,*child2;
-	xml_param_t *params;
-	
-	if(cfg != NULL) {
-		strcpy(cfg->node->node_name,"PrefixFiltering");		
-		strcpy(cfg->node->child_node_name,"filter");
-		
-		xml_cfg_child_get(cfg->root,cfg->node);
+	int i,num;
+	xmlNode *curr,*child;
 
-		if(cfg->node->child_num == 0) return;
+	if(cfg == NULL) return;
 
-		cfg->filters = prefix_filter_init(cfg->node->child_num);
-		
-		child2 = cfg->node->child_node;
+	/* Locate <PrefixFiltering> under the profile root.
+	 * Its <filter> children carry the rule as element ATTRIBUTES
+	 * (prefix/num/replace/len), not <param name= value=> sub-elements,
+	 * so read them directly with libxml. */
+	for(curr = cfg->root->children; curr != NULL; curr = curr->next) {
+		if((curr->type == XML_ELEMENT_NODE) &&
+		   (xmlStrcmp(curr->name,(const xmlChar *)"PrefixFiltering") == 0)) break;
+	}
 
-		i = 0;
-		child  = child2;
-		while(child != NULL) {
-			if(child->params != NULL) {
-				params = child->params;
-			
-				while(params != NULL) {					
-					if(strcmp(params->name,"prefix") == 0) {
-						cfg->filters[i].id = i+1;
-						strcpy(cfg->filters[i].filtering_prefix,params->value);
-					}
-					
-					if(strcmp(params->name,"num") == 0) {
-						cfg->filters[i].filtering_number = atoi(params->value);
-					}					
-					
-					if(strcmp(params->name,"replace") == 0) {
-						strcpy(cfg->filters[i].replace_str,params->value);
-					}
-					
-					if(strcmp(params->name,"len") == 0) {
-						cfg->filters[i].len = atoi(params->value);
-					}
-																
-					params = params->next_param;
-				}
-				
-				i++;
-			}
+	if(curr == NULL) return;
 
-			child = child->next_node;
-		}
+	num = 0;
+	for(child = curr->children; child != NULL; child = child->next) {
+		if((child->type == XML_ELEMENT_NODE) &&
+		   (xmlStrcmp(child->name,(const xmlChar *)"filter") == 0)) num++;
+	}
 
-		xml_cfg_child_free(child2);
-	}	
+	if(num == 0) return;
+
+	cfg->filters = prefix_filter_init(num);
+	if(cfg->filters == NULL) return;
+
+	i = 0;
+	for(child = curr->children; child != NULL; child = child->next) {
+		if((child->type != XML_ELEMENT_NODE) ||
+		   xmlStrcmp(child->name,(const xmlChar *)"filter")) continue;
+
+		cfg->filters[i].id = i + 1;
+		cdr_cfg_filter_attr(child,"prefix",cfg->filters[i].filtering_prefix,sizeof(cfg->filters[i].filtering_prefix));
+		cfg->filters[i].filtering_number = cdr_cfg_filter_attr_int(child,"num");
+		cdr_cfg_filter_attr(child,"replace",cfg->filters[i].replace_str,sizeof(cfg->filters[i].replace_str));
+		cfg->filters[i].len = cdr_cfg_filter_attr_int(child,"len");
+
+		i++;
+	}
 }
 
 int cdr_cfg_get_cdr_profile_filters(db_t *dbp,int cdr_profile_id)
@@ -646,26 +662,107 @@ int cdr_cfg_insert_filters(cdr_profile_cfg_t *profile)
 	return 0;
 }
 
+/* Number of cdr_dbstorage rows for a server (existence check). */
+int cdr_cfg_get_cdr_dbstorage(db_t *dbp,int cdr_server_id)
+{
+	int num;
+	char str[512];
+
+	db_sql_result_t *result;
+
+	if(dbp == NULL) return -1;
+	if(cdr_server_id <= 0) return -2;
+
+	num = 0;
+
+	if(dbp->t == sql) {
+		bzero(str,sizeof(str));
+		sprintf(str,"select count(*) from cdr_dbstorage where cdr_server_id = %d",cdr_server_id);
+
+		if(db_select(dbp,str) < 0) return -3;
+
+		db_fetch(dbp);
+
+		if(dbp->conn->result != NULL) {
+			result = (db_sql_result_t *)dbp->conn->result;
+			if(result->rows == 1) num = atoi(result->cols_list[0].rows_list[0].row);
+
+			db_sql_result_free(result);
+			dbp->conn->result = NULL;
+		}
+	} else return -4;
+
+	return num;
+}
+
+/* Persist the remote-source connection of a db-type profile into cdr_dbstorage.
+ * Idempotent: skips if a row for this server already exists (e.g. created by
+ * the provisioning CLI). dbstorage_type: pgsql=1, mysql=2, sqlite3=3. */
+int cdr_cfg_insert_dbstorage(cdr_profile_cfg_t *profile)
+{
+	int type_id;
+	char str[SQL_BUF_LEN];
+	char e_host[sizeof(((cdr_storage_profile_t *)0)->dbhost)*2+1];
+	char e_name[sizeof(((cdr_storage_profile_t *)0)->dbname)*2+1];
+	char e_user[sizeof(((cdr_storage_profile_t *)0)->dbuser)*2+1];
+	char e_pass[sizeof(((cdr_storage_profile_t *)0)->dbpass)*2+1];
+	char e_tbl[sizeof(((cdr_storage_profile_t *)0)->cdr_table)*2+1];
+
+	cdr_storage_profile_t *p;
+
+	if(profile->dbp == NULL) return -1;
+	if(profile->t != db) return 0;                 /* db-type profiles only */
+	if(profile->profile_db_type == NULL) return -2;
+	if(profile->cdr_server_id <= 0) return -3;
+	if(profile->dbp->t != sql) return 0;
+
+	/* idempotent guard - do not duplicate the CLI's row */
+	if(cdr_cfg_get_cdr_dbstorage(profile->dbp,profile->cdr_server_id) != 0) return 0;
+
+	p = profile->profile_db_type;
+
+	if(strcmp(p->dbtype,"mysql") == 0) type_id = 2;
+	else if(strcmp(p->dbtype,"sqlite3") == 0) type_id = 3;
+	else type_id = 1; /* pgsql */
+
+	db_sql_escape(p->dbhost,e_host,sizeof(e_host));
+	db_sql_escape(p->dbname,e_name,sizeof(e_name));
+	db_sql_escape(p->dbuser,e_user,sizeof(e_user));
+	db_sql_escape(p->dbpass,e_pass,sizeof(e_pass));
+	db_sql_escape(p->cdr_table,e_tbl,sizeof(e_tbl));
+
+	snprintf(str,sizeof(str),
+		"insert into cdr_dbstorage "
+		"(cdr_server_id,dbhost,dbname,dbuser,dbpass,cdr_table,dbstorage_type_id,dbport) "
+		"values (%d,'%s','%s','%s','%s','%s',%d,%d)",
+		profile->cdr_server_id,e_host,e_name,e_user,e_pass,e_tbl,type_id,p->dbport);
+
+	return db_insert(profile->dbp,str);
+}
+
 void cdr_cfg_profile_insert(cdr_profile_cfg_t *profile)
 {
 	profile->cdr_profile_id = cdr_cfg_get_cdr_profile_id(profile->dbp,profile->profile_name);
-						
+
 	if(profile->cdr_profile_id == 0) {
 		profile->cdr_profile_id = cdr_cfg_insert_profile(profile);
-		profile->cdr_server_id  = cdr_cfg_insert_server(profile);		
+		profile->cdr_server_id  = cdr_cfg_insert_server(profile);
 	} else {
 		profile->cdr_server_id = cdr_cfg_get_cdr_server_id(profile->dbp,profile->cdr_profile_id);
-							
+
 		if(profile->cdr_server_id == 0) {
 			profile->cdr_server_id = cdr_cfg_insert_server(profile);
 		}
 	}
-	
+
+	/* db-type profiles: persist the remote source connection (idempotent) */
+	if(profile->t == db) cdr_cfg_insert_dbstorage(profile);
+
 	if((profile->cdr_profile_id > 0)&&(profile->filters != NULL)) {
-		if(cdr_cfg_get_cdr_profile_filters(profile->dbp,profile->cdr_profile_id) == 0) { 
+		if(cdr_cfg_get_cdr_profile_filters(profile->dbp,profile->cdr_profile_id) == 0) {
 			cdr_cfg_insert_filters(profile);
 		}
-	
+
 		if(profile->dbp->t == sql) mem_free(profile->filters);
 	}
 }
