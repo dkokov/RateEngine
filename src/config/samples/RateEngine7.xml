@@ -46,7 +46,7 @@
     <!-- in seconds -->
     <param name="RatingInterval" value="300" />
     <!-- in micro seconds -->
-    <param name="waitRatingInterval" value="500" />
+    <param name="WaitRatingInterval" value="500" />
     <!-- When you want to use pcard for all subscribers,
          set this param with 'yes' -->
     <param name="UsePCard" value="no" />

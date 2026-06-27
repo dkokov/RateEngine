@@ -30,7 +30,9 @@ void rt_duckdb_close(rt_duckdb_t *ctx);
 /* (re)load the static dimension tables into local DuckDB tables */
 int rt_duckdb_load_dims(rt_duckdb_t *ctx);
 
-/* rate a batch of CDRs using DuckDB — returns number rated */
-int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit);
+/* rate a batch of CDRs using DuckDB. Returns the number of CDRs consumed from
+ * the window this cycle (0 = queue empty, <0 = error); *rated_out (optional)
+ * receives how many of those produced a rating row. */
+int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit,int *rated_out);
 
 #endif

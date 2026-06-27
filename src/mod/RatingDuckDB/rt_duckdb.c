@@ -417,15 +417,18 @@ static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
  * 3. Calculate prices in DuckDB SQL
  * 4. Write rated rows back to PostgreSQL, mark the rest of the window as -1
  */
-int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
+int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit,int *rated_out)
 {
 	char sql[16384];
 	char acct_union[6144];
 	int row_count = 0;
 	int rated = 0;
 	long long max_window_id = 0;
+	long long win_count = 0;
 
 	db_sql_result_t *rb;
+
+	if(rated_out != NULL) *rated_out = 0;
 
 	if(ctx == NULL || pg_dbp == NULL) return 0;
 
@@ -451,7 +454,6 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	{
 		db_sql_result_t *wr =
 			rt_duckdb_select(ctx,"SELECT COUNT(*), COALESCE(MAX(id),0) FROM batch_window");
-		long long win_count;
 
 		if(wr == NULL || wr->rows < 1) {
 			if(wr != NULL) { db_sql_result_free(wr); ctx->duck->conn->result = NULL; }
@@ -807,27 +809,58 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit)
 	if(rated > 0) rt_duckdb_free_balance(ctx,pg_dbp);
 
 	/*
-	 * STEP 3: Mark the evaluated-but-unrated CDRs in this window as leg = -1.
-	 * Scoped to id <= max_window_id (the window we just rated against), so we
-	 * never mark a CDR that was never evaluated. Matched CDRs are already
-	 * leg > 0 and excluded by the leg = 0 predicate.
+	 * STEP 3: mark the evaluated-but-unmatched CDRs of THIS window as leg = -1.
+	 * Mirrors /Rating's per-call -1 (rating.c -> cdr_update_cdr), but in bulk:
+	 * we mark ONLY the exact window ids that produced no rating row - never a
+	 * blanket "id <= max" range. So a rateable CDR that wasn't written for any
+	 * reason is left at leg = 0 for the next cycle instead of being buried as -1.
 	 */
 	{
-		char mark_sql[256];
-		snprintf(mark_sql,sizeof(mark_sql),
-			"UPDATE cdrs SET leg_%c = -1 WHERE leg_%c = 0 AND id <= %lld",
-			leg,leg,(long long)max_window_id);
+		db_sql_result_t *um = rt_duckdb_select(ctx,
+			"SELECT bw.id FROM batch_window bw "
+			"LEFT JOIN (SELECT DISTINCT cdr_id FROM rated_batch) r ON r.cdr_id = bw.id "
+			"WHERE r.cdr_id IS NULL ORDER BY bw.id");
+		int marked = 0;
 
-		db_query(pg_dbp,mark_sql,1);
+		if(um != NULL && um->rows > 0) {
+			const int chunk = 2000;            /* ids per UPDATE statement */
+			const int bufsz = chunk * 24 + 128;
+			char *mark_sql = (char *)mem_alloc(bufsz);
+			int i = 0;
 
-		LOG("rt_duckdb_rate_batch()","marked unmatched CDRs as -1 (id <= %lld)",
-			(long long)max_window_id);
+			if(mark_sql != NULL) {
+				while(i < um->rows) {
+					int j,n = 0,len;
+
+					len = sprintf(mark_sql,
+						"UPDATE cdrs SET leg_%c = -1 WHERE leg_%c = 0 AND id IN (",leg,leg);
+
+					for(j = 0; j < chunk && i < um->rows; j++,i++) {
+						len += snprintf(mark_sql+len,bufsz-len,"%s%s",
+							(n ? "," : ""),um->cols_list[0].rows_list[i].row);
+						n++;
+					}
+
+					snprintf(mark_sql+len,bufsz-len,")");
+					db_query(pg_dbp,mark_sql,1);
+					marked += n;
+				}
+
+				mem_free(mark_sql);
+			}
+		}
+
+		if(um != NULL) { db_sql_result_free(um); ctx->duck->conn->result = NULL; }
+
+		LOG("rt_duckdb_rate_batch()","marked %d unmatched CDRs as -1 (window <= id %lld)",
+			marked,(long long)max_window_id);
 	}
 
 	/* commit balance + free_billsec_balance + the -1 mark together */
 	db_query(pg_dbp,"COMMIT",1);
 
-	LOG("rt_duckdb_rate_batch()","batch complete: %d rated",rated);
+	LOG("rt_duckdb_rate_batch()","batch complete: %d rated (window %lld)",rated,win_count);
 
-	return rated;
+	if(rated_out != NULL) *rated_out = rated;
+	return (int)win_count;
 }

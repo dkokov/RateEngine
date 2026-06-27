@@ -17,7 +17,8 @@
 
 static rt_duckdb_t duckdb_ctx;
 static db_t *pg_dbp;
-static int rating_interval = 300;
+static int rating_interval = 300;       /* idle poll (seconds) when queue empty */
+static int wait_rating = 1500;          /* throttle (microseconds) between drain cycles; default mirrors /Rating WAIT_RATING */
 static int batch_limit = 5000;
 static int rating_threads = 0;   /* 0 = DuckDB default (all cores) */
 static int cache_mode = RT_DIMCACHE_ALL;   /* dimension cache: all|static|none */
@@ -105,6 +106,7 @@ void *RateEngine(void *dt)
 					if(strcmp(params->value,"yes") == 0) active = 't';
 				}
 				if(strcmp(params->name,"RatingInterval") == 0) rating_interval = atoi(params->value);
+				if(strcmp(params->name,"WaitRatingInterval") == 0) wait_rating = atoi(params->value);
 				if(strcmp(params->name,"BatchLimit") == 0) batch_limit = atoi(params->value);
 				if(strcmp(params->name,"RatingThreads") == 0) rating_threads = atoi(params->value);
 				if(strcmp(params->name,"CacheDimensions") == 0) {
@@ -139,36 +141,45 @@ void *RateEngine(void *dt)
 	loop:
 	{
 		struct timeval t1,t2;
-		int batch_count = 0;
+		int processed = 0;   /* CDRs consumed from the window this cycle */
+		int rated = 0;       /* of those, how many produced a rating row */
 
 		LOG("RateEngine","DuckDB rating cycle started ...");
 
 		gettimeofday(&t1,NULL);
 
 		if(leg == '\0') {
-			batch_count += rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,'a',batch_limit);
-			batch_count += rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,'b',batch_limit);
+			int ra = 0,rb = 0,pa,pb;
+			pa = rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,'a',batch_limit,&ra);
+			pb = rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,'b',batch_limit,&rb);
+			processed = (pa > 0 ? pa : 0) + (pb > 0 ? pb : 0);
+			rated = ra + rb;
 		} else {
-			batch_count = rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,leg,batch_limit);
+			processed = rt_duckdb_rate_batch(&duckdb_ctx,pg_dbp,leg,batch_limit,&rated);
+			if(processed < 0) processed = 0;
 		}
 
 		gettimeofday(&t2,NULL);
 
 		double elapsed = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-		if(batch_count > 0) {
-			LOG("RateEngine","cycle done: %d rated in %f sec (%f ms/cdr, %.0f cdr/s)",
-				batch_count,elapsed,
-				elapsed/batch_count*1000,
-				batch_count/elapsed);
+		if(processed > 0) {
+			LOG("RateEngine","cycle done: processed %d (rated %d) in %f sec (%.0f cdr/s)",
+				processed,rated,elapsed,processed/elapsed);
 		} else {
 			LOG("RateEngine","cycle done: 0 CDRs to rate");
 		}
 
 		if(active == 't') {
-			if(batch_count > 0) {
+			/* keep draining while the window was non-empty - even if nothing
+			 * matched, there may be more (unrateable) backlog ahead. Only sleep
+			 * once the queue is genuinely empty. */
+			if(processed > 0) {
 				/* periodic refresh during a long continuous drain */
 				if(++dim_cycles % 1000 == 0) rt_duckdb_load_dims(&duckdb_ctx);
+				/* throttle between drain cycles so rating shares DB/CPU with
+				 * the CDRMediator instead of monopolising it */
+				if(wait_rating > 0) usleep(wait_rating);
 				goto loop;
 			}
 			/* idle: refresh the dimension cache so subscriber/rate/tariff
