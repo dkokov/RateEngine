@@ -55,39 +55,41 @@ cdr_profiles_list_t *cdr_profiles_list_init(int n)
 
 void cdr_profiles_list_get(cdr_cfg_t *cfg)
 {
-	int i;
+	int n,i;
 	DIR  *d;
 	struct dirent *dir;
 
-	i = 0;
-
 	d = opendir(cfg->cdr_profiles_dir);
+	if(d == NULL) return;
 
-	if(d) {
-		while ((dir = readdir(d)) != NULL) {
+	/* count real entries (excluding . and ..) */
+	n = 0;
+	while((dir = readdir(d)) != NULL) {
+		if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) continue;
+		n++;
+	}
+
+	if(n > 0) {
+		cfg->list = cdr_profiles_list_init(n);
+
+		/* rewinddir() is the portable rewind; seekdir(d,0) is unreliable
+		 * (e.g. overlayfs), which left zeroed list slots -> phantom profiles. */
+		rewinddir(d);
+
+		i = 0;
+		while(((dir = readdir(d)) != NULL) && (i < n)) {
+			if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) continue;
+
+			snprintf(cfg->list[i].filename,sizeof(cfg->list[i].filename),
+					"%s%s",cfg->cdr_profiles_dir,dir->d_name);
 			i++;
 		}
 
-		if(i > 2) {
-			seekdir(d,0);
-		
-			cfg->profiles_number = (i - 2);
-
-			cfg->list = cdr_profiles_list_init(cfg->profiles_number);
-		
-			i=0;
-			while ((dir = readdir(d)) != NULL) {
-				if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) {
-					continue;
-				} else {
-					sprintf(cfg->list[i].filename,"%s%s",cfg->cdr_profiles_dir,dir->d_name);
-					i++;
-				}
-			}
-		}
-		
-		closedir(d);
+		/* trust what we actually filled - never process an empty slot */
+		cfg->profiles_number = i;
 	}
+
+	closedir(d);
 }
 
 cdr_profile_cfg_t *cdr_profile_cfg_init(int n)
@@ -742,6 +744,14 @@ int cdr_cfg_insert_dbstorage(cdr_profile_cfg_t *profile)
 
 void cdr_cfg_profile_insert(cdr_profile_cfg_t *profile)
 {
+	/* Never register a nameless profile: it comes from an invalid/unparsed
+	 * file in CDRProfilesDIR and would pollute cdr_profiles/cdr_servers and
+	 * shift the server ids of the real profiles. */
+	if((profile == NULL)||(profile->profile_name[0] == '\0')) {
+		LOG("cdr_cfg_profile_insert()","skipping profile with empty name (invalid/unparsed profile file)");
+		return;
+	}
+
 	profile->cdr_profile_id = cdr_cfg_get_cdr_profile_id(profile->dbp,profile->profile_name);
 
 	if(profile->cdr_profile_id == 0) {
