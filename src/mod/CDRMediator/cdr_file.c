@@ -168,40 +168,39 @@ cdr_file_list_t *cdr_file_list_init(int n)
 
 void cdr_file_list_get(cdr_file_profile_t *cfg)
 {
-	int i;
+	int n,i;
 	DIR  *d;
 	struct dirent *dir;
 
-	i = 0;
-
 	d = opendir(cfg->src_dir);
-	
-	if(d) {
-		while ((dir = readdir(d)) != NULL) {
+	if(d == NULL) return;
+
+	/* count real entries (excluding . and ..) */
+	n = 0;
+	while((dir = readdir(d)) != NULL) {
+		if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) continue;
+		n++;
+	}
+
+	if(n > 0) {
+		cfg->list = cdr_file_list_init(n);
+
+		/* portable rewind; seekdir(d,0) is unreliable (e.g. overlayfs) */
+		rewinddir(d);
+
+		i = 0;
+		while(((dir = readdir(d)) != NULL) && (i < n)) {
+			if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) continue;
+
+			snprintf(cfg->list[i].filename,sizeof(cfg->list[i].filename),"%s",dir->d_name);
 			i++;
 		}
 
-		if(i > 2) {
-			seekdir(d,0);
-		
-			/* without '.' and '..' */
-			cfg->files_number = (i - 2);
-
-			cfg->list = cdr_file_list_init(cfg->files_number);
-		
-			i=0;
-			while ((dir = readdir(d)) != NULL) {
-				if((strcmp(dir->d_name,".") == 0)||(strcmp(dir->d_name,"..") == 0)) {
-				
-				} else {
-					strcpy(cfg->list[i].filename,dir->d_name);
-					i++;
-				}
-			}
-		}
-		
-		closedir(d);
+		/* trust what we actually filled */
+		cfg->files_number = i;
 	}
+
+	closedir(d);
 }
 
 /* CDR file field analize */
