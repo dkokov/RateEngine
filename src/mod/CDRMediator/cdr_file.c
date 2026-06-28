@@ -331,11 +331,9 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 	/* Inserted rows */
 	ins_rows = 0;
 
-	/* One transaction for the whole file: a single commit/fsync instead of
-	 * one per row. Conflict-tolerant inserts keep the transaction unpoisoned. */
-	int tx = (profile->dbp->t == sql);
-
-	if(tx) db_query(profile->dbp,"BEGIN",1);
+	/* Autocommit per insert (no wrapping transaction): rows become
+	 * visible+durable immediately (rating can run concurrently) and a restart
+	 * loses only the last row. Dedup is via cdrs.call_uid UNIQUE + ON CONFLICT. */
 
 	/* Read row by row. Driving the loop on fgets() (not feof) avoids
 	 * processing a phantom final iteration on a stale buffer. */
@@ -351,10 +349,9 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 
 			if((file_field_num > 0)&&(profile->file_field_num == file_field_num)) {
 				arr = (cdr_file_field_t *)mem_alloc_arr((file_field_num+1),sizeof(cdr_file_field_t));
-					
+
 				if(arr == NULL) {
 					LOG("cdr_file_parser()","An 'arr' pointer is null!");
-					if(tx) db_query(profile->dbp,"COMMIT",1);
 					fclose(fp);
 					return 3;
 				}
@@ -405,8 +402,6 @@ int cdr_file_parser(cdr_file_profile_t *profile,char *filename)
 			}
 		}
 	}
-
-	if(tx) db_query(profile->dbp,"COMMIT",1);
 
 	LOG("cdr_file_parser()","all rows: %d,parse rows: %d(%.2f%),inserted rows: %d(%.2f%)",
 						all_rows,parse_rows,(((float)parse_rows/(float)all_rows)*100),
