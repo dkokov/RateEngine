@@ -752,6 +752,14 @@ void cdr_cfg_profile_insert(cdr_profile_cfg_t *profile)
 		return;
 	}
 
+	/* Provisioning is a unit (profile -> server -> dbstorage -> filters):
+	 * register it atomically so a failure can't leave a half-registered
+	 * profile (e.g. a server row without dbstorage). SQL only - NoSQL has
+	 * no BEGIN/COMMIT. (CDR rows are inserted separately, without a tx.) */
+	int tx = ((profile->dbp != NULL)&&(profile->dbp->t == sql));
+
+	if(tx) db_query(profile->dbp,"BEGIN",1);
+
 	profile->cdr_profile_id = cdr_cfg_get_cdr_profile_id(profile->dbp,profile->profile_name);
 
 	if(profile->cdr_profile_id == 0) {
@@ -775,6 +783,8 @@ void cdr_cfg_profile_insert(cdr_profile_cfg_t *profile)
 
 		if(profile->dbp->t == sql) mem_free(profile->filters);
 	}
+
+	if(tx) db_query(profile->dbp,"COMMIT",1);
 }
 
 cdr_cfg_t *cdr_cfg_main(char *xmlFileName)

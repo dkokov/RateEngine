@@ -112,13 +112,11 @@ int cdr_storage_get_remote_cdrs(cdr_storage_profile_t *profile)
 			result = (db_sql_result_t *)profile->rem_dbp->conn->result;
 			
 			if(result->rows > 0) {
-				/* One transaction for the whole batch: a single commit/fsync
-				 * instead of one per CDR. Conflict-tolerant inserts mean
-				 * duplicates don't error, so the transaction is never poisoned. */
-				int tx = (profile->dbp->t == sql);
-
-				if(tx) db_query(profile->dbp,"BEGIN",1);
-
+				/* Autocommit per insert (no wrapping transaction): each CDR
+				 * becomes visible+durable immediately, so the rating engine can
+				 * process them concurrently and a restart loses only the last
+				 * row instead of the whole batch. Dedup is handled by the
+				 * cdrs.call_uid UNIQUE constraint + ON CONFLICT in the insert. */
 				for (i = 0; i < result->rows ;i++) {
 					memset(&the_cdr,0,sizeof(the_cdr));
 
@@ -132,8 +130,6 @@ int cdr_storage_get_remote_cdrs(cdr_storage_profile_t *profile)
 					strcpy(the_cdr.profile_name,profile->profile_name);
 					if(cdr_add_in_db(profile->dbp,&the_cdr,profile->filters) == 0) p++;
 				}
-
-				if(tx) db_query(profile->dbp,"COMMIT",1);
 			}
 			
 			LOG("cdr_storage_get_romote_cdrs()",
