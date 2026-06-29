@@ -1,61 +1,51 @@
 # RateEngine
 
-  A **RateEngine(RE)** is engine for calls/messages calculate and 
-online call control (prepaid or postpaid).Can be started as server(daemon) or to use from the console.
-The software packet is free and open source solution under [GPLv3](https://opensource.org/licenses/GPL-3.0) license .
+**A fast, modular rating and online call-control engine for telecom billing.**
 
-* [Introduction](#Introduction)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/GPL-3.0)
+
+  **RateEngine (RE)** rates calls and messages and, optionally, controls them in
+real time (prepaid or postpaid). Written in C, it runs as a server (daemon) or
+straight from the console, and plugs into your existing billing system through
+its APIs. Free and open source under the [GPLv3](https://opensource.org/licenses/GPL-3.0)
+license.
+
+## Key features
+
+* **Modular** — load only what you need (rating, CDR mediation, call control,
+  transports, database engines) as runtime plugins.
+* **Multi-database** — PostgreSQL, MySQL, Redis, MongoDB and embedded DuckDB
+  behind one storage abstraction.
+* **Two rating engines** — classic per-CDR rating, or **DuckDB batch rating**
+  that prices thousands of CDRs per cycle in a single analytical pass.
+* **Flexible pricing** — nested bill plans, longest-prefix match, multi-tier
+  tariffs, time conditions (peak/off-peak) and free-seconds allowances.
+* **Online call control** — prepaid / credit-limit enforcement returning a
+  `maxsec` per call, integrable with FreeSWITCH, Asterisk and others.
+* **CDR mediation** — import CDRs from external databases or CSV files via
+  per-source profiles.
+
+## Documentation
 
 * [Software Architecture](doc/arch.md)
-
 * [Features](doc/features.md)
-
 * [Installation](doc/install.md)
+* [Configuration](doc/config.md)
+* [CDRMediator](doc/cdrm.md) · [Rating](doc/rating.md) · [CallControl](doc/call_control.md)
 
-* [Configurations](doc/config.md)
+## How it works
 
-* [CDRMediator](doc/cdrm.md)
-
-* [Rating](doc/rating.md)
-
-* [CallControl](doc/call_control.md)
-
-* [Feedback](#Feedback)
-
-## Introduction
-
-  In more cases,the rating engine is part by the billing system.
-Sometimes is released as module,sometimes is released as different application.
-Always the rating engine is part of entire billing system architecture.
- 
-  Why **RE** is different apllication ?
-The last years appear different billing systems.A lot of telecommunication companies start to develop
-own billing system or upgrade exact billing systems.In the same billing system still include not only voice service.
-The billing system is not only application for money collecting,payment statistics and reports.
-Make more from this - manage same services.Start and stop the service,modify settings,etc.
-This system is interface into different services,servers,platforms.
-For example: Internet,IPTV,VOIP are different services. Usualy are released over different platforms.
-No problem to use one billing system and general interface from this system.
-But call/message rating is specific action.Should be had learning and experience.
-Therefore is this release.In your conception,the RateEngine will release the call rating and if you need,can be used the call control.
-
-You can see example topology for RateEngine using in the follow picture:
+  RE pulls the CDRs it needs from external servers (files or databases),
+determines each call's **BillPlan** and **Tariff**, calculates the charge and
+updates the balance — applying **FreeBillsec** and **TimeConditions** per tariff
+where configured. An external **BillingSystem** drives it through APIs. When
+call control is enabled, RE returns a `maxsec` you can use as an RTP timeout or
+other guard in your call flow.
 
 ![](doc/png/RateEngine_v2.png)
 
-  A **RE** get need records from definited servers as files or from databases.
-Determine her **BillPlan** and **Tariff** is current call.
-Calculate and save in balance.Can be used **FreeBillsec** per difined tariff.
-Can be used **TimeConditions** per tariff - different prices in different time zone.
-The **RE** to be managed by external **BillingSystem** with APIs or other external interface.
-If you want to use CallControl - prepaid or credit limit(postpaid),then the RE will return 'maxsec'.
-Can be used 'maxsec' as RTP timeout or other param in you call managment.
-
 ## Feedback
 
-  You have a question or issue,you see errors,
-can send request to me here: [ISSUES](https://github.com/dkokov/RateEngine/issues)
+  Questions, ideas or bugs? Open an issue: [ISSUES](https://github.com/dkokov/RateEngine/issues)
 
-You have need from different/private helping or consulting -
-this my personal e-mail address: dkokov75 at gmail dot com
-
+For private help or consulting, reach me directly: dkokov75 at gmail dot com
