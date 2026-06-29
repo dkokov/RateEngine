@@ -56,10 +56,10 @@ void mem_test_alloc(int n)
 	mem_test_t ptr[100];
 //	mem_test_t *ptr;
 	
-	mem = ((101)*sizeof(mem_test_t));
-	
+	mem = sizeof(ptr);	/* exactly the 100-element array, not 101 */
+
 //	ptr = (mem_test_t *)alloca(mem);
-	
+
 	memset(ptr,0,mem);
 	
 	for(i=0;i<100;i++) {

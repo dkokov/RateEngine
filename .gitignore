@@ -6,3 +6,6 @@ src/mod/db_duckdb/lib/
 *.o
 *.so
 *.d
+
+# quarantined tests that don't compile / are unused (stale APIs, empty stubs)
+src/unit_tests/_old/

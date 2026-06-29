@@ -63,8 +63,8 @@ int main(void)
 	
 	for(i=0;i<10;i++) {
 		rt_ids[i] = i+1;
-		sprintf(rt_prefix[i].str,"359%d",i);
-		sprintf(rt_comm[i].str,"comm %s",rt_prefix[i].str);
+		snprintf(rt_prefix[i].str,sizeof(rt_prefix[i].str),"359%d",i);
+		snprintf(rt_comm[i].str,sizeof(rt_comm[i].str),"comm %.250s",rt_prefix[i].str);
 	}
 
 	tttt = (test_struct_t *)calloc(1,sizeof(test_struct_t));
