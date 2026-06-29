@@ -19,6 +19,8 @@ If you want to use same module,should be defined first here!
 ``` XML
  <LoadModules>
     <param name="module" value="pgsql.so" />
+    <!-- DuckDB engine for the RatingDuckDB module; load before rt.so -->
+    <param name="module" value="duckdb.so" />
     <param name="module" value="mysql.so" />
     <param name="module" value="redis.so" />
     <param name="module" value="cdrm.so" />
@@ -71,34 +73,65 @@ Last is the path to CallControl interface profiles.
 * [CallControl Interface Profile Example](cc_int_prof.md) 
 
 
-The **'Rating'** part is defined all params for this module.
+The **'Rating'** section configures the rating engine.
 
-``` XML 
+RateEngine ships two interchangeable rating modules - **both build to `rt.so`**,
+so you load `rt.so` either way and choose which one to build in `config.md`:
+
+* **RatingDuckDB** (`mod/RatingDuckDB`) - analytical *batch* rating with an
+  embedded DuckDB engine. The current default. Rates thousands of CDRs per
+  cycle in one set of analytical queries; needs the `duckdb.so` engine module.
+* **Rating** (`mod/Rating`) - the classic per-CDR engine (15-20 SQL queries
+  per call). Its parameters are kept further below for reference.
+
+**RatingDuckDB parameters:**
+
+``` XML
+ <Rating>
+    <param name="active" value="yes" />
+    <!-- rating leg: 'a' or 'b' -->
+    <param name="leg" value="a" />
+    <!-- idle poll interval, seconds (used when the CDR queue is empty) -->
+    <param name="RatingInterval" value="300" />
+    <!-- throttle between back-to-back drain cycles, microseconds -->
+    <param name="WaitRatingInterval" value="1500" />
+    <!-- CDRs rated per batch window (default 5000) -->
+    <param name="BatchLimit" value="5000" />
+    <!-- DuckDB worker threads; 0 = all cores -->
+    <param name="RatingThreads" value="4" />
+    <!-- dimension cache mode:
+         'all'    (default) - cache every lookup table; fastest, most RAM
+         'static'           - cache small config tables, account tables stay live
+         'none'             - all dimensions live as views over PostgreSQL -->
+    <param name="CacheDimensions" value="all" />
+    <!-- billing cycle day; if empty, uses 'billing_day' from 'billing_account' -->
+    <param name="BillingDay" value="01" />
+    <param name="DayOfPayment" value="10" />
+ </Rating>
+```
+
+**Legacy `Rating` module parameters** (only relevant when you build
+`mod/Rating` instead of `mod/RatingDuckDB`):
+
+``` XML
  <Rating>
     <param name="active" value="no" />
     <param name="leg" value="a" />
-    <!-- <param name="NoPrefixRating" value="&" /> -->
     <!-- RatingInterval, seconds -->
     <param name="RatingInterval" value="120" />
-    <!-- WaitRatingInterval , microseconds -->
+    <!-- WaitRatingInterval, microseconds -->
     <param name="WaitRatingInterval" value="5" />
-    <param name="RatingJSONConfigDIR" value="/home/dkokov/VQuality/RateEngine/v7/src/config/samples/rt_json/" />
-    <!-- When you want to use pcard for all subscribers,
-         set this param with 'yes' -->
-    <param name="UsePCard" value="no" />
-    <!-- 'start_date' or 'end_date' -->
-    <param name="PCardSortKey" value="start_date" />
-    <!-- 'desc' or 'asc' -->
-    <param name="PCardSortMode" value="desc" />
-    <!-- When you want to use only one billing day(one billing cycle),
-         insert a billing day here.If it's empty,
-         then will use 'billing_day' from the 'billing_account' table -->
+    <param name="RatingJSONConfigDIR" value="/usr/local/RateEngine/config/samples/rt_json/" />
+    <!-- single billing cycle day; if empty, uses 'billing_day' from 'billing_account' -->
     <param name="BillingDay" value="01" />
     <param name="DayOfPayment" value="10" />
-    <!-- k limit min = (limit/amount) when have more from 1 rating account per billing account -->
+    <!-- k limit min = (limit/amount) when more than 1 rating account per billing account -->
     <param name="KLimitMin" value="0.05" />
  </Rating>
 ```
+
+> Note: `UsePCard`, `PCardSortKey` and `PCardSortMode` appeared in older
+> configs but are no longer used by the engine.
 
 In **'CDRMediator'** part has only path to cdr profiles.Same module will read and load all profiles.
 
