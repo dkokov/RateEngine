@@ -1,0 +1,53 @@
+name: unit_tests
+
+# Build and run the RateEngine test suite (src/unit_tests).
+#   * unit-tests       : self-contained, self-asserting tests -> the CI gate
+#   * integration-build: build the core lib, then link the core-linked tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Self-asserting unit tests. No external deps (libc/libm only). These assert
+  # via exit code, so a regression fails the job.
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: unit tests (make check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & run unit tests
+        working-directory: src/unit_tests
+        run: make check
+
+  # ---------------------------------------------------------------------------
+  # Build the core library and link the core-linked tests. These are not run
+  # (they need argv / a live DB) — building proves they stay API-compatible
+  # with the core lib.
+  # ---------------------------------------------------------------------------
+  integration-build:
+    name: integration build (core lib + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libxml2-dev libjson-c-dev libpq-dev
+
+      - name: Build core library (libre7core.so)
+        working-directory: src
+        run: make RE7Core
+
+      - name: Build integration tests
+        working-directory: src/unit_tests
+        run: make integration
+
+      - name: Build extra (manual, argv-driven) tests
+        working-directory: src/unit_tests
+        run: make integration-extra
