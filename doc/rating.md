@@ -1,3 +1,3 @@
 # Rating
 
-![](png/Rating5.png)
+![](png/Rating5_genChatGPT.png)
