@@ -42,7 +42,7 @@ where configured. An external **BillingSystem** drives it through APIs. When
 call control is enabled, RE returns a `maxsec` you can use as an RTP timeout or
 other guard in your call flow.
 
-![](doc/png/RateEngine_v2.png)
+![](doc/png/RateEngine7_genChatGPT.png)
 
 ## Feedback
 
