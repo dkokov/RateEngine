@@ -9,7 +9,7 @@ In this case,you shold be used the **CDRMediator** for this task.
 If you would not use this case,don't start CDRMediator,but have to load same module therefore the **Rating** module.
 It uses exporting functions by the **CDRMediator** module.
 
-![](png/CDRMediator.png)
+![](png/CDRMediator7_genChatGPT.png)
 
   The **CDRMediator** can works for several CDRs servers.Every server is different CDR profile
 and different CDRMediatorThread.If you use three CDRs servers,will be have three CDR profiles and three CDRMediatorThreads.
