@@ -6,7 +6,7 @@ but as feature there is a process,not only module.
 In the same CallControl process are using functionalities by entire RateEngine (Rating,CDRMediator,MyCC or JSON-RPC over UDP/TCP/SCTP/TLS,etc).
 
 
-![](png/CallControl.png)
+![](png/CallControl7_genChatGPT.png)
 
 
   When you are releasing prepaid,the CallControl is following whether a prepaid amount is reaching to defined amount per this subscriber.
