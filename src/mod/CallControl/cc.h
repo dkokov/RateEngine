@@ -120,7 +120,7 @@ void cc_term_f(cc_t *cc_ptr);
 void cc_balance_f(cc_t *cc_ptr);
 
 void cc_event_manager(cc_t *cc_ptr);
-void cc_call_rating(cc_t *ptr,rating *pre);
+void cc_call_rating(cc_t *ptr,racc_t *rtp);
 cc_t *cc_alloc(void);
 void cc_free(cc_t *cc_ptr);
 

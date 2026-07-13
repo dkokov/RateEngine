@@ -422,12 +422,12 @@ int my_cc_mod_init(void)
 
 	memset(&mycc_cc_api,0,sizeof(cc_funcs_t));
 
-	mod_ptr = mod_find_module("CallControl.so");
+	mod_ptr = mod_find_module("cc.so");
 
 	if(mod_ptr == NULL) return RE_ERROR_N;
 	if(mod_ptr->handle == NULL) return RE_ERROR_N;
 	
-	func = mod_find_func(mod_ptr->handle,"cc_bind_api");
+	func = mod_find_sim(mod_ptr->handle,"cc_bind_api");
 	if(func != NULL) {
 		fptr = func;
 			
@@ -445,7 +445,17 @@ int my_cc_proto_bind(char *buf)
 {
 	char *data,*readbuf;
 	my_cc_t *my = NULL;
-	
+
+	/* bind the CallControl API (mycc_cc_api) on first use - my_cc_mod_init()
+	 * is not auto-invoked, so without this mycc_cc_api.cc_alloc is NULL and
+	 * my_cc_parser() segfaults */
+	if(mycc_cc_api.cc_alloc == NULL) {
+		if(my_cc_mod_init() < 0) {
+			memcpy(buf,"error",5);
+			return RE_SUCCESS;
+		}
+	}
+
 	readbuf = strdup(buf);
 	memset(buf,0,strlen(buf));
 

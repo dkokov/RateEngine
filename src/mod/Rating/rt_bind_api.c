@@ -15,6 +15,7 @@ int rt_bind_api(rt_funcs_t *api)
 	api->engine     = RateEngine;
 	api->maxsec     = rt_maxsec;
 	api->exec       = rt_exec;
+	api->racc_free  = rt_data_racc_free;
 
 	return 0;
 }

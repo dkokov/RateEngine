@@ -57,6 +57,8 @@ extern rate_engine_t rt_eng;
 
 void *RateEngine(void *dt);
 void rt_exec(db_t *dbp,racc_t *rtp,char leg);
+racc_t *rt_racc_voip_av_a(db_t *dbp,rating_t *pre);
+void rt_rate_searching(db_t *dbp,racc_t *rtp);
 void rt_chk_bplan_periods(bplan_t *bpt,int ts);
 void rt_chk_tr_opt(db_t *dbp,rating_t *pre);
 int rt_double_rating(db_t *dbp,racc_t *rtp,char leg);

@@ -708,10 +708,10 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 	
 	db_select(dbp,str);
 	db_fetch(dbp);
-				
+
 	if(dbp->conn->result != NULL) {
 		result = (db_sql_result_t *)dbp->conn->result;
-			
+
 		for(i = 0; i < result->rows; i++) {
 			rtp->bacc_ptr->id = atoi(result->cols_list[0].rows_list[i].row);
 			rtp->bplan_ptr->id = atoi(result->cols_list[1].rows_list[i].row);
@@ -1179,7 +1179,7 @@ racc_t *rt_data_q_racc(db_t *dbp,rating_t *pre)
 	rtp->pre = pre;
 	rtp->rtm = pre->rating_mode_id;
 	rtp->bacc_ptr->cdr_server_id = pre->cdr_server_id;
-	
+
 	if(dbp->t == sql) {
 		ret = rt_data_q_racc_sql(dbp,rtp);
 		

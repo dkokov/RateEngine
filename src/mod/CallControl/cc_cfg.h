@@ -22,7 +22,7 @@ typedef struct cc_cfg_int {
 	char cc_proto[32];
 	char proto[32];
 	
-	net_ip_ver_t ipv;
+	net_dom_t ipv;
 	char ip[128];
 	unsigned short port;
 		

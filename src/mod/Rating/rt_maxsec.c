@@ -8,126 +8,146 @@
 
 #include "rt_maxsec.h"
 
-int rt_maxsec(db_t *dbp,rating_t *pre)
+/*
+ * Online-charging max-seconds computation for CallControl.
+ *
+ * This is the full computation 0.6.14's monolithic cc_maxsec_f() performed,
+ * relocated into the Rating module so CallControl reaches it via the single
+ * rt_maxsec bind entry. It reuses the same functions as the batch path, so
+ * pcards and time-conditions behave identically:
+ *   - rt_racc_voip_av_a() : billing account + bill plan
+ *   - pcard_manager()     : active payment card  -> bacc_ptr->pcard_ptr
+ *   - rt_rate_searching() : rate/tariff + time-conditions + consumed balance
+ *   - calc_maxsec()       : seconds, from the (possibly split) credit limit
+ *
+ * 'sim' is the number of simultaneous calls already up for this subscriber,
+ * supplied by CallControl (it lives in the cc_tbl / CallControl plane).
+ *
+ * Returns the racc_t on success (pre->maxsec > 0); the caller owns it, holds
+ * it until 'term', rates the call with rt_exec(), then frees it with
+ * rt_data_racc_free(). pre is owned by the caller and never freed here.
+ * On failure returns NULL and sets pre->maxsec to a negative RT_MAXSEC_* code.
+ */
+racc_t *rt_maxsec(db_t *dbp,rating_t *pre,int sim)
 {
-/*	tariff *tr;
-    pcard_t *card;
-	
-	tr = NULL;
-	pre = NULL;
-	card = NULL;
-	
-	if(dbp == NULL) {
-		LOG("rt_maxsec()","DB no init - pointer is NULL !");
-		return RE_ERROR_N;
-	}
-	
-	if(pre == NULL) {
-		LOG("rt_maxsec()","Memory alloc error - pointer 'pre' is NULL !");
-		return RT_MAXSEC_NO_PRE;
-	}
-	
-	f_bacc_query(dbp,pre);
-	chk_bplan_periods(pre);
+	racc_t *rtp;
+	pcard_t *card;
 
-	if(pre->bacc == 0) {
-		LOG("rt_maxsec()","The bacc is not found!");
+	if(dbp == NULL) return NULL;
+	if(pre == NULL) return NULL;
+
+	/* billing account + bill plan (voip leg-a, online) */
+	rtp = rt_racc_voip_av_a(dbp,pre);
+
+	if(rtp == NULL) {
 		pre->maxsec = RT_MAXSEC_NO_BACC;
-	} else {
-		if(pre->bplan == 0) {
-			LOG("rt_maxsec_f()","The bplan is not found!");
-			pre->maxsec = RT_MAXSEC_NO_BPLAN;
-		} else {					
-			pcard_manager_v2(dbp,pre);
+		return NULL;
+	}
 
-			if(pre->card == 0) {
-				// Nerazre6eno nabirane poradi neplatena smetka ili dostignat krediten limit! 
-				LOG("rt_maxsec_f()","The pcard is not found or actived");
-				pre->maxsec = RT_MAXSEC_NO_PCARD;
-			} else {
-				card = pre->card;
-				tr = rate_searching(dbp,pre);						
-				pre->limit = ((card->amount)-(pre->balanse));
-				
-				if(pre->limit <= 0) {
-					// Nerazre6eno nabirane poradi dostignat krediten limit 
-					pre->maxsec = RT_MAXSEC_NO_CLIMIT;
-					
-					return RE_ERROR;
-				}
-				
-				if(card->call_number <= 0) return RE_ERROR; */
-						
-//						sim = cc_server_call_search_racc(pre->clg);
-//						LOG("cc_maxsec_f()","clg: %s,call_uid: %s,sim: %d",pre->clg,pre->call_uid,sim);
-						
-						/* compare sim calls with define call number in the PCard */
-/*						if(card->call_number <= sim) {
-							LOG("cc_maxsec_f()","call number restriction %s,call number %d,sim %d",
-								pre->call_uid,card->call_number,sim);
-					
-							pre->maxsec = RT_MAXSEC_CRESTICT;
-							return RE_ERROR;
-						} */
-						
-						/* one user,a lot of calls */
-/*						if(card->call_number > 1) {
-							double test,k;
-					
-							k = (pre->limit/card->amount);
-					
-							if((k > k_limit_min)) {
-								test = ((pre->limit)/((card->call_number)));
-								pre->limit = test;
-							} else {						
-								if((sim) > 0) {
-									pre->limit = 0;
-									pre->maxsec = MAXSEC_CRESTICT;
-						
-									return RE_ERROR;
-								}
-							}
-					
-							if(pre->limit <= 0) {
-								pre->maxsec = MAXSEC_NO_PCARD;
-								return RE_ERROR;
-							}
-							
-							LOG("cc_maxsec_f()",
-								"PCard data,call_uid: %s,sim: %d,limit/calls: %f,k: %f",
-								pre->call_uid,sim,test,k);
-						} */
-				
-	/*			if(tr) {
-					calc_maxsec(pre,tr);
-				
-					if(pre->maxsec <= 0) pre->maxsec = RT_MAXSEC_NO_CREDIT;
+	rtp->pre = pre;
 
-					mem_free(tr);
-					tr = NULL;
-				} else {
-					LOG("rt_maxsec_f()","Don't have a tariff");
-					pre->maxsec = RT_MAXSEC_NO_TARIFF;	
-				}
+	if((rtp->bacc_ptr == NULL)||(rtp->bacc_ptr->id == 0)) {
+		pre->maxsec = RT_MAXSEC_NO_BACC;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
 
+	if((rtp->bplan_ptr == NULL)||(rtp->bplan_ptr->id == 0)) {
+		pre->maxsec = RT_MAXSEC_NO_BPLAN;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
 
-					}
-				}
+	rt_chk_bplan_periods(rtp->bplan_ptr,pre->ts);
+
+	/* active payment card */
+	pcard_manager(dbp,rtp);
+
+	card = rtp->bacc_ptr->pcard_ptr;
+
+	if(card == NULL) {
+		pre->maxsec = RT_MAXSEC_NO_PCARD;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	/* rate/tariff + time-conditions; also reads consumed balance */
+	rt_rate_searching(dbp,rtp);
+
+	if((rtp->bplan_ptr->rates_ptr == NULL)||
+	   (rtp->bplan_ptr->rates_ptr->calc_funcs == NULL)) {
+		pre->maxsec = RT_MAXSEC_NO_TARIFF;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	/* remaining credit = card credit limit - already consumed balance */
+	pre->limit = (card->amount) - (rtp->bal_ptr->amount);
+
+	if(pre->limit <= 0) {
+		pre->maxsec = RT_MAXSEC_NO_CLIMIT;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	/* no simultaneous calls permitted for this pcard */
+	if(card->call_number <= 0) {
+		pre->maxsec = RT_MAXSEC_CRESTICT;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	/* already at/over the allowed number of concurrent calls */
+	if(card->call_number <= sim) {
+		LOG("rt_maxsec()","call number restriction %s,call number %d,sim %d",
+			pre->call_uid,card->call_number,sim);
+		pre->maxsec = RT_MAXSEC_CRESTICT;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	/* one user, several simultaneous calls: split the shared credit limit
+	 * across the allowed number of calls, gated by k_limit_min */
+	if(card->call_number > 1) {
+		double test,k;
+
+		test = 0;
+		k = (pre->limit / card->amount);
+
+		if(k > k_limit_min) {
+			test = (pre->limit) / (card->call_number);
+			pre->limit = test;
+		} else {
+			if(sim > 0) {
+				pre->limit = 0;
+				pre->maxsec = RT_MAXSEC_CRESTICT;
+				rt_data_racc_free(rtp);
+				return NULL;
 			}
-			
-	LOG("rt_maxsec_f()","call_uid: %s,clg: %s,maxsec: %d",pre->call_uid,pre->clg,pre->maxsec);
-		
-	if(pre->maxsec < 0) {
-		if(card != NULL) { 
-			mem_free(card);
-			LOG("rt_maxsec_f()","mem_free(card)");
 		}
-					
-		if(tr != NULL) {
-			mem_free(tr);
-			LOG("rt_maxsec_f()","mem_free(tr)");
+
+		if(pre->limit <= 0) {
+			pre->maxsec = RT_MAXSEC_NO_PCARD;
+			rt_data_racc_free(rtp);
+			return NULL;
 		}
-	}			
-	*/
-	return RE_SUCCESS;
+
+		LOG("rt_maxsec()","PCard data,call_uid: %s,sim: %d,limit/calls: %f,k: %f",
+			pre->call_uid,sim,test,k);
+	}
+
+	/* seconds from the (possibly split) credit limit; AFTER the split so
+	 * maxsec reflects the divided credit (0.6.14 ordering) */
+	calc_maxsec(rtp);
+
+	if(pre->maxsec <= 0) {
+		pre->maxsec = RT_MAXSEC_NO_CREDIT;
+		rt_data_racc_free(rtp);
+		return NULL;
+	}
+
+	LOG("rt_maxsec()","call_uid: %s,clg: %s,limit: %f,maxsec: %d",
+		pre->call_uid,pre->clg,pre->limit,pre->maxsec);
+
+	return rtp;
 }

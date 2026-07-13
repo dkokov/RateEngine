@@ -1,7 +1,11 @@
 <Interface>
  <config>
-    <!-- MyCC,Diameter Credit Control -->
-    <param name="proto" value="MyCC" />
+    <!-- CallControl session/application protocol: my_cc, json_rpc -->
+    <param name="CC-proto" value="my_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tcp" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
     <param name="ip" value="" />
     <param name="port" value="9090" />
  </config>

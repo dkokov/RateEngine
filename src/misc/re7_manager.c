@@ -100,45 +100,39 @@ int rating_action(void)
 }
 
 int cc_server_action(void)
-{	
-/*	int rc,ret;
-	void *func;
-	
+{
+	void *sym;
 	mod_t *mod_ptr;
-	cc_funcs_t api;
-	int (*fptr)(cc_funcs_t *);
+	void *(*cc_main)(void *);
 
-	mod_ptr = mod_find_module("CallControl.so");
+	/* module file is cc.so (MOD_LIB in mod/CallControl/Makefile) */
+	mod_ptr = mod_find_module("cc.so");
 
-	if(mod_ptr == NULL) return RE_ERROR;
-	if(mod_ptr->handle == NULL) return RE_ERROR;
-	
-	memset(&api,0,sizeof(cc_funcs_t));
-
-	func = mod_find_func(mod_ptr->handle,"cc_bind_api");
-	if(func != NULL) {
-		fptr = func;
-			
-		ret = fptr(&api);
-		if(ret < 0) {
-			LOG("cc_bind_api()","ret: %d",ret);
-			return RE_ERROR;
-		}
-	}
-	
-	rc = 0;
-	
-	rc = pthread_create(&config.thread_cc_server,NULL,api.cc_main,NULL);
-	if(rc) {
-		LOG("CC","pthread_create(rate_engine) error");
+	if((mod_ptr == NULL)||(mod_ptr->handle == NULL)) {
+		LOG("cc_server_action()","ERROR! The module 'cc.so' is not find!");
 		return RE_ERROR;
 	}
-	
+
+	/* Resolve the module's server-thread entry by symbol and launch it - the
+	 * core treats the module as a black box (no CallControl headers here). */
+	sym = mod_find_sim(mod_ptr->handle,"cc_server_main");
+	if(sym == NULL) {
+		LOG("cc_server_action()","ERROR! The symbol 'cc_server_main' is not find!");
+		return RE_ERROR;
+	}
+
+	cc_main = (void *(*)(void *))sym;
+
+	if(pthread_create(&config.thread_cc_server,NULL,cc_main,NULL)) {
+		LOG("CC","pthread_create(cc_server) error");
+		return RE_ERROR;
+	}
+
 	if(opt_cli_mem.daemon_flag == 0) {
 		pthread_join(config.thread_cc_server,NULL);
 		LOG("CC","pthread_join() is join");
 	}
-	*/
+
 	return RE_SUCCESS;
 }
 

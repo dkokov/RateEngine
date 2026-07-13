@@ -16,6 +16,17 @@
 #include "cc_cfg.h"
 #include "cc_server.h"
 
+/* single definitions for the globals declared 'extern' in cc_server.h */
+cc_server_t ccserver;
+cc_server_tbl_t *cc_tbl;
+pthread_mutex_t cc_tbl_lock;
+unsigned short cc_server_sim;
+rt_funcs_t rt_api;
+
+/* CallControl's own CDRMediator API table (rating.h externs a global 'cdrm_api'
+ * pointer used inside Rating.so; CallControl keeps its own) */
+cdr_funcs_t cc_cdrm_api;
+
 
 cc_server_tbl_t *cc_server_tbl_init(int sim)
 {
@@ -28,18 +39,18 @@ cc_server_tbl_t *cc_server_tbl_init(int sim)
 	return tbl;
 }
 
-int cc_server_call_init(cc_t *cc_ptr,rating *pre)
+int cc_server_call_init(cc_t *cc_ptr,racc_t *rtp)
 {
 	int i,ret;
-	
+
 	ret = RE_ERROR;
-	
+
 	pthread_mutex_lock(&cc_tbl_lock);
 
 	for(i=0;i<sim_calls;i++) {
-		if((cc_tbl[i].cc_ptr == NULL)&&(cc_tbl[i].pre == NULL)) {
+		if((cc_tbl[i].cc_ptr == NULL)&&(cc_tbl[i].rtp == NULL)) {
 			cc_tbl[i].cc_ptr = cc_ptr;
-			cc_tbl[i].pre = pre;
+			cc_tbl[i].rtp = rtp;
 			
 			ret = RE_SUCCESS;
 			
@@ -96,7 +107,7 @@ int cc_server_call_search_racc(char *racc)
 	for(i=0;i<sim_calls;i++) {
 		if(cc_tbl[i].cc_ptr != NULL) {
 			if(cc_tbl[i].cc_ptr->max != NULL) {
-				if(strcmp(cc_tbl[i].pre->clg,racc) == 0) {
+				if(strcmp(cc_tbl[i].cc_ptr->max->clg,racc) == 0) {
 					ret++;
 					
 					LOG("cc_server_call_search_racc()","racc: %s,sim: %d",racc,ret);
@@ -121,7 +132,7 @@ void cc_server_add_cdr(cc_server_tbl_t *tbl)
 		 * - from 'struct cc' is null ????
 		 * - from 'pre' is not null ! temp to use this !!!
 		 * */
-		cdr_pt.cdr_server_id = tbl->pre->cdr_server_id;
+		cdr_pt.cdr_server_id = tbl->rtp->pre->cdr_server_id;
 		
 		/* set 'cdr_rec_type_id' to be 'voip_a' ??? */
 		cdr_pt.cdr_rec_type_id = voip_a;
@@ -130,10 +141,10 @@ void cc_server_add_cdr(cc_server_tbl_t *tbl)
 		strcpy(cdr_pt.call_uid,tbl->cc_ptr->term->call_uid);
 		
 		/* copy 'pre->timestamp' to 'cdr.start_ts' */
-		strcpy(cdr_pt.start_ts,tbl->pre->timestamp);
-		
+		strcpy(cdr_pt.start_ts,tbl->rtp->pre->timestamp);
+
 		/* copy 'pre->ts' to 'cdr->start_epoch' */
-		cdr_pt.start_epoch = tbl->pre->ts;
+		cdr_pt.start_epoch = tbl->rtp->pre->ts;
 		
 		/* copy 'clg' from 'struct max' to 'struct cdr' as 'calling_number' */
 		strcpy(cdr_pt.calling_number,tbl->cc_ptr->max->clg);
@@ -148,34 +159,41 @@ void cc_server_add_cdr(cc_server_tbl_t *tbl)
 		cdr_pt.duration = tbl->cc_ptr->term->duration;
 				
 		/* insert 'no complete' cdr in DB */
-		if(cdrm_api.add_cdr(ccserver.dbp,&cdr_pt,NULL)) 
-			tbl->pre->cdr_id = cdrm_api.get_cdr_id(ccserver.dbp,&cdr_pt);	
-		else tbl->pre->cdr_id = 0;
+		if(cc_cdrm_api.add_cdr(ccserver.dbp,&cdr_pt,NULL))
+			tbl->rtp->pre->cdr_id = cc_cdrm_api.get_cdr_id(ccserver.dbp,&cdr_pt);
+		else tbl->rtp->pre->cdr_id = 0;
 	}	
 }
 
 void cc_server_call_term(cc_server_tbl_t *tbl,cc_t *cc_ptr)
 {
-	if((tbl != NULL)&&(cc_ptr->term != NULL)) {
+	pthread_mutex_lock(&cc_tbl_lock);
+
+	if((tbl->cc_ptr != NULL)&&(cc_ptr->term != NULL)) {
 		tbl->cc_ptr->term = cc_ptr->term;
 	}
+
+	pthread_mutex_unlock(&cc_tbl_lock);
 }
 
 void cc_server_call_clear(cc_server_tbl_t *tbl)
 {
 	pthread_mutex_lock(&cc_tbl_lock);
 	
-	if(tbl->pre != NULL) {
-		if(tbl->pre->tr != NULL) {
-			mem_free(tbl->pre->tr);
-			tbl->pre->tr = NULL;
+	if(tbl->rtp != NULL) {
+		rating_t *pre = tbl->rtp->pre;
+
+		/* free the racc scaffolding (bacc/bplan/pcard/bal) via the bind API,
+		 * then pre (CC owns it) - no direct Rating-internal call across the .so */
+		rt_api.racc_free(tbl->rtp);
+
+		if(pre != NULL) {
+			LOG("cc_server_call_clear()","mem_free(pre),call_uid: %s",pre->call_uid);
+			mem_free(pre);
 		}
-		
-		LOG("cc_server_call_clear()","mem_free(tbl->pre),call_uid: %s",tbl->pre->call_uid);
-		mem_free(tbl->pre);
 	}
 
-	tbl->pre = NULL;
+	tbl->rtp = NULL;
 
 	if(tbl->cc_ptr != NULL) {
 		tbl->cc_ptr->cc_status = CC_STATUS_DEACTIVE;
@@ -214,7 +232,7 @@ void *cc_server_proto_bind(char *proto)
 	func = NULL;
 	
 	if(mod_ptr->handle != NULL) {
-		func = mod_find_func(mod_ptr->handle,funcname);
+		func = mod_find_sim(mod_ptr->handle,funcname);
 	}
 	
 	return func;	
@@ -250,12 +268,19 @@ void *cc_server_thread_int(void *dt)
 		goto _end;
 	}
 	
+	np->conn->t = server;
 	np->conn->buf_size = 2048;
-	np->conn->ipv = cc_int->ipv;
+	np->conn->domain = cc_int->ipv;
 	strcpy(np->conn->ip_str,cc_int->ip);
 	np->conn->port = cc_int->port;
 	strcpy(np->conn->proto,cc_int->proto);
-	
+
+	/* map transport name -> proto_id enum; net_open_socket() switches on it */
+	if(strcmp(cc_int->proto,NET_TCP_PROTO_STR) == 0)       np->conn->proto_id = tcp;
+	else if(strcmp(cc_int->proto,NET_UDP_PROTO_STR) == 0)  np->conn->proto_id = udp;
+	else if(strcmp(cc_int->proto,NET_TLS_PROTO_STR) == 0)  np->conn->proto_id = tls;
+	else if(strcmp(cc_int->proto,NET_SCTP_PROTO_STR) == 0) np->conn->proto_id = sctp;
+
 	/* Network Protocol Bind */
 	if(net_proto_bind(np) < 0) {
 		LOG("cc_server_thread_int()","net_proto_bind() ERROR for '%s'",cc_int->proto);
@@ -263,12 +288,12 @@ void *cc_server_thread_int(void *dt)
 	}
 	
 	LOG("cc_server_thread_int()","net_proto_bind() for '%s'",cc_int->proto);
-	
+
 	if(net_open(np) < 0) goto _end;
 	
 	LOG("cc_server_thread_int()","net_open() success");	
 	
-	if(net_listen(np) < 0) goto _end;
+	if(net_listen(np->conn) < 0) goto _end;
 
 	LOG("cc_server_thread_int()","net_listen() success");
 	
@@ -312,23 +337,17 @@ void *cc_server_thread(void *dt)
 				if(cc_tbl[i].cc_ptr->term != NULL) {
 					LOG("cc_server_thread","term is NOT NULL(%d)",i);
 										
-					if(cc_tbl[i].cc_ptr->term->status == normal_clear) {	
-						convert_epoch_to_ts(cc_tbl[i].pre->ts,cc_tbl[i].pre->timestamp);
-							
+					if((cc_tbl[i].cc_ptr->term->status == normal_clear)&&(cc_tbl[i].rtp != NULL)) {
+						convert_epoch_to_ts(cc_tbl[i].rtp->pre->ts,cc_tbl[i].rtp->pre->timestamp);
+
 						if(cc_tbl[i].cc_ptr->term->billsec > 0) cc_server_add_cdr(&cc_tbl[i]);
-							
-						if(cc_tbl[i].pre->cdr_id > 0) cc_call_rating(cc_tbl[i].cc_ptr,cc_tbl[i].pre);
+
+						if(cc_tbl[i].rtp->pre->cdr_id > 0) cc_call_rating(cc_tbl[i].cc_ptr,cc_tbl[i].rtp);
 						else {
 							LOG("cc_server_thread()","call_uid: %s,no rating",cc_tbl[i].cc_ptr->term->call_uid);
-						
-							if(cc_tbl[i].pre) {
-								if(cc_tbl[i].pre->card) mem_free(cc_tbl[i].pre->card);
-								if(cc_tbl[i].pre->card) mem_free(cc_tbl[i].pre->tc);
-								
-								mem_free(cc_tbl[i].pre);
-								cc_tbl[i].pre = NULL; 
-							}
 						}
+
+						/* racc_t + pre are freed below by cc_server_call_clear() */
 					}
 					
 					LOG("cc_server_thread()","call_uid: %s,clear from the cc_server table (receive 'term')",cc_tbl[i].cc_ptr->term->call_uid);
@@ -393,18 +412,18 @@ int cc_server_cdrm_init(void)
 	mod_t *mod_ptr;
 	int (*fptr)(cdr_funcs_t *);
 
-	memset(&cdrm_api,0,sizeof(cdr_funcs_t));
+	memset(&cc_cdrm_api,0,sizeof(cdr_funcs_t));
 
-	mod_ptr = mod_find_module("CDRMediator.so");
+	mod_ptr = mod_find_module("cdrm.so");
 
 	if(mod_ptr == NULL) return RE_ERROR_N;
 	if(mod_ptr->handle == NULL) return RE_ERROR_N;
 	
-	func = mod_find_func(mod_ptr->handle,"cdr_bind_api");
+	func = mod_find_sim(mod_ptr->handle,"cdr_bind_api");
 	if(func != NULL) {
 		fptr = func;
 			
-		ret = fptr(&cdrm_api);
+		ret = fptr(&cc_cdrm_api);
 		if(ret < 0) {
 			LOG("cc_server_cdr_init()","cdr_bind_api(),ret: %d",ret);
 			return RE_ERROR_N;
@@ -423,12 +442,12 @@ int cc_server_rt_init(void)
 
 	memset(&rt_api,0,sizeof(rt_funcs_t));
 
-	mod_ptr = mod_find_module("Rating.so");
+	mod_ptr = mod_find_module("rt.so");
 
 	if(mod_ptr == NULL) return RE_ERROR_N;
 	if(mod_ptr->handle == NULL) return RE_ERROR_N;
 	
-	func = mod_find_func(mod_ptr->handle,"rt_bind_api");
+	func = mod_find_sim(mod_ptr->handle,"rt_bind_api");
 	if(func != NULL) {
 		fptr = func;
 			
@@ -457,7 +476,13 @@ void *cc_server_main(void *dt)
 	cc_cfg_t *cfg;
 	
 	cc_tbl = NULL;
-	
+
+	/* bind the Rating (rt_api) + CDRMediator (cc_cdrm_api) function tables
+	 * before any interface thread handles a request - otherwise rt_api.maxsec
+	 * is NULL and the first maxsec crashes the server. All modules are loaded
+	 * by the time this thread runs. */
+	CallControl_mod_init();
+
 	cfg = cc_cfg_main(mcfg->cfg_filename);
 	
 	if(cfg != NULL) {		
@@ -504,12 +529,21 @@ void *cc_server_main(void *dt)
 					cc_server_thread_int_run(&cfg->interfaces[i]);
 				}
 			}
+
+			/* SUCCESS: the detached janitor + interface threads keep running and
+			 * use ccserver.dbp and cfg->interfaces[] for the whole process
+			 * lifetime. This setup thread must exit WITHOUT freeing them - the
+			 * db_free/mem_free at _end_func below was a use-after-free that
+			 * corrupted ccserver.dbp (dbp->t became garbage -> every maxsec
+			 * lookup returned NO_BACC). Leak is intentional: process-lifetime. */
+			pthread_exit(NULL);
 		} else LOG("cc_server_main()","A 'cc_tbl' pointer is null!");
 	} else LOG("cc_server_main()","A 'cfg' pointer is null!");
 
 _end_func:
+	/* error paths only (no worker threads were started) - safe to free */
 	mem_free(cfg);
 	db_free(ccserver.dbp);
-	
+
 	pthread_exit(NULL);
 } 

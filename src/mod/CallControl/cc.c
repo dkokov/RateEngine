@@ -65,121 +65,78 @@ void cc_free(cc_t *cc_ptr)
 	}
 }
 
-rating *cc_maxsec_pre(cc_t *cc_ptr)
+rating_t *cc_maxsec_pre(cc_t *cc_ptr)
 {
-	rating *pre;
-	
-	pre = (rating *)mem_alloc(sizeof(rating));
-	
-	if(pre != NULL) {		
+	rating_t *pre;
+
+	/* core alloc (zeroed) - CallControl must not call Rating-internal
+	 * rt_data_rating_init() across the .so boundary */
+	pre = mem_alloc(sizeof(rating_t));
+
+	if(pre != NULL) {
 		pre->cdr_server_id = cc_ptr->cdr_server_id;
 		strcpy(pre->clg,cc_ptr->max->clg);
 		strcpy(pre->cld,cc_ptr->max->cld);
 		strcpy(pre->call_uid,cc_ptr->max->call_uid);
 		pre->ts = cc_ptr->max->ts;
-		
-		pre->tr = NULL;
 	}
-	
+
 	return pre;
 }
 
 void cc_maxsec_f(cc_t *cc_ptr)
 {
-	int cc_f,sim,ret;
-    pcard_t *card;
+	int cc_f,sim;
 
-    rating *pre;
-	
+	rating_t *pre;
+	racc_t *rtp;
+
 	pre = NULL;
-	
+	rtp = NULL;
+	sim = 0;
+
 	if(cc_ptr->max != NULL) {
 		if(strlen(cc_ptr->max->clg) > 0) {
 			pre = cc_maxsec_pre(cc_ptr);
-			
+
 			if(pre == NULL) {
 				LOG("cc_maxsec_f()","Memory alloc error!");
 				cc_ptr->max->maxsec = CC_MAXSEC_NO_PRE;
-				goto end_func;
+				return;
 			}
-ccserver.pre = pre;
-			ret = rt_api.maxsec(ccserver.dbp,ccserver.pre);
-			if( ret < 0) {
-				pre->maxsec = ret;
-				goto end_func;
-			}
-			
-			card = pre->card;
 
-			sim = 0;
-						
+			/* concurrent calls already up for this subscriber (this call is
+			 * not in cc_tbl yet, so it is excluded from the count) */
 			sim = cc_server_call_search_racc(pre->clg);
 			LOG("cc_maxsec_f()","clg: %s,call_uid: %s,sim: %d",pre->clg,pre->call_uid,sim);
-						
-			/* compare sim calls with define call number in the PCard */
-			if(card->call_number <= sim) {
-				LOG("cc_maxsec_f()","call number restriction %s,call number %d,sim %d",pre->call_uid,card->call_number,sim);
-					
-				pre->maxsec = CC_MAXSEC_CRESTICT;
-				goto end_func;
-			}
-						
-			/* one user,a lot of calls */
-			if(card->call_number > 1) {
-				double test,k;
-					
-				k = (pre->limit/card->amount);
-					
-				if((k > k_limit_min)) {
-					test = ((pre->limit)/((card->call_number)));
-					pre->limit = test;
-				} else {						
-					if((sim) > 0) {
-						pre->limit = 0;
-						pre->maxsec = CC_MAXSEC_CRESTICT;
-						
-						goto end_func;
-					}
-				}
-					
-				if(pre->limit <= 0) {
-					pre->maxsec = CC_MAXSEC_NO_PCARD;
-					goto end_func;
-				}
-							
-				LOG("cc_maxsec_f()","PCard data,call_uid: %s,sim: %d,limit/calls: %f,k: %f", pre->call_uid,sim,test,k);
-			}
-				
+
+			/* full online maxsec (pcard + rate + time-conditions + credit
+			 * limit + sim/call-number restriction + shared-pcard split) */
+			rtp = rt_api.maxsec(ccserver.dbp,pre,sim);
 		}
 	}
-		
-end_func:
-	if(pre != NULL) { 
+
+	if(pre != NULL) {
 		cc_ptr->max->maxsec = pre->maxsec;
 		LOG("cc_maxsec_f()","call_uid: %s,clg: %s,maxsec: %d",pre->call_uid,pre->clg,pre->maxsec);
-				
-		if(cc_ptr->max->maxsec > 0) {
-			/* save 'pre' and 'cc_ptr' pointers in the 'cc_tbl' */
-			cc_f = cc_server_call_init(cc_ptr,pre);
-			
+
+		if(rtp != NULL) {
+			/* success (pre->maxsec > 0): keep the racc_t (owning pre) alive
+			 * in 'cc_tbl' until 'term' */
+			cc_f = cc_server_call_init(cc_ptr,rtp);
+
 			if(cc_f == RE_ERROR) {
 				LOG("cc_maxsec_f()","CC Table is full");
 				cc_ptr->max->maxsec = CC_MAXSEC_NO_CCTBL;
+
+				rt_api.racc_free(rtp);
+				mem_free(pre);
 			}
 		} else {
-			if(card != NULL) { 
-				//mem_free(card);
-				LOG("cc_maxsec_f()","mem_free(card)");
-			}
-					
-/*					if(tr != NULL) {
-						mem_free(tr);
-						LOG("cc_maxsec_f()","mem_free(tr)");
-					} */
-					
+			/* failure: rt_api.maxsec() already freed the racc_t, free pre */
 			mem_free(pre);
 			LOG("cc_maxsec_f()","mem_free(pre)");
-		}			
+		}
 	} else cc_ptr->max->maxsec = CC_MAXSEC_NO_PRE;
 }
 
@@ -222,24 +179,25 @@ void cc_cprice_f(cc_t *cc_ptr)
 	}
 }
 
-void cc_call_rating(cc_t *cc_ptr,rating *pre)
+void cc_call_rating(cc_t *cc_ptr,racc_t *rtp)
 {
 	struct timeval times;
-	
+	rating_t *pre;
+
+	pre = rtp->pre;
+
 	gettimeofday(&times, NULL);
-	pre->start_timer = (((times.tv_sec)*1000000)+(times.tv_usec));	
-	
-	pre->rating_mode_id = 1;
+	pre->start_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
+
+	pre->rating_mode_id = rt_mode_clg;
     pre->billsec = cc_ptr->term->billsec;
-    
-//	rating_exec(ccserver.conn2,pre,'a');
-	rt_api.exec(ccserver.dbp,pre,'a');
+
+	rt_api.exec(ccserver.dbp,rtp,'a');
 
 	LOG("cc_call_rating()","rating_exec(),call_uid: %s",pre->call_uid);
-	
-	mem_free(pre->card);
-    mem_free(pre->tc);
-    
+
+	/* the racc_t (incl. pcard) is freed later by cc_server_call_clear() */
+
 	gettimeofday(&times, NULL);
 	pre->current_timer = (((times.tv_sec)*1000000)+(times.tv_usec));
 			

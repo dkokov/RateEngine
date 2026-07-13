@@ -17,7 +17,11 @@ XML2_CFLAGS = $(shell xml2-config --cflags)
 PGSQL_INCLUDEDIR = $(shell pg_config --includedir 2>/dev/null)
 
 FLAGS   = -Wall
-CFLAGS  = -fPIC -Ofast -I/usr/include/libxml2/ -I$(PGSQL_INCLUDEDIR)
+# pin pre-C23 std: gcc 14 defaults to gnu23, which (with glibc >= 2.38) redirects
+# strtol/atof/scanf to __isoc23_* symbols that are missing on older runtime libc
+# (e.g. dlopen rt.so -> "undefined symbol: __isoc23_strtol"). gnu17 keeps the GNU
+# extensions the code uses but emits the classic, portable libc symbols.
+CFLAGS  = -std=gnu17 -fPIC -Ofast -I/usr/include/libxml2/ -I$(PGSQL_INCLUDEDIR)
 LDFLAGS = -shared
 LDLIBS  = -lpq
 

@@ -11,6 +11,6 @@
 #define RT_MAXSEC_NO_PRE    -9
 #define RT_MAXSEC_NO_CCTBL  -10
 
-int rt_maxsec(db_t *dbp,rating_t *pre);
+racc_t *rt_maxsec(db_t *dbp,rating_t *pre,int sim);
 
 #endif 
