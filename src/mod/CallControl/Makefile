@@ -1,6 +1,6 @@
 include ../../config.mk
 
-MOD_NAME = CallControl
+MOD_NAME = cc
 
 # CallControl
 MOD_LIB = $(MOD_NAME).so
