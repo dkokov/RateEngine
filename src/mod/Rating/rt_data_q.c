@@ -211,13 +211,15 @@ int rt_data_q_pcard_sql(db_t *dbp,bacc_t *bpt,int pcard_status_id)
 		result = (db_sql_result_t *)dbp->conn->result;
 			
 		if(result->rows > 0) {
-			card = (pcard_t *)mem_alloc_arr(result->rows,sizeof(pcard_t));
+			/* rows+1: the trailing zeroed entry (id==0) terminates the array,
+			 * which pcard_manager relies on when it walks 'while(card[i].id)' */
+			card = (pcard_t *)mem_alloc_arr(result->rows + 1,sizeof(pcard_t));
 			if(card == NULL) {
 				//bpt->pcard_i = -1;
 				return -1;
 			}
-			
-			for(i = 0;i < result->rows;i++) {	
+
+			for(i = 0;i < result->rows;i++) {
 				card[i].id = atoi(result->cols_list[0].rows_list[i].row);
 				card[i].amount = atof(result->cols_list[1].rows_list[i].row);
 				strcpy(card[i].start,result->cols_list[2].rows_list[i].row);
@@ -226,9 +228,14 @@ int rt_data_q_pcard_sql(db_t *dbp,bacc_t *bpt,int pcard_status_id)
 				card[i].type = atoi(result->cols_list[5].rows_list[i].row);
 				card[i].call_number = atoi(result->cols_list[6].rows_list[i].row);
 			}
-		
+
 			bpt->pcard_ptr = card;
 			//bpt->pcard_i = i;
+
+			/* cache the raw active-pcard set (cache stores its own copy);
+			 * pcard_manager munges its per-call copy, so only raw data is cached */
+			if(rt_eng.cache != NULL && pcard_status_id == 1 /* pcard_active */)
+				rt_cache_pcard_put(rt_eng.cache,bpt->id,card,result->rows);
 		} //else bpt->pcard_i = -1;
 			
 		db_sql_result_free(result);
@@ -662,17 +669,18 @@ int rt_data_q_racc_sql(db_t *dbp,racc_t *rtp)
 
 	/* check subscriber cache first */
 	if(rt_eng.cache != NULL) {
-		sprintf(cache_key,"%d:%s",rtp->rtm,cond);
-		rt_cache_racc_data_t *cached = rt_cache_racc_get(rt_eng.cache,cache_key);
+		rt_cache_racc_data_t cached;
 
-		if(cached != NULL) {
-			rtp->bacc_ptr->id = cached->bacc_id;
-			rtp->bplan_ptr->id = cached->bplan_id;
-			rtp->bplan_ptr->bplan_start_period = cached->bplan_start_period;
-			rtp->bplan_ptr->bplan_end_period = cached->bplan_end_period;
-			rtp->bacc_ptr->billing_day = cached->billing_day;
-			rtp->bacc_ptr->round_mode_id = cached->round_mode_id;
-			rtp->bacc_ptr->day_of_payment = cached->day_of_payment;
+		sprintf(cache_key,"%d:%s",rtp->rtm,cond);
+
+		if(rt_cache_racc_get(rt_eng.cache,cache_key,&cached)) {
+			rtp->bacc_ptr->id = cached.bacc_id;
+			rtp->bplan_ptr->id = cached.bplan_id;
+			rtp->bplan_ptr->bplan_start_period = cached.bplan_start_period;
+			rtp->bplan_ptr->bplan_end_period = cached.bplan_end_period;
+			rtp->bacc_ptr->billing_day = cached.billing_day;
+			rtp->bacc_ptr->round_mode_id = cached.round_mode_id;
+			rtp->bacc_ptr->day_of_payment = cached.day_of_payment;
 			return DB_OK;
 		}
 	}
@@ -789,8 +797,8 @@ int rt_data_q_tariff_sql(db_t *dbp,racc_t *rtp)
 
 			tr[i].pos = 0;
 
-			/* store in cache */
-			if(rt_eng.cache != NULL) rt_cache_tariff_put(rt_eng.cache,rtp->pre->tariff_id,tr);
+			/* store a copy in cache (cache owns its copy; 'tr' stays owned by this racc) */
+			if(rt_eng.cache != NULL) rt_cache_tariff_put(rt_eng.cache,rtp->pre->tariff_id,tr,result->rows);
 
 			rtp->bplan_ptr->rates_ptr->calc_funcs = tr;
 		}
@@ -895,8 +903,8 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 					rt[i].free_billsec_id = atoi(result->cols_list[6].rows_list[i].row);
 				}
 
-				/* store in cache - cache owns the memory now */
-				if(rt_eng.cache != NULL) rt_cache_rates_put(rt_eng.cache,rtp->bplan_ptr->id,rt);
+				/* store a copy in cache; 'rt' stays owned by this racc (freed by racc_free) */
+				if(rt_eng.cache != NULL) rt_cache_rates_put(rt_eng.cache,rtp->bplan_ptr->id,rt,result->rows);
 			}
 
 			db_sql_result_free(result);

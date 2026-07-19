@@ -55,6 +55,10 @@ typedef struct rate_engine
 
 extern rate_engine_t rt_eng;
 
+/* lazily create the process-wide shared reference cache (rt_eng.cache) once.
+ * Safe to call from any thread (online CC workers, offline rating workers). */
+void rt_cache_ensure(void);
+
 void *RateEngine(void *dt);
 void rt_exec(db_t *dbp,racc_t *rtp,char leg);
 racc_t *rt_racc_voip_av_a(db_t *dbp,rating_t *pre);

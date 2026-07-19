@@ -23,12 +23,69 @@ static unsigned int rt_cache_hash_str(const char *key)
 	return h % RT_CACHE_BUCKETS;
 }
 
+/* entry is usable if it was (re)filled within the last RT_CACHE_TTL seconds */
+static int rt_cache_fresh(time_t ts)
+{
+	return (time(NULL) - ts) <= RT_CACHE_TTL;
+}
+
+/* deep-copy the null-terminated rate array (count real rows + 1 terminator).
+ * calc_funcs is attached later per call, so it is not carried in the copy. */
+static rate_t *rt_cache_rates_dup(rate_t *src,int count)
+{
+	int i;
+	rate_t *dst;
+
+	if(src == NULL || count <= 0) return NULL;
+
+	dst = (rate_t *)mem_alloc_arr(count + 1,sizeof(rate_t));
+	if(dst == NULL) return NULL;
+
+	memcpy(dst,src,count * sizeof(rate_t));
+	for(i = 0; i < count; i++) dst[i].calc_funcs = NULL;
+
+	return dst;
+}
+
+/* deep-copy the null-terminated calc_function array (count rows + 1 terminator) */
+static calc_function_t *rt_cache_calc_dup(calc_function_t *src,int count)
+{
+	calc_function_t *dst;
+
+	if(src == NULL || count <= 0) return NULL;
+
+	dst = (calc_function_t *)mem_alloc_arr(count + 1,sizeof(calc_function_t));
+	if(dst == NULL) return NULL;
+
+	memcpy(dst,src,count * sizeof(calc_function_t));
+
+	return dst;
+}
+
+/* deep-copy the pcard array (count rows + 1 terminator, id==0) */
+static pcard_t *rt_cache_pcard_dup(pcard_t *src,int count)
+{
+	pcard_t *dst;
+
+	if(src == NULL || count <= 0) return NULL;
+
+	dst = (pcard_t *)mem_alloc_arr(count + 1,sizeof(pcard_t));
+	if(dst == NULL) return NULL;
+
+	memcpy(dst,src,count * sizeof(pcard_t));
+
+	return dst;
+}
+
 rt_cache_t *rt_cache_init(void)
 {
 	rt_cache_t *cache;
 
 	cache = (rt_cache_t *)mem_alloc(sizeof(rt_cache_t));
-	if(cache != NULL) memset(cache,0,sizeof(rt_cache_t));
+	if(cache != NULL) {
+		memset(cache,0,sizeof(rt_cache_t));
+		pthread_rwlock_init(&cache->lock,NULL);
+	}
 
 	return cache;
 }
@@ -108,6 +165,8 @@ void rt_cache_free(rt_cache_t *cache)
 		cache->racc_hits,cache->racc_misses,
 		cache->pcard_hits,cache->pcard_misses);
 
+	pthread_rwlock_destroy(&cache->lock);
+
 	mem_free(cache);
 }
 
@@ -117,36 +176,72 @@ rate_t *rt_cache_rates_get(rt_cache_t *cache,unsigned int bplan_id)
 {
 	unsigned int h;
 	rt_cache_rate_entry_t *e;
+	rate_t *copy = NULL;
 
 	if(cache == NULL) return NULL;
 
 	h = rt_cache_hash_int(bplan_id);
-	e = cache->rates[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->rates[h];
 	while(e != NULL) {
-		if(e->bplan_id == bplan_id) { cache->rates_hits++; return e->rates; }
+		if(e->bplan_id == bplan_id) {
+			if(rt_cache_fresh(e->ts)) copy = rt_cache_rates_dup(e->rates,e->count);
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	cache->rates_misses++;
-	return NULL;
+	if(copy != NULL) __atomic_fetch_add(&cache->rates_hits,1,__ATOMIC_RELAXED);
+	else __atomic_fetch_add(&cache->rates_misses,1,__ATOMIC_RELAXED);
+
+	return copy;
 }
 
-void rt_cache_rates_put(rt_cache_t *cache,unsigned int bplan_id,rate_t *rates)
+void rt_cache_rates_put(rt_cache_t *cache,unsigned int bplan_id,rate_t *rates,int count)
 {
 	unsigned int h;
 	rt_cache_rate_entry_t *e;
+	rate_t *copy;
 
-	if(cache == NULL || rates == NULL) return;
+	if(cache == NULL || rates == NULL || count <= 0) return;
+
+	/* copy outside the lock to keep the write section short */
+	copy = rt_cache_rates_dup(rates,count);
+	if(copy == NULL) return;
 
 	h = rt_cache_hash_int(bplan_id);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	/* replace in place if the key already exists (TTL refresh) */
+	for(e = cache->rates[h]; e != NULL; e = e->next) {
+		if(e->bplan_id == bplan_id) {
+			if(e->rates != NULL) mem_free(e->rates);
+			e->rates = copy;
+			e->count = count;
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_rate_entry_t *)mem_alloc(sizeof(rt_cache_rate_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		mem_free(copy);
+		return;
+	}
 
 	e->bplan_id = bplan_id;
-	e->rates = rates;
+	e->rates = copy;
+	e->count = count;
+	e->ts = time(NULL);
 	e->next = cache->rates[h];
 	cache->rates[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- tariff cache ---- */
@@ -155,57 +250,102 @@ calc_function_t *rt_cache_tariff_get(rt_cache_t *cache,unsigned int tariff_id)
 {
 	unsigned int h;
 	rt_cache_tariff_entry_t *e;
+	calc_function_t *copy = NULL;
 
 	if(cache == NULL) return NULL;
 
 	h = rt_cache_hash_int(tariff_id);
-	e = cache->tariffs[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->tariffs[h];
 	while(e != NULL) {
-		if(e->tariff_id == tariff_id) { cache->tariff_hits++; return e->calc_funcs; }
+		if(e->tariff_id == tariff_id) {
+			if(rt_cache_fresh(e->ts)) copy = rt_cache_calc_dup(e->calc_funcs,e->count);
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	cache->tariff_misses++;
-	return NULL;
+	if(copy != NULL) __atomic_fetch_add(&cache->tariff_hits,1,__ATOMIC_RELAXED);
+	else __atomic_fetch_add(&cache->tariff_misses,1,__ATOMIC_RELAXED);
+
+	return copy;
 }
 
-void rt_cache_tariff_put(rt_cache_t *cache,unsigned int tariff_id,calc_function_t *funcs)
+void rt_cache_tariff_put(rt_cache_t *cache,unsigned int tariff_id,calc_function_t *funcs,int count)
 {
 	unsigned int h;
 	rt_cache_tariff_entry_t *e;
+	calc_function_t *copy;
 
-	if(cache == NULL || funcs == NULL) return;
+	if(cache == NULL || funcs == NULL || count <= 0) return;
+
+	copy = rt_cache_calc_dup(funcs,count);
+	if(copy == NULL) return;
 
 	h = rt_cache_hash_int(tariff_id);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	for(e = cache->tariffs[h]; e != NULL; e = e->next) {
+		if(e->tariff_id == tariff_id) {
+			if(e->calc_funcs != NULL) mem_free(e->calc_funcs);
+			e->calc_funcs = copy;
+			e->count = count;
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_tariff_entry_t *)mem_alloc(sizeof(rt_cache_tariff_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		mem_free(copy);
+		return;
+	}
 
 	e->tariff_id = tariff_id;
-	e->calc_funcs = funcs;
+	e->calc_funcs = copy;
+	e->count = count;
+	e->ts = time(NULL);
 	e->next = cache->tariffs[h];
 	cache->tariffs[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- subscriber (racc) cache ---- */
 
-rt_cache_racc_data_t *rt_cache_racc_get(rt_cache_t *cache,const char *key)
+int rt_cache_racc_get(rt_cache_t *cache,const char *key,rt_cache_racc_data_t *out)
 {
 	unsigned int h;
 	rt_cache_racc_entry_t *e;
+	int hit = 0;
 
-	if(cache == NULL || key == NULL) return NULL;
+	if(cache == NULL || key == NULL || out == NULL) return 0;
 
 	h = rt_cache_hash_str(key);
-	e = cache->raccs[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->raccs[h];
 	while(e != NULL) {
-		if(strcmp(e->key,key) == 0) { cache->racc_hits++; return &e->data; }
+		if(strcmp(e->key,key) == 0) {
+			if(rt_cache_fresh(e->ts)) {
+				memcpy(out,&e->data,sizeof(rt_cache_racc_data_t));
+				hit = 1;
+			}
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	cache->racc_misses++;
-	return NULL;
+	if(hit) __atomic_fetch_add(&cache->racc_hits,1,__ATOMIC_RELAXED);
+	else __atomic_fetch_add(&cache->racc_misses,1,__ATOMIC_RELAXED);
+
+	return hit;
 }
 
 void rt_cache_racc_put(rt_cache_t *cache,const char *key,rt_cache_racc_data_t *data)
@@ -216,52 +356,109 @@ void rt_cache_racc_put(rt_cache_t *cache,const char *key,rt_cache_racc_data_t *d
 	if(cache == NULL || key == NULL || data == NULL) return;
 
 	h = rt_cache_hash_str(key);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	for(e = cache->raccs[h]; e != NULL; e = e->next) {
+		if(strcmp(e->key,key) == 0) {
+			memcpy(&e->data,data,sizeof(rt_cache_racc_data_t));
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_racc_entry_t *)mem_alloc(sizeof(rt_cache_racc_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		return;
+	}
 
 	strncpy(e->key,key,sizeof(e->key)-1);
 	memcpy(&e->data,data,sizeof(rt_cache_racc_data_t));
+	e->ts = time(NULL);
 	e->next = cache->raccs[h];
 	cache->raccs[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- pcard cache ---- */
 
-rt_cache_pcard_entry_t *rt_cache_pcard_get(rt_cache_t *cache,unsigned int bacc_id)
+pcard_t *rt_cache_pcard_get(rt_cache_t *cache,unsigned int bacc_id,int *count)
 {
 	unsigned int h;
 	rt_cache_pcard_entry_t *e;
+	pcard_t *copy = NULL;
+	int cnt = 0;
 
 	if(cache == NULL) return NULL;
 
 	h = rt_cache_hash_int(bacc_id);
-	e = cache->pcards[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->pcards[h];
 	while(e != NULL) {
-		if(e->bacc_id == bacc_id) { cache->pcard_hits++; return e; }
+		if(e->bacc_id == bacc_id) {
+			if(rt_cache_fresh(e->ts)) {
+				copy = rt_cache_pcard_dup(e->cards,e->count);
+				cnt = e->count;
+			}
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	cache->pcard_misses++;
-	return NULL;
+	if(copy != NULL) {
+		if(count != NULL) *count = cnt;
+		__atomic_fetch_add(&cache->pcard_hits,1,__ATOMIC_RELAXED);
+	} else __atomic_fetch_add(&cache->pcard_misses,1,__ATOMIC_RELAXED);
+
+	return copy;
 }
 
 void rt_cache_pcard_put(rt_cache_t *cache,unsigned int bacc_id,pcard_t *cards,int count)
 {
 	unsigned int h;
 	rt_cache_pcard_entry_t *e;
+	pcard_t *copy;
 
-	if(cache == NULL) return;
+	if(cache == NULL || cards == NULL || count <= 0) return;
+
+	copy = rt_cache_pcard_dup(cards,count);
+	if(copy == NULL) return;
 
 	h = rt_cache_hash_int(bacc_id);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	for(e = cache->pcards[h]; e != NULL; e = e->next) {
+		if(e->bacc_id == bacc_id) {
+			if(e->cards != NULL) mem_free(e->cards);
+			e->cards = copy;
+			e->count = count;
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_pcard_entry_t *)mem_alloc(sizeof(rt_cache_pcard_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		mem_free(copy);
+		return;
+	}
 
 	e->bacc_id = bacc_id;
-	e->cards = cards;
+	e->cards = copy;
 	e->count = count;
+	e->ts = time(NULL);
 	e->next = cache->pcards[h];
 	cache->pcards[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- time condition cache ---- */
@@ -270,18 +467,24 @@ int rt_cache_tc_get(rt_cache_t *cache,unsigned int tariff_id,int *has_tc)
 {
 	unsigned int h;
 	rt_cache_tc_entry_t *e;
+	int hit = 0;
 
 	if(cache == NULL) return 0;
 
 	h = rt_cache_hash_int(tariff_id);
-	e = cache->tcs[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->tcs[h];
 	while(e != NULL) {
-		if(e->tariff_id == tariff_id) { *has_tc = e->has_tc; return 1; }
+		if(e->tariff_id == tariff_id) {
+			if(rt_cache_fresh(e->ts)) { *has_tc = e->has_tc; hit = 1; }
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	return 0;
+	return hit;
 }
 
 void rt_cache_tc_put(rt_cache_t *cache,unsigned int tariff_id,int has_tc)
@@ -292,13 +495,31 @@ void rt_cache_tc_put(rt_cache_t *cache,unsigned int tariff_id,int has_tc)
 	if(cache == NULL) return;
 
 	h = rt_cache_hash_int(tariff_id);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	for(e = cache->tcs[h]; e != NULL; e = e->next) {
+		if(e->tariff_id == tariff_id) {
+			e->has_tc = has_tc;
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_tc_entry_t *)mem_alloc(sizeof(rt_cache_tc_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		return;
+	}
 
 	e->tariff_id = tariff_id;
 	e->has_tc = has_tc;
+	e->ts = time(NULL);
 	e->next = cache->tcs[h];
 	cache->tcs[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- free billsec limit cache ---- */
@@ -307,18 +528,24 @@ int rt_cache_fbs_get(rt_cache_t *cache,unsigned int tariff_id,int *limit)
 {
 	unsigned int h;
 	rt_cache_fbs_entry_t *e;
+	int hit = 0;
 
 	if(cache == NULL) return 0;
 
 	h = rt_cache_hash_int(tariff_id);
-	e = cache->fbs[h];
 
+	pthread_rwlock_rdlock(&cache->lock);
+	e = cache->fbs[h];
 	while(e != NULL) {
-		if(e->tariff_id == tariff_id) { *limit = e->free_billsec_limit; return 1; }
+		if(e->tariff_id == tariff_id) {
+			if(rt_cache_fresh(e->ts)) { *limit = e->free_billsec_limit; hit = 1; }
+			break;
+		}
 		e = e->next;
 	}
+	pthread_rwlock_unlock(&cache->lock);
 
-	return 0;
+	return hit;
 }
 
 void rt_cache_fbs_put(rt_cache_t *cache,unsigned int tariff_id,int limit)
@@ -329,14 +556,33 @@ void rt_cache_fbs_put(rt_cache_t *cache,unsigned int tariff_id,int limit)
 	if(cache == NULL) return;
 
 	h = rt_cache_hash_int(tariff_id);
+
+	pthread_rwlock_wrlock(&cache->lock);
+
+	for(e = cache->fbs[h]; e != NULL; e = e->next) {
+		if(e->tariff_id == tariff_id) {
+			e->free_billsec_limit = limit;
+			e->queried = 1;
+			e->ts = time(NULL);
+			pthread_rwlock_unlock(&cache->lock);
+			return;
+		}
+	}
+
 	e = (rt_cache_fbs_entry_t *)mem_alloc(sizeof(rt_cache_fbs_entry_t));
-	if(e == NULL) return;
+	if(e == NULL) {
+		pthread_rwlock_unlock(&cache->lock);
+		return;
+	}
 
 	e->tariff_id = tariff_id;
 	e->free_billsec_limit = limit;
 	e->queried = 1;
+	e->ts = time(NULL);
 	e->next = cache->fbs[h];
 	cache->fbs[h] = e;
+
+	pthread_rwlock_unlock(&cache->lock);
 }
 
 /* ---- preload: batch load subscribers from CDR batch ---- */
@@ -367,8 +613,9 @@ int rt_cache_preload_raccs(rt_cache_t *cache,db_t *dbp,char **numbers,int count,
 
 		/* skip if already in cache */
 		char key[128];
+		rt_cache_racc_data_t seen;
 		sprintf(key,"%d:%s",rt_mode_clg,numbers[i]);
-		if(rt_cache_racc_get(cache,key) != NULL) continue;
+		if(rt_cache_racc_get(cache,key,&seen)) continue;
 
 		/* check if already in IN clause (simple dedup) */
 		db_sql_escape(numbers[i],safe,sizeof(safe));
@@ -534,6 +781,7 @@ int rt_cache_preload_pcards(rt_cache_t *cache,db_t *dbp)
 						}
 
 						rt_cache_pcard_put(cache,cur_bacc,cards,cnt);
+						mem_free(cards);   /* put() stores its own copy */
 						loaded++;
 					}
 

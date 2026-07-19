@@ -36,6 +36,10 @@ racc_t *rt_maxsec(db_t *dbp,rating_t *pre,int sim)
 	if(dbp == NULL) return NULL;
 	if(pre == NULL) return NULL;
 
+	/* ensure the shared reference cache exists (online charging otherwise runs
+	 * with rt_eng.cache == NULL and re-queries all static data every call) */
+	rt_cache_ensure();
+
 	/* billing account + bill plan (voip leg-a, online) */
 	rtp = rt_racc_voip_av_a(dbp,pre);
 

@@ -35,14 +35,9 @@ void pcard_manager(db_t *dbp,racc_t *rtp)
     
     /* check pcard cache first */
 	if(rt_eng.cache != NULL) {
-		rt_cache_pcard_entry_t *cached = rt_cache_pcard_get(rt_eng.cache,bpt->id);
-		if(cached != NULL) {
-			/* copy from cache - pcard_manager modifies card data, so we need a copy */
-			if(cached->count > 0 && cached->cards != NULL) {
-				card = (pcard_t *)mem_alloc_arr(cached->count + 1,sizeof(pcard_t));
-				if(card != NULL) memcpy(card,cached->cards,cached->count * sizeof(pcard_t));
-			} else card = NULL;
-
+		/* get() returns an owned copy; pcard_manager munges it below */
+		card = rt_cache_pcard_get(rt_eng.cache,bpt->id,NULL);
+		if(card != NULL) {
 			bpt->pcard_ptr = card;
 			goto pcard_process;
 		}

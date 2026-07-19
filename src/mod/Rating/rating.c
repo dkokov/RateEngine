@@ -692,6 +692,23 @@ void *rt_worker_func(void *arg)
 	return NULL;
 }
 
+/* Lazily create the process-wide shared reference cache exactly once. The
+ * online CallControl worker pool and the offline rating workers all share
+ * rt_eng.cache; it is created on first use and lives for the process lifetime
+ * (entries self-refresh via RT_CACHE_TTL), so no thread frees it out from
+ * under another. */
+void rt_cache_ensure(void)
+{
+	static pthread_mutex_t once_lock = PTHREAD_MUTEX_INITIALIZER;
+
+	pthread_mutex_lock(&once_lock);
+	if(rt_eng.cache == NULL) {
+		rt_eng.cache = rt_cache_init();
+		LOG("rt_cache_ensure()","shared reference cache created (ttl %ds)",RT_CACHE_TTL);
+	}
+	pthread_mutex_unlock(&once_lock);
+}
+
 /* returns number of CDRs processed in this batch */
 int rt_loop(rate_engine_t *rt_eng)
 {
@@ -704,8 +721,9 @@ int rt_loop(rate_engine_t *rt_eng)
     int cc = 0;
 	int num_threads = rt_eng->num_threads;
 
-	/* create cache for this batch cycle */
-	rt_eng->cache = rt_cache_init();
+	/* shared process-wide reference cache (created once, persists across batches;
+	 * entries self-refresh via RT_CACHE_TTL) */
+	rt_cache_ensure();
 
     if(log_debug_level >= LOG_LEVEL_INFO) {
 		gettimeofday(&tim, NULL);
@@ -795,11 +813,7 @@ int rt_loop(rate_engine_t *rt_eng)
 		mem_free(cdrs);
     }
 
-	/* free cache */
-	if(rt_eng->cache != NULL) {
-		rt_cache_free(rt_eng->cache);
-		rt_eng->cache = NULL;
-	}
+	/* cache is shared/persistent (rt_cache_ensure) - not freed per batch */
 
     if(log_debug_level >= LOG_LEVEL_INFO) {
 		gettimeofday(&tim, NULL);

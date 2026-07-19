@@ -63,13 +63,12 @@ void rt_data_racc_free(racc_t *racc_pt)
 		}
 
 		if(racc_pt->bplan_ptr != NULL) {
-			/* rates and calc_funcs may be owned by cache - don't free if cached */
-			if(rt_eng.cache == NULL) {
-				if(racc_pt->bplan_ptr->rates_ptr != NULL) {
-					if(racc_pt->bplan_ptr->rates_ptr->calc_funcs != NULL)
-						mem_free(racc_pt->bplan_ptr->rates_ptr->calc_funcs);
-					mem_free(racc_pt->bplan_ptr->rates_ptr);
-				}
+			/* racc always owns its rates_ptr/calc_funcs: the cache uses
+			 * copy-on-hit, so every call gets an independent copy */
+			if(racc_pt->bplan_ptr->rates_ptr != NULL) {
+				if(racc_pt->bplan_ptr->rates_ptr->calc_funcs != NULL)
+					mem_free(racc_pt->bplan_ptr->rates_ptr->calc_funcs);
+				mem_free(racc_pt->bplan_ptr->rates_ptr);
 			}
 
 			mem_free(racc_pt->bplan_ptr);
