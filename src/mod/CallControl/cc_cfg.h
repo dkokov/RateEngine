@@ -38,6 +38,7 @@ typedef struct cc_cfg {
     
     unsigned int call_maxsec_limit;
     unsigned short sim_calls;
+    unsigned short cc_workers;
     unsigned int cc_server_usleep;
         
     char cc_int_cfg_dir[255];

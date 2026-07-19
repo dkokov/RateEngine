@@ -84,7 +84,7 @@ rating_t *cc_maxsec_pre(cc_t *cc_ptr)
 	return pre;
 }
 
-void cc_maxsec_f(cc_t *cc_ptr)
+void cc_maxsec_f(cc_t *cc_ptr,db_t *dbp)
 {
 	int cc_f,sim;
 
@@ -112,7 +112,7 @@ void cc_maxsec_f(cc_t *cc_ptr)
 
 			/* full online maxsec (pcard + rate + time-conditions + credit
 			 * limit + sim/call-number restriction + shared-pcard split) */
-			rtp = rt_api.maxsec(ccserver.dbp,pre,sim);
+			rtp = rt_api.maxsec(dbp,pre,sim);
 		}
 	}
 
@@ -140,19 +140,23 @@ void cc_maxsec_f(cc_t *cc_ptr)
 	} else cc_ptr->max->maxsec = CC_MAXSEC_NO_PRE;
 }
 
-void cc_balance_f(cc_t *cc_ptr)
+void cc_balance_f(cc_t *cc_ptr,db_t *dbp)
 {
 	int bacc_id;
-	
+
+	(void)dbp;   /* balance event is a stub for now (re-implemented separately) */
+
+	bacc_id = 0;
+
 	if(cc_ptr != NULL) {
 		if(cc_ptr->bal != NULL) {
 //			bacc_id = rt_get_bacc_id(ccserver.conn,"calling_number",cc_ptr->cdr_server_id,cc_ptr->bal->clg);
-		
+
 			if(bacc_id > 0) {
 //				cc_ptr->bal->amount = rt_get_balances(ccserver.conn,bacc_id);
 			}
 		}
-		
+
 		cc_ptr->cc_status = CC_STATUS_DEACTIVE;
 	}
 }
@@ -225,15 +229,15 @@ void cc_term_f(cc_t *cc_ptr)
 	}
 }
 
-void cc_event_manager(cc_t *cc_ptr)
-{	
+void cc_event_manager(cc_t *cc_ptr,db_t *dbp)
+{
 	switch(cc_ptr->t) {
 		case maxsec_event:
-					cc_maxsec_f(cc_ptr);
+					cc_maxsec_f(cc_ptr,dbp);
 					//cc_ptr->max->maxsec = 3662;
 					break;
 		case balance_event:
-					cc_balance_f(cc_ptr);
+					cc_balance_f(cc_ptr,dbp);
 					break;
 		case rate_event:
 					cc_rate_f(cc_ptr);

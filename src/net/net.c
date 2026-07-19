@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "../misc/globals.h"
 #include "../mod/mod.h"
@@ -435,13 +436,154 @@ int net_serial_server(net_t *np,int (*external_func)(char *))
 	return np->api->s_server(np->conn,external_func);	
 }
 
-/* 
- * Parallel Network Server / independent by the proto /;
- * 
- * */
-int net_parallel_server(net_t *np)
+/*
+ * Parallel (worker-pool) network server / independent of the proto /.
+ *
+ * The acceptor (this thread) accepts connections and pushes their fds onto a
+ * bounded blocking queue. 'nworkers' worker threads each run worker_init() once
+ * (per-worker state, e.g. a DB connection) then loop: pop an fd, recv one
+ * message, handler(buf, ctx), send the reply, close. Each worker uses its own
+ * net_conn_t (its fd + own buffer) so workers never share socket/buffer state.
+ */
+
+#define NET_PSRV_QCAP 1024
+
+typedef struct net_job_q {
+	int fds[NET_PSRV_QCAP];
+	int head,tail,count;
+	pthread_mutex_t lock;
+	pthread_cond_t  not_empty;
+	pthread_cond_t  not_full;
+} net_job_q_t;
+
+static void net_job_push(net_job_q_t *q,int fd)
 {
-	
+	pthread_mutex_lock(&q->lock);
+	while(q->count == NET_PSRV_QCAP) pthread_cond_wait(&q->not_full,&q->lock);
+	q->fds[q->tail] = fd;
+	q->tail = (q->tail + 1) % NET_PSRV_QCAP;
+	q->count++;
+	pthread_cond_signal(&q->not_empty);
+	pthread_mutex_unlock(&q->lock);
+}
+
+static int net_job_pop(net_job_q_t *q)
+{
+	int fd;
+
+	pthread_mutex_lock(&q->lock);
+	while(q->count == 0) pthread_cond_wait(&q->not_empty,&q->lock);
+	fd = q->fds[q->head];
+	q->head = (q->head + 1) % NET_PSRV_QCAP;
+	q->count--;
+	pthread_cond_signal(&q->not_full);
+	pthread_mutex_unlock(&q->lock);
+
+	return fd;
+}
+
+typedef struct net_worker_arg {
+	net_t *np;
+	net_job_q_t *q;
+	net_worker_init_f worker_init;
+	net_handler_f handler;
+} net_worker_arg_t;
+
+static void *net_worker_thread(void *arg)
+{
+	net_worker_arg_t *w = (net_worker_arg_t *)arg;
+
+	net_conn_t wc;
+	char *buf;
+	int n,fd;
+	void *ctx;
+
+	/* per-worker state (e.g. a dedicated DB connection) */
+	ctx = (w->worker_init != NULL) ? w->worker_init() : NULL;
+
+	buf = mem_alloc(w->np->conn->buf_size);
+	if(buf == NULL) pthread_exit(NULL);
+
+	while(TRUE) {
+		fd = net_job_pop(w->q);
+		if(fd < 0) break;   /* shutdown sentinel */
+
+		memset(&wc,0,sizeof(wc));
+		wc.t         = client;
+		wc.proto_id  = w->np->conn->proto_id;
+		wc.domain    = w->np->conn->domain;
+		wc.buf_size  = w->np->conn->buf_size;
+		wc.buffer    = buf;
+		wc.newsockfd = fd;
+
+		memset(buf,0,wc.buf_size);
+
+		n = w->np->api->recv_msg(&wc);
+		if(n > 0) {
+			w->handler(wc.buffer,ctx);
+			w->np->api->send_msg(&wc);
+		}
+
+		w->np->api->close(&wc);
+	}
+
+	mem_free(buf);
+	pthread_exit(NULL);
+}
+
+int net_parallel_server(net_t *np,net_worker_init_f worker_init,net_handler_f handler,int nworkers)
+{
+	int i;
+	net_job_q_t q;
+	net_worker_arg_t warg;
+	pthread_t *workers;
+
+	if(np == NULL) return NET_T_POINTER_NUL;
+	if(np->conn == NULL) return NET_T_CONN_POINTER_NUL;
+	if(np->api == NULL) return NET_T_API_POINTER_NUL;
+	if(np->api->accept == NULL) return NET_T_API_ACCEPT_P_NUL;
+	if(np->api->recv_msg == NULL) return NET_T_API_RECV_P_NUL;
+	if(np->api->send_msg == NULL) return NET_T_API_SEND_P_NUL;
+	if(handler == NULL) return NET_T_API_SSERV_P_NUL;
+
+	if(nworkers <= 0) nworkers = 1;
+
+	memset(&q,0,sizeof(q));
+	pthread_mutex_init(&q.lock,NULL);
+	pthread_cond_init(&q.not_empty,NULL);
+	pthread_cond_init(&q.not_full,NULL);
+
+	warg.np          = np;
+	warg.q           = &q;
+	warg.worker_init = worker_init;
+	warg.handler     = handler;
+
+	workers = mem_alloc(nworkers * sizeof(pthread_t));
+	if(workers == NULL) return -1001;
+
+	for(i=0;i<nworkers;i++) pthread_create(&workers[i],NULL,net_worker_thread,&warg);
+
+	LOG("net_parallel_server()","started with %d workers",nworkers);
+
+	/* acceptor loop (this thread) */
+	while(TRUE) {
+		if(np->conn->sockfd <= 0) break;
+
+		if(np->api->accept(np->conn) < 0) break;
+		if(np->conn->newsockfd < 0) break;
+
+		net_job_push(&q,np->conn->newsockfd);
+	}
+
+	/* shutdown: wake workers with sentinels, join, then free */
+	for(i=0;i<nworkers;i++) net_job_push(&q,-1);
+	for(i=0;i<nworkers;i++) pthread_join(workers[i],NULL);
+
+	mem_free(workers);
+	pthread_mutex_destroy(&q.lock);
+	pthread_cond_destroy(&q.not_empty);
+	pthread_cond_destroy(&q.not_full);
+
 	return NET_OK;
 }
 

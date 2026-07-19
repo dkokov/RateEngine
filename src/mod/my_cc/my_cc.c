@@ -441,7 +441,7 @@ int my_cc_mod_init(void)
 	return RE_SUCCESS;
 }
 
-int my_cc_proto_bind(char *buf)
+int my_cc_proto_bind(char *buf,void *ctx)
 {
 	char *data,*readbuf;
 	my_cc_t *my = NULL;
@@ -463,7 +463,7 @@ int my_cc_proto_bind(char *buf)
 
 	if(my != NULL) {
 		if(my->cc_ptr != NULL) {LOG("DEBUG","cmd: %s",my->command);
-			mycc_cc_api.cc_event_m(my->cc_ptr);
+			mycc_cc_api.cc_event_m(my->cc_ptr,(db_t *)ctx);
 
 			data = my_cc_comp_ack(my->cc_ptr);
 				

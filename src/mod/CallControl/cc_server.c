@@ -21,6 +21,7 @@ cc_server_t ccserver;
 cc_server_tbl_t *cc_tbl;
 pthread_mutex_t cc_tbl_lock;
 unsigned short cc_server_sim;
+unsigned short cc_workers;
 rt_funcs_t rt_api;
 
 /* CallControl's own CDRMediator API table (rating.h externs a global 'cdrm_api'
@@ -234,25 +235,55 @@ void *cc_server_proto_bind(char *proto)
 	if(mod_ptr->handle != NULL) {
 		func = mod_find_sim(mod_ptr->handle,funcname);
 	}
-	
-	return func;	
+
+	return func;
+}
+
+/* Per-worker init for net_parallel_server: each worker thread gets its OWN DB
+ * connection so N ratings run concurrently (no shared connection bottleneck).
+ * Returns the db_t* as the opaque ctx passed to the handler on every request. */
+void *cc_worker_init(void)
+{
+	db_t *dbp;
+
+	dbp = db_init();
+	if(dbp == NULL) return NULL;
+
+	dbp->conn = db_conn_init(mcfg->dbtype,mcfg->dbhost,mcfg->dbname,mcfg->dbport,mcfg->dbuser,mcfg->dbpass,0);
+	if(dbp->conn == NULL) { db_free(dbp); return NULL; }
+
+	if(db_engine_bind(dbp) < 0) {
+		LOG("cc_worker_init()","db_engine_bind() ERROR - '%s'",dbp->conn->enginename);
+		db_free(dbp);
+		return NULL;
+	}
+
+	if(db_connect(dbp) < 0) {
+		LOG("cc_worker_init()","db_connect() ERROR - '%s'",dbp->conn->enginename);
+		db_free(dbp);
+		return NULL;
+	}
+
+	LOG("cc_worker_init()","worker DB connection ready");
+
+	return dbp;
 }
 
 void *cc_server_thread_int(void *dt)
 {
 	int ret;
 	void *func;
-	
+
 	net_t *np;
-	int (*external_func)(char *);
+	net_handler_f external_func;
 	cc_cfg_int_t *cc_int = (cc_cfg_int_t *)dt;
-	
+
 	/* CallControl protocol init */
 	func = cc_server_proto_bind(cc_int->cc_proto);
 
 	if(func != NULL) {
-		external_func = func;
-		
+		external_func = (net_handler_f)func;
+
 		LOG("cc_server_thread_int()","cc_server_proto_bind() for '%s'",cc_int->cc_proto);
 	} else {
 		LOG("cc_server_thread_int()","cc_server_proto_bind() ERROR for '%s'",cc_int->cc_proto);
@@ -296,8 +327,9 @@ void *cc_server_thread_int(void *dt)
 	if(net_listen(np->conn) < 0) goto _end;
 
 	LOG("cc_server_thread_int()","net_listen() success");
-	
-	ret = net_serial_server(np,external_func);
+
+	/* pooled server: N workers, each with its own DB connection (cc_worker_init) */
+	ret = net_parallel_server(np,cc_worker_init,external_func,cc_workers);
 	
 _end:
 	LOG("cc_server_thread_int()","_end , ret: %d",ret);
@@ -497,6 +529,11 @@ void *cc_server_main(void *dt)
 		if(cfg->sim_calls > 0) sim_calls = cfg->sim_calls;
 		else sim_calls = SIM_CALLS;
 
+		if(cfg->cc_workers > 0) cc_workers = cfg->cc_workers;
+		else cc_workers = CC_WORKERS;
+
+		/* ccserver.dbp is the JANITOR thread's dedicated connection (term-time
+		 * rating + CDR insert); interface workers get their own via cc_worker_init */
 		ccserver.dbp = db_init();
 		ccserver.dbp->conn = db_conn_init(mcfg->dbtype,mcfg->dbhost,mcfg->dbname,mcfg->dbport,mcfg->dbuser,mcfg->dbpass,0);
 		

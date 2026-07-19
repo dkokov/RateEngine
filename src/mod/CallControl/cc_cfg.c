@@ -146,7 +146,11 @@ void cc_cfg_get(cc_cfg_t *cfg)
 			if(strcmp(params->name,"SimCalls") == 0) {
 				cfg->sim_calls = atoi(params->value);
 			}
-			
+
+			if(strcmp(params->name,"CCWorkers") == 0) {
+				cfg->cc_workers = atoi(params->value);
+			}
+
 			if(strcmp(params->name,"CCServerMicroSleep") == 0) {
 				cfg->cc_server_usleep = atoi(params->value);
 			}

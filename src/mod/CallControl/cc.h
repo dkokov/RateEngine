@@ -1,6 +1,8 @@
 #ifndef CC_H
 #define CC_H
 
+#include "../../db/db.h"
+
 #define CC_MAXSEC_NO_BACC   -1
 #define CC_MAXSEC_NO_BPLAN  -2
 #define CC_MAXSEC_NO_PCARD  -3
@@ -115,11 +117,11 @@ typedef struct cc {
 
 #define CC_SLEEP 5000
 
-void cc_maxsec_f(cc_t *cc_ptr);
+void cc_maxsec_f(cc_t *cc_ptr,db_t *dbp);
 void cc_term_f(cc_t *cc_ptr);
-void cc_balance_f(cc_t *cc_ptr);
+void cc_balance_f(cc_t *cc_ptr,db_t *dbp);
 
-void cc_event_manager(cc_t *cc_ptr);
+void cc_event_manager(cc_t *cc_ptr,db_t *dbp);
 void cc_call_rating(cc_t *ptr,racc_t *rtp);
 cc_t *cc_alloc(void);
 void cc_free(cc_t *cc_ptr);

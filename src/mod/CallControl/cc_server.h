@@ -37,6 +37,10 @@ extern unsigned short cc_server_sim;
 #define CALL_MAXSEC_LIMIT_WAIT 90
 #define SIM_CALLS 50
 
+/* worker-pool size for the parallel CallControl server (per interface) */
+#define CC_WORKERS 8
+extern unsigned short cc_workers;
+
 extern rt_funcs_t rt_api;
 
 #endif 

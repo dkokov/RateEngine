@@ -123,6 +123,13 @@ typedef int  (*net_remote_conn_f) (net_conn_t *conn);
 
 typedef int  (*net_s_server_f) (net_conn_t *conn,int (*external_func)(char *));
 
+/* Parallel (worker-pool) server hooks:
+ * - net_worker_init_f : per-worker setup, run once per worker thread; returns an
+ *   opaque ctx (e.g. a DB connection) handed to the handler on every request.
+ * - net_handler_f     : request handler; reads/processes/writes buffer, gets ctx. */
+typedef void *(*net_worker_init_f)(void);
+typedef int   (*net_handler_f)(char *buf,void *ctx);
+
 
 typedef struct net_funcs {
 	net_open_f        open;
@@ -162,6 +169,7 @@ int net_listen(net_conn_t *conn);
 
 int net_proto_bind(net_t *np);
 int net_serial_server(net_t *np,int (*external_func)(char *));
+int net_parallel_server(net_t *np,net_worker_init_f worker_init,net_handler_f handler,int nworkers);
 
 void net_test(void);
 
