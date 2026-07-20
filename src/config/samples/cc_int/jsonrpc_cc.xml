@@ -1,0 +1,15 @@
+<Interface>
+ <config>
+    <!-- CallControl session/application protocol.
+         The value must match the module base name: cc_server resolves
+         "<CC-proto>.so" and the symbol "<CC-proto>_proto_bind".
+         jsonrpc_cc -> jsonrpc_cc.so / jsonrpc_cc_proto_bind -->
+    <param name="CC-proto" value="jsonrpc_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tcp" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
+    <param name="ip" value="" />
+    <param name="port" value="9091" />
+ </config>
+</Interface>

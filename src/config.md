@@ -12,5 +12,5 @@ mod/tcp
 #mod/sctp
 #mod/tls
 mod/my_cc
-#mod/jsonrpc_cc
+mod/jsonrpc_cc
 #mod/jsonrpc_rt

@@ -62,9 +62,9 @@ typedef struct jsonrpc_errors {
 } jsonrpc_errors_t;
 
 typedef enum jsonrpc_type {
-	request  = JSONRPC_TYPE_REQUEST,
-	response = JSONRPC_TYPE_RESPONSE,
-	error    = JSONRPC_TYPE_ERROR
+	jrpc_request  = JSONRPC_TYPE_REQUEST,
+	jrpc_response = JSONRPC_TYPE_RESPONSE,
+	jrpc_error    = JSONRPC_TYPE_ERROR
 } jsonrpc_type_t;
 
 typedef struct jsonrpc_proto_type {

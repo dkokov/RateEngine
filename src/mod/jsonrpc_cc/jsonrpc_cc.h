@@ -23,6 +23,17 @@
 #define JSONRPC_CC_SRV_STATE    "state"
 #define JSONRPC_CC_SRV_STATUS   "status"
 
+/* term clear codes (request "status" param) - same set as my_cc */
+#define JSONRPC_CC_TERM_NC "nc"   /* normal clear */
+#define JSONRPC_CC_TERM_C  "c"    /* cancel */
+#define JSONRPC_CC_TERM_B  "b"    /* busy */
+#define JSONRPC_CC_TERM_E  "e"    /* error */
+
+/* response literals */
+#define JSONRPC_CC_OK     "ok"
+#define JSONRPC_CC_NOK    "nok"
+#define JSONRPC_CC_IDLE   "idle"
+
 /* JSON-RPC CallControl errors: -50...-59 */
 #define JSONRPC_CC_ERR_P_NUL       -50
 #define JSONRPC_CC_ERR_MAX_NUL     -51
@@ -32,6 +43,7 @@
 
 #define JSONRPC_CC_ERR_EVENT_UNKN  -59
 
-//cc_funcs_t jsonrpc_cc_api;
+int jsonrpc_cc_mod_init(void);
+int jsonrpc_cc_proto_bind(char *buf,void *ctx);
 
 #endif
