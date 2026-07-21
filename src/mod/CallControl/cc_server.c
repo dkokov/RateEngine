@@ -439,10 +439,8 @@ void cc_server_thread_run(proc_thread_t *proc)
 
 int cc_server_cdrm_init(void)
 {
-	int ret;
-	void *func;
+	cdr_funcs_t *api;
 	mod_t *mod_ptr;
-	int (*fptr)(cdr_funcs_t *);
 
 	memset(&cc_cdrm_api,0,sizeof(cdr_funcs_t));
 
@@ -450,19 +448,20 @@ int cc_server_cdrm_init(void)
 
 	if(mod_ptr == NULL) return RE_ERROR_N;
 	if(mod_ptr->handle == NULL) return RE_ERROR_N;
-	
-	func = mod_find_sim(mod_ptr->handle,"cdr_bind_api");
-	if(func != NULL) {
-		fptr = func;
-			
-		ret = fptr(&cc_cdrm_api);
-		if(ret < 0) {
-			LOG("cc_server_cdr_init()","cdr_bind_api(),ret: %d",ret);
-			return RE_ERROR_N;
-		}
+
+	/* CDRMediator exports the 'cdrm_api' struct directly (the same symbol the
+	 * Rating module binds); there is no cdr_bind_api() function. Resolving the
+	 * wrong symbol left cc_cdrm_api zeroed, so cc_cdrm_api.add_cdr was NULL and
+	 * the first normal-clear term (janitor -> cc_server_add_cdr) crashed. */
+	api = (cdr_funcs_t *)mod_find_sim(mod_ptr->handle,"cdrm_api");
+	if(api == NULL) {
+		LOG("cc_server_cdrm_init()","struct 'cdrm_api' is not ready!");
+		return RE_ERROR_N;
 	}
 
-	return RE_SUCCESS;	
+	cc_cdrm_api = *api;
+
+	return RE_SUCCESS;
 }
 
 int cc_server_rt_init(void)
