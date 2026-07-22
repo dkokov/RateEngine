@@ -855,6 +855,16 @@ int rt_data_q_rate_sql(db_t *dbp,racc_t *rtp)
 
 	rt = NULL;
 
+	/* re-rating the same racc (CallControl: rate-searched once at maxsec and
+	 * again at term) would overwrite the previous rates copy and leak it. This
+	 * racc always owns its rates_ptr/calc_funcs (copy-on-hit), so free it first. */
+	if(rtp->bplan_ptr != NULL && rtp->bplan_ptr->rates_ptr != NULL) {
+		if(rtp->bplan_ptr->rates_ptr->calc_funcs != NULL)
+			mem_free(rtp->bplan_ptr->rates_ptr->calc_funcs);
+		mem_free(rtp->bplan_ptr->rates_ptr);
+		rtp->bplan_ptr->rates_ptr = NULL;
+	}
+
 	/* check cache first */
 	if(rt_eng.cache != NULL) {
 		rt = rt_cache_rates_get(rt_eng.cache,rtp->bplan_ptr->id);

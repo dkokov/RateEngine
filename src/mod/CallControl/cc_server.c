@@ -159,8 +159,10 @@ void cc_server_add_cdr(cc_server_tbl_t *tbl)
 		/* copy 'duration' from 'struct term' to 'struct cdr' */
 		cdr_pt.duration = tbl->cc_ptr->term->duration;
 				
-		/* insert 'no complete' cdr in DB */
-		if(cc_cdrm_api.add_cdr(ccserver.dbp,&cdr_pt,NULL))
+		/* insert 'no complete' cdr in DB. add_cdr returns DB_OK(0) on success
+		 * (negative on error), so test against DB_OK - the old truthy test read
+		 * every successful insert as a failure and skipped term-time rating. */
+		if(cc_cdrm_api.add_cdr(ccserver.dbp,&cdr_pt,NULL) == DB_OK)
 			tbl->rtp->pre->cdr_id = cc_cdrm_api.get_cdr_id(ccserver.dbp,&cdr_pt);
 		else tbl->rtp->pre->cdr_id = 0;
 	}	
