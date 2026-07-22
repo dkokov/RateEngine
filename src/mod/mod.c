@@ -26,11 +26,13 @@ void mod_free(void)
 
 	while(mod_lst != NULL) {
 		curr = mod_lst;
+		mod_lst = mod_lst->next;   /* advance BEFORE freeing: reading curr->next
+		                              after mem_free(curr) is a use-after-free
+		                              that crashed shutdown once the freed block
+		                              got reused */
 
 		LOG("mod_free()","module '%s',free memory from the HEAP",curr->mod_name);
 		mem_free(curr);
-		
-		mod_lst = mod_lst->next;
 	}
 }
 
