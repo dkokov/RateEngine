@@ -24,6 +24,7 @@ cdr_funcs_t *cdrm_api;
  
 int rt_init(void);
 int rt_free(void);
+int rt_mod_init(void);
 
 mod_dep_t rt_mod_dep[] = {
 	{"cdrm.so",0,1},
@@ -33,12 +34,64 @@ mod_dep_t rt_mod_dep[] = {
 mod_t rt_mod_t = {
 	.mod_name = "Rating",
 	.ver      = 1,
-	.init     = NULL,
+	/* module init runs at load (after .depends are confirmed loaded): it binds
+	 * the cdrm.so dependency into cdrm_api. This must NOT wait for the rating
+	 * engine to start, because CallControl drives rt_exec() for online term
+	 * rating without ever starting rt.so's engine. */
+	.init     = rt_mod_init,
 	.destroy  = NULL,
 	.depends  = rt_mod_dep,
 	.handle   = NULL,
 	.next     = NULL
 };
+
+/* Module init, run by the loader at load time (after .depends are confirmed):
+ *  1) bind the cdrm.so dependency into cdrm_api;
+ *  2) load the online-relevant Rating config into rt_eng.
+ * Both are otherwise only done at engine start (rt_init/RateEngine). When
+ * CallControl drives rt.so for online charging while the batch rater is a
+ * different module (rt_duckdb.so), rt.so's engine never runs - leaving
+ * cdrm_api NULL (term crash) and rt_eng.bal_num 0, which makes the unpaid-
+ * balance limit wrongly block a pcard at 2 active balances instead of the
+ * configured BalActiveNum (RT_BAL_NUM). Idempotent; also called from rt_init(). */
+int rt_mod_init(void)
+{
+	mod_t *mod_ptr;
+	rt_cfg_t *cfg;
+
+	if(cdrm_api == NULL) {
+		mod_ptr = mod_find_module(rt_mod_dep[0].dep_mod_name);
+		if(mod_ptr == NULL || mod_ptr->handle == NULL) {
+			LOG("rt_mod_init()","dependency '%s' not loaded (check LoadModules order)",rt_mod_dep[0].dep_mod_name);
+			return RE_ERROR_N;
+		}
+
+		cdrm_api = (cdr_funcs_t *)mod_find_sim(mod_ptr->handle,"cdrm_api");
+		if(cdrm_api == NULL) {
+			LOG("rt_mod_init()","ERROR! struct 'cdrm_api' is not ready!");
+			return RE_ERROR_N;
+		}
+	}
+
+	/* online billing params (rt_mod_init runs at module load, before the engine,
+	 * so bal_num==0 is the load-once trigger). rt_cfg_params_init() has already
+	 * applied the K_LIMIT_MIN default to cfg->k_limit_min. k_limit_min gates the
+	 * shared-pcard credit split in rt_maxsec(); it was previously left 0 on every
+	 * path because nothing propagated it from config. */
+	if(rt_eng.bal_num == 0) {
+		cfg = rt_cfg_main(mcfg->cfg_filename);
+		if(cfg != NULL) {
+			rt_eng.bal_num = (cfg->bal_num > 0) ? cfg->bal_num : RT_BAL_NUM;
+			k_limit_min    = cfg->k_limit_min;
+			mem_free(cfg);
+		} else {
+			rt_eng.bal_num = RT_BAL_NUM;
+			k_limit_min    = K_LIMIT_MIN;
+		}
+	}
+
+	return RE_SUCCESS;
+}
 
 void rt_rating_init(rating_t *pre)
 {
@@ -829,19 +882,9 @@ int rt_loop(rate_engine_t *rt_eng)
 
 int rt_init(void)
 {
-	mod_t *mod_ptr;
-
-	mod_ptr = mod_find_module(rt_mod_dep[0].dep_mod_name);
-
-	if(mod_ptr == NULL) return -1;
-	if(mod_ptr->handle == NULL) return -2;
-	
-	cdrm_api = (cdr_funcs_t *)mod_find_sim(mod_ptr->handle,"cdrm_api");
-	if(cdrm_api == NULL) {
-		LOG("rt_init()","ERROR! struct 'cdrm_api' is not ready!");
-		
-		return -3;
-	}
+	/* dependency (cdrm_api) is normally bound at module load via rt_mod_init();
+	 * call it here too so the engine path is self-sufficient (idempotent). */
+	if(rt_mod_init() < 0) return -3;
 
 	memset(&rt_eng,0,sizeof(rate_engine_t));
 	

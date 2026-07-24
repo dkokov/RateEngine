@@ -63,12 +63,19 @@ int rating_action(void)
 	rt_funcs_t api;
 	int (*fptr)(rt_funcs_t *);
 
-	mod_ptr = mod_find_module("rt.so");
-	
+	/* offline batch rating backend is config-selectable (<Rating> RatingModule,
+	 * default rt.so). Lets RatingDuckDB (rt_duckdb.so) do batch rating while
+	 * CallControl keeps binding rt.so for online charging. */
+	char *rt_mod = (mcfg != NULL && strlen(mcfg->rating_module) > 0) ? mcfg->rating_module : "rt.so";
+
+	mod_ptr = mod_find_module(rt_mod);
+
 	if((mod_ptr == NULL)||(mod_ptr->handle == NULL)) {
-		LOG("rating_action()","ERROR!The module 'rt.so' is not find!");
+		LOG("rating_action()","ERROR! The rating module '%s' is not found!",rt_mod);
 		return RE_ERROR;
 	}
+
+	LOG("rating_action()","offline batch rating engine: %s",rt_mod);
 	
 	memset(&api,0,sizeof(rt_funcs_t));
 

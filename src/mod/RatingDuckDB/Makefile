@@ -1,11 +1,13 @@
 include ../../config.mk
 
-MOD_NAME = rt
+MOD_NAME = rt_duckdb
 
-# RatingDuckDB - analytical batch rating (produces rt.so, drop-in for Rating).
-# DuckDB is now reached through the db_duckdb engine (duckdb.so), so this
-# module no longer links libduckdb directly. It requires duckdb.so to be
-# built/installed and loaded at runtime.
+# RatingDuckDB - analytical batch rating (produces rt_duckdb.so). It runs
+# side by side with the Rating module (rt.so): CallControl binds rt.so for
+# online charging, while the offline batch rater is selected by the core
+# <Rating> RatingModule config param (default rt.so, set rt_duckdb.so to use
+# this engine). DuckDB is reached through the db_duckdb engine (duckdb.so),
+# which must be built/installed and loaded at runtime.
 MOD_LIB = $(MOD_NAME).so
 
 MOD_SRC = rating_duckdb.c rt_duckdb.c

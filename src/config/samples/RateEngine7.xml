@@ -8,6 +8,10 @@
     <param name="module" value="pgsql.so" />
     <param name="module" value="cdrm.so" />
     <param name="module" value="rt.so" />
+    <!-- RatingDuckDB: analytical batch rater. Load it (alongside rt.so) only
+         if <Rating> RatingModule is set to rt_duckdb.so. Requires duckdb.so. -->
+    <!-- <param name="module" value="duckdb.so" /> -->
+    <!-- <param name="module" value="rt_duckdb.so" /> -->
  </LoadModules>
  <DB>
     <!-- pgsql,mysql,redis -->
@@ -41,6 +45,11 @@
  </CallControl>
  <Rating>
     <param name="active" value="yes" />
+    <!-- Offline batch rating backend module. Default rt.so (the Rating engine).
+         Set rt_duckdb.so to use the DuckDB analytical batch rater instead;
+         CallControl always binds rt.so for online charging regardless. The
+         chosen module must be listed in <LoadModules> above. -->
+    <!-- <param name="RatingModule" value="rt_duckdb.so" /> -->
     <param name="leg" value="a" />
     <!-- <param name="NoPrefixRating" value="&" /> -->
     <!-- in seconds -->

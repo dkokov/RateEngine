@@ -34,7 +34,9 @@ mod_dep_t rt_mod_dep[] = {
 	{"",0,0}
 };
 
-mod_t rt_mod_t = {
+/* descriptor symbol must be "<module-file>_mod_t" (mod_load_modules derives it
+ * from the .so name); this module is rt_duckdb.so, so it is rt_duckdb_mod_t. */
+mod_t rt_duckdb_mod_t = {
 	.mod_name = "RatingDuckDB",
 	.ver      = 1,
 	.init     = NULL,
