@@ -25,9 +25,15 @@ int append_free_billsec(rating_t *pre)
 		
 		if(free_billsec > 0) {
 			if(checksec > free_billsec)	return 1 ;
-		
-			cprice = ((cprice) * (-1));
-			pre->cprice = cprice;
+
+			/* mark a free-billsec-covered call by negating its price. Guard
+			 * against zero: -0.0 is not < 0, so negating a 0-fee price yields a
+			 * bogus -0.000000 that the 'call_price < 0' free-billsec tracking
+			 * query never matches. */
+			if(cprice != 0) {
+				cprice = ((cprice) * (-1));
+				pre->cprice = cprice;
+			}
 		}
     }
     
