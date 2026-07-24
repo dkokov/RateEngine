@@ -19,12 +19,19 @@ If you want to use same module,should be defined first here!
 ``` XML
  <LoadModules>
     <param name="module" value="pgsql.so" />
-    <!-- DuckDB engine for the RatingDuckDB module; load before rt.so -->
+    <!-- DuckDB engine for the RatingDuckDB module -->
     <param name="module" value="duckdb.so" />
-    <param name="module" value="mysql.so" />
-    <param name="module" value="redis.so" />
+    <!-- dependencies first: cdrm.so before the rating modules -->
     <param name="module" value="cdrm.so" />
+    <!-- offline batch rater; depends on cdrm.so + duckdb.so (loaded above) -->
+    <param name="module" value="rt_duckdb.so" />
+    <!-- online charging for CallControl; always load when CallControl is active -->
     <param name="module" value="rt.so" />
+    <!-- transport + CallControl + protocol codecs -->
+    <param name="module" value="tcp.so" />
+    <param name="module" value="cc.so" />
+    <param name="module" value="my_cc.so" />
+    <param name="module" value="jsonrpc_cc.so" />
  </LoadModules>
 ```
 
@@ -65,7 +72,13 @@ Last is the path to CallControl interface profiles.
     <!-- Sim calls -->
     <param name="SimCalls" value="30000" />
 
-    <!-- Interface Configuration Directory - config per protocol/interface -->
+    <!-- worker threads per interface (parallel request handling); default 8.
+         Each worker holds its own DB connection. -->
+    <param name="CCWorkers" value="8" />
+
+    <!-- Interface Configuration Directory - config per protocol/interface.
+         Each interface file selects a transport (tcp) and a codec
+         (my_cc or jsonrpc_cc) on its own port. -->
     <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
  </CallControl>
 ```
@@ -75,14 +88,32 @@ Last is the path to CallControl interface profiles.
 
 The **'Rating'** section configures the rating engine.
 
-RateEngine ships two interchangeable rating modules - **both build to `rt.so`**,
-so you load `rt.so` either way and choose which one to build in `config.md`:
+RateEngine ships two rating modules that build to **separate** `.so` files and
+can run **side by side**:
 
-* **RatingDuckDB** (`mod/RatingDuckDB`) - analytical *batch* rating with an
-  embedded DuckDB engine. The current default. Rates thousands of CDRs per
+* **Rating** (`mod/Rating` -> `rt.so`) - the classic per-CDR engine (15-20 SQL
+  queries per call, backed by a shared reference cache). It also provides the
+  **online** charging used by CallControl (`maxsec` / term-time rating), so
+  **`rt.so` must always be loaded** whenever CallControl is active.
+* **RatingDuckDB** (`mod/RatingDuckDB` -> `rt_duckdb.so`) - analytical *batch*
+  rating with an embedded DuckDB engine. Rates tens of thousands of CDRs per
   cycle in one set of analytical queries; needs the `duckdb.so` engine module.
-* **Rating** (`mod/Rating`) - the classic per-CDR engine (15-20 SQL queries
-  per call). Its parameters are kept further below for reference.
+
+Which module runs the **offline batch** rater is chosen with the **`RatingModule`**
+parameter (default `rt.so`). A typical split is: `rt.so` for CallControl online
+charging + `rt_duckdb.so` for the offline batch.
+
+``` XML
+ <Rating>
+    <!-- offline batch rating engine: rt.so (default) or rt_duckdb.so -->
+    <param name="RatingModule" value="rt_duckdb.so" />
+    ...
+ </Rating>
+```
+
+> **LoadModules order matters:** a module's dependencies must be loaded before
+> it. `rt_duckdb.so` depends on `cdrm.so` and `duckdb.so`, and `rt.so` depends
+> on `cdrm.so` - list `cdrm.so` (and `duckdb.so`) **before** the rating modules.
 
 **RatingDuckDB parameters:**
 

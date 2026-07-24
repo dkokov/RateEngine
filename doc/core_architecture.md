@@ -92,17 +92,23 @@ paths, prefer **pre-allocated pools** (`mem_alloc_arr`) over alloc/free churn.
 Vtable model: `net_t = { net_conn_t *conn, net_funcs_t *api }`.
 `net_proto_bind(np)` dlopens `<proto>.so` and calls `<proto>_bind_api` to fill the
 `net_funcs_t` vtable (`open/close/accept/listen/recv/send/status/connect/s_server`).
-`net_serial_server()` just delegates to `api->s_server`.
+`net_serial_server()` just delegates to `api->s_server`. `net_parallel_server()`
+is the concurrent variant: an acceptor loop hands each accepted fd to a fixed pool
+of worker threads (bounded blocking queue). Each worker runs a one-time
+`worker_init()` (returning an opaque per-worker context, e.g. a DB connection)
+and then, per request, `handler(buffer, ctx)`; workers never share socket/buffer
+state. CallControl uses this (see `CCWorkers`).
 
 **Rules**
 - Do all networking through `net_t` + the vtable — never raw sockets in a module.
 - IP version type is **`net_dom_t`** (`ipv4`/`ipv6`/`loc`); the connection field is
   **`conn->domain`** (not `ipv`). `net_listen(net_conn_t *conn)` takes the conn.
 - Add a transport = a new module implementing `<proto>_bind_api`. This is the extension
-  seam; concurrency (e.g. a parallel/pooled server) belongs at the net level so all
-  transports inherit it (`net_parallel_server` is a stub awaiting implementation).
-- The `s_server` contract: `external_func(char *buffer)` reads the request from `buffer`,
-  processes, and writes the reply back into the same `buffer`.
+  seam; concurrency lives at the net level (`net_parallel_server`) so all transports
+  inherit it.
+- The handler contract (both servers): `handler(char *buffer, void *ctx)` reads the
+  request from `buffer`, processes, and writes the reply back into the same `buffer`
+  (`ctx` is the per-worker context for the parallel server; NULL for the serial one).
 - Status: **tcp** and **udp** work; **tls** is incomplete; **sctp** is a stub.
 
 ---
@@ -148,7 +154,11 @@ db_close(dbp); db_free(dbp);
   `xml_cfg_params_get(root, node)` reads `<param name= value=>` children into a linked
   list of `xml_param_t`; `xml_cfg_child_get()` handles repeated child nodes.
 - **`main_cfg`** — parses the top-level `RateEngine7.xml` into `main_cfg_t` (db creds,
-  logs, retries, daemon flag), exposed globally as **`mcfg`**.
+  logs, retries, daemon flag, `RatingModule`), exposed globally as **`mcfg`**.
+- **libxml2 is not thread-safe by default.** `main_cfg_main()` calls `xmlInitParser()`
+  once, on the main thread, before any subsystem threads start; and `xml_cfg_free_doc()`
+  must **not** call `xmlCleanupParser()` (it destroys global state — a per-free cleanup
+  raced concurrent parses in CallControl / rating / CDRMediator and crashed startup).
 
 **Rule/pattern:** each module ships its own `<mod>_cfg.c` that uses the `xml_cfg_*`
 helpers to parse its own config section into its own struct (see
@@ -224,7 +234,14 @@ channel for live metrics — e.g. the concurrent-call count a shared-pcard split
 6. **Config:** own `<mod>_cfg` via `xml_cfg_*`; globals from `mcfg`.
 7. **Logging:** `LOG()` / `DBG()`.
 8. **Cross-module:** bind function tables via `mod_find_func("<mod>_bind_api")`.
-9. **Return codes:** `RE_SUCCESS` (0) / `RE_ERROR` (1) / `RE_ERROR_N` (-1).
+9. **Module descriptor:** export a `mod_t` named **`<sofile>_mod_t`** (the loader derives
+   the symbol from the `.so` filename — `rt.so` -> `rt_mod_t`, `rt_duckdb.so` ->
+   `rt_duckdb_mod_t`). Declare cross-module needs in `.depends`, and bind them in the
+   descriptor's **`.init`** (run at load, after deps are confirmed) — do **not** defer
+   dependency binding to engine start, or a module used without its engine (e.g. `rt.so`
+   driven by CallControl for online charging) will have NULL API pointers. `.depends`
+   requires the dependency to appear **earlier** in `<LoadModules>`.
+10. **Return codes:** `RE_SUCCESS` (0) / `RE_ERROR` (1) / `RE_ERROR_N` (-1).
 
 ## Build & known gotchas
 
