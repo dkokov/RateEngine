@@ -115,6 +115,36 @@ void main_cfg_logs_get(main_cfg_t *cfg)
 	xml_cfg_params_free(cfg->node->params);
 }
 
+/* Read only the core-relevant param from <Rating>: which module runs the
+ * offline batch rater. The Rating module still parses the rest of <Rating>
+ * (leg, batch limit, pcard/billing options) for its own engine. */
+void main_cfg_rating_get(main_cfg_t *cfg)
+{
+	xml_param_t *params = NULL;
+
+	/* default: the Rating module itself does batch rating */
+	strcpy(cfg->rating_module,"rt.so");
+
+	strcpy(cfg->node->node_name,"Rating");
+
+	xml_cfg_params_get(cfg->root,cfg->node);
+
+	params = cfg->node->params;
+
+	while(params != NULL) {
+		if(strcmp(params->name,"RatingModule") == 0) {
+			if(strlen(params->value) > 0) {
+				strncpy(cfg->rating_module,params->value,sizeof(cfg->rating_module)-1);
+				cfg->rating_module[sizeof(cfg->rating_module)-1] = '\0';
+			}
+		}
+
+		params = params->next_param;
+	}
+
+	xml_cfg_params_free(cfg->node->params);
+}
+
 void main_cfg_view(main_cfg_t *cfg)
 {
 	if(cfg != NULL) {
@@ -128,7 +158,14 @@ void main_cfg_view(main_cfg_t *cfg)
 main_cfg_t *main_cfg_main(char *cfg_filename)
 {
 	main_cfg_t *cfg;
-	
+
+	/* Initialise libxml2 once, here on the main thread, before any config XML
+	 * is parsed and before subsystem threads start. libxml2 is not thread-safe
+	 * without this: CallControl, the rating engine and CDRMediator parse config
+	 * concurrently at startup, and the lazy global init would otherwise race.
+	 * (Paired with the removal of the per-free xmlCleanupParser().) */
+	xmlInitParser();
+
 	cfg = main_cfg_init();
 	
 	if(cfg != NULL) {
@@ -151,7 +188,10 @@ main_cfg_t *main_cfg_main(char *cfg_filename)
 		
 					/* Logs */
 					main_cfg_logs_get(cfg);
-		
+
+					/* offline batch rating backend selector */
+					main_cfg_rating_get(cfg);
+
 					mem_free(cfg->node);
 				}
 			}

@@ -155,8 +155,13 @@ xml_param_t *xml_cfg_param_get(char *search)
 void xml_cfg_free_doc(xmlDoc *doc)
 {
 	xmlFreeDoc(doc);
-	
-	xmlCleanupParser();
+
+	/* Do NOT call xmlCleanupParser() here: it tears down libxml2's global
+	 * state and must never run while another thread is parsing. CallControl,
+	 * the rating engine and CDRMediator all parse config XML concurrently, so
+	 * a per-free cleanup raced with a concurrent xmlReadFile() and crashed the
+	 * daemon at startup. libxml2 is initialised once via xmlInitParser() in
+	 * main(); global cleanup is left to process exit. */
 }
 
 int xml_cfg_child_get(xmlNode *root,xml_node_t *node)

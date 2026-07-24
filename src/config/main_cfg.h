@@ -31,11 +31,16 @@ typedef struct main_cfg {
     unsigned int log_max_file_size;
 	
 	unsigned short daemon_flag;
-	
+
 	/* Reconnection params for DBs */
 	unsigned short num_retries;
 	unsigned short int_retries;
-}main_cfg_t; 
+
+	/* offline batch rating backend module (<Rating> RatingModule);
+	 * default "rt.so" (Rating). Set "rt_duckdb.so" to run the DuckDB batch
+	 * rater instead - CallControl still binds rt.so for online charging. */
+	char rating_module[64];
+}main_cfg_t;
 
 main_cfg_t *main_cfg_main(char *cfg_filename);
 void main_cfg_view(main_cfg_t *cfg);
