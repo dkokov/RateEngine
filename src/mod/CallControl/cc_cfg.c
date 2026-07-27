@@ -48,7 +48,26 @@ void cc_cfg_get_int_xml(cc_cfg_int_t *cfg)
 			if(strcmp(params->name,"port") == 0) {
 				cfg->port = atoi(params->value);
 			}
-						
+
+			/* TLS transport: server certificate chain + private key (PEM) */
+			if(strcmp(params->name,"cert") == 0) {
+				strcpy(cfg->cert,params->value);
+			}
+
+			if(strcmp(params->name,"key") == 0) {
+				strcpy(cfg->key,params->value);
+			}
+
+			/* Mutual TLS (optional): client-cert verification + CA bundle */
+			if(strcmp(params->name,"verify-client") == 0) {
+				if(strcmp(params->value,"yes") == 0) cfg->verify_client = 't';
+				else cfg->verify_client = 'f';
+			}
+
+			if(strcmp(params->name,"ca") == 0) {
+				strcpy(cfg->ca,params->value);
+			}
+
 			params = params->next_param;
 		}
 	

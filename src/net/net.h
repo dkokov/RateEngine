@@ -105,11 +105,21 @@ typedef struct net_conn {
 	char *buffer;
 	unsigned int buf_size;
 	
+	/* eng_tmp : per-connection transport state (e.g. the TLS SSL* for this fd).
+	 * eng_ctx : per-listener shared transport context (e.g. the TLS SSL_CTX);
+	 *           set once on the server conn at open, propagated read-only to each
+	 *           worker conn so a worker can mint per-connection state from it. */
 	void *eng_tmp;
-	
+	void *eng_ctx;
+
 	char unix_socket_filename[FILENAME_LEN];
 	char cert_filename[FILENAME_LEN];
 	char pkey_filename[FILENAME_LEN];
+
+	/* TLS mutual auth (optional): when tls_verify_peer != 0 the server requests
+	 * and verifies a client certificate against the CA bundle ca_filename. */
+	char ca_filename[FILENAME_LEN];
+	int  tls_verify_peer;
 } net_conn_t;
 
 typedef int  (*net_open_f)     (net_conn_t *conn);

@@ -1,0 +1,19 @@
+<Interface>
+ <config>
+    <!-- CallControl application protocol: my_cc (resolves my_cc.so / my_cc_proto_bind) -->
+    <param name="CC-proto" value="my_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tls" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
+    <param name="ip" value="" />
+    <param name="port" value="9093" />
+    <!-- TLS server credentials (PEM). Required when proto == "tls". -->
+    <param name="cert" value="/usr/local/RateEngine/config/certs/server.crt" />
+    <param name="key"  value="/usr/local/RateEngine/config/certs/server.key" />
+    <!-- Mutual TLS (optional, default off). verify-client=yes rejects any client
+         that does not present a certificate chaining to the CA bundle 'ca'. -->
+    <param name="verify-client" value="no" />
+    <param name="ca" value="/usr/local/RateEngine/config/certs/ca.crt" />
+ </config>
+</Interface>

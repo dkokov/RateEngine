@@ -10,7 +10,7 @@ mod/db_duckdb
 mod/tcp
 #mod/udp
 #mod/sctp
-#mod/tls
+mod/tls
 mod/my_cc
 mod/jsonrpc_cc
 #mod/jsonrpc_rt

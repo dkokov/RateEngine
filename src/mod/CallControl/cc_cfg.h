@@ -25,7 +25,16 @@ typedef struct cc_cfg_int {
 	net_dom_t ipv;
 	char ip[128];
 	unsigned short port;
-		
+
+	/* TLS transport (proto == "tls"): server cert chain + private key (PEM) */
+	char cert[255];
+	char key[255];
+
+	/* Mutual TLS (optional, default off): verify_client == 't' requires a client
+	 * certificate that chains to the CA bundle 'ca'. */
+	char verify_client;
+	char ca[255];
+
 }cc_cfg_int_t;
 
 typedef struct cc_cfg {

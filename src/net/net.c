@@ -515,6 +515,8 @@ static void *net_worker_thread(void *arg)
 		wc.buf_size  = w->np->conn->buf_size;
 		wc.buffer    = buf;
 		wc.newsockfd = fd;
+		/* per-listener shared context (e.g. TLS SSL_CTX); read-only in workers */
+		wc.eng_ctx   = w->np->conn->eng_ctx;
 
 		memset(buf,0,wc.buf_size);
 

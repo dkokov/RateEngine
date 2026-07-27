@@ -36,6 +36,8 @@ services:
         dockerfile: docker/re7-core/Dockerfile
     ports:
       - "9090:9090"
+      - "9092:9092"
+      - "9093:9093"
     networks:
       - re7_network
     volumes:

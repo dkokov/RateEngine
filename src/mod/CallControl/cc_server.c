@@ -308,6 +308,14 @@ void *cc_server_thread_int(void *dt)
 	np->conn->port = cc_int->port;
 	strcpy(np->conn->proto,cc_int->proto);
 
+	/* TLS transport reads these in tls_open(); empty for non-TLS interfaces */
+	strcpy(np->conn->cert_filename,cc_int->cert);
+	strcpy(np->conn->pkey_filename,cc_int->key);
+
+	/* mutual TLS (optional): verify client cert against 'ca' when enabled */
+	strcpy(np->conn->ca_filename,cc_int->ca);
+	np->conn->tls_verify_peer = (cc_int->verify_client == 't') ? 1 : 0;
+
 	/* map transport name -> proto_id enum; net_open_socket() switches on it */
 	if(strcmp(cc_int->proto,NET_TCP_PROTO_STR) == 0)       np->conn->proto_id = tcp;
 	else if(strcmp(cc_int->proto,NET_UDP_PROTO_STR) == 0)  np->conn->proto_id = udp;

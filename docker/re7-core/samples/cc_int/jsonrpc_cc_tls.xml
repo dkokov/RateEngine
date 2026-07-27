@@ -1,0 +1,20 @@
+<Interface>
+ <config>
+    <!-- CallControl session/application protocol.
+         The value must match the module base name: cc_server resolves
+         "<CC-proto>.so" and the symbol "<CC-proto>_proto_bind".
+         jsonrpc_cc -> jsonrpc_cc.so / jsonrpc_cc_proto_bind -->
+    <param name="CC-proto" value="jsonrpc_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tls" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
+    <param name="ip" value="" />
+    <param name="port" value="9092" />
+    <!-- TLS server credentials (PEM). Required when proto == "tls".
+         'cert' is the server certificate chain, 'key' its private key.
+         A single certificate is used process-wide across TLS interfaces. -->
+    <param name="cert" value="/usr/local/RateEngine/config/certs/server.crt" />
+    <param name="key"  value="/usr/local/RateEngine/config/certs/server.key" />
+ </config>
+</Interface>
