@@ -6,9 +6,15 @@ name: Build and Test
 
 on:
   push:
-    branches: [ master, 0.7.1 ]
+    branches: [ master, '0.7.*' ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref so rapid pushes don't pile up.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -86,3 +92,57 @@ jobs:
         run: |
           export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
           /usr/local/RateEngine/bin/RateEngine -v
+
+      - name: CallControl E2E (jsonrpc_cc over tcp + TLS/mTLS)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBTYPE: pgsql
+          DBHOST: localhost
+          DBNAME: rate_engine
+          DBUSER: re_admin
+          DBPASS: _cfg.access
+          DBPORT: "5432"
+        run: bash src/scripts/tests/e2e/run_e2e.sh
+
+  # ---------------------------------------------------------------------------
+  # Compile-check the modules that are commented out in src/config.md, so they
+  # are NOT built by `make modules` above and would otherwise rot silently.
+  # Each entry builds the core lib (a `make module` prerequisite) + one module
+  # with its own dev dependency. fail-fast: false so one broken module doesn't
+  # hide the others.
+  # ---------------------------------------------------------------------------
+  module-matrix:
+    name: build module (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: db_mysql
+            deps: default-libmysqlclient-dev
+          - name: db_redis
+            deps: libhiredis-dev
+          - name: db_mongodb
+            deps: libmongoc-dev libbson-dev
+          - name: sctp
+            deps: libsctp-dev
+          - name: udp
+            deps: ""
+          - name: jsonrpc_rt
+            deps: ""
+          - name: tls
+            deps: libssl-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          # Base deps for the core lib (a `make module` prerequisite) + this
+          # module's own dev package.
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libxml2-dev libjson-c-dev ${{ matrix.deps }}
+
+      - name: Build module ${{ matrix.name }}
+        working-directory: src
+        run: make module name=${{ matrix.name }}

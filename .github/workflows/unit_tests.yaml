@@ -8,6 +8,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Cancel superseded runs on the same ref so rapid pushes don't pile up.
+concurrency:
+  group: unit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ---------------------------------------------------------------------------
   # Self-asserting unit tests. No external deps (libc/libm only). These assert
