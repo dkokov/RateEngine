@@ -109,7 +109,13 @@ state. CallControl uses this (see `CCWorkers`).
 - The handler contract (both servers): `handler(char *buffer, void *ctx)` reads the
   request from `buffer`, processes, and writes the reply back into the same `buffer`
   (`ctx` is the per-worker context for the parallel server; NULL for the serial one).
-- Status: **tcp** and **udp** work; **tls** is incomplete; **sctp** is a stub.
+- Stateful transports (e.g. TLS) keep **per-listener** context in `conn->eng_ctx`
+  (built once at `open`, propagated read-only to every worker conn by
+  `net_parallel_server`) and **per-connection** state in `conn->eng_tmp`. TLS does its
+  handshake in `recv` (on the worker), not `accept`, so clients negotiate in parallel.
+- Status: **tcp** and **udp** work; **tls** works (server-side + optional mutual TLS,
+  each interface with its own cert/key/verify — see [call_control.md](call_control.md)
+  and [cc_int_prof.md](cc_int_prof.md)); **sctp** is a stub.
 
 ---
 

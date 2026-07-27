@@ -51,6 +51,12 @@ from the transport (`tcp`, ...):
 Multiple interfaces can run at once (e.g. `my_cc` on 9090 and `jsonrpc_cc` on
 9091), each with its own worker pool.
 
+The transport (`proto`) is independent of the wire protocol: any of the above can
+run over `tcp` or `tls`. For `tls` the interface config adds `cert`/`key` (PEM) and,
+optionally, mutual TLS via `verify-client="yes"` + a `ca` bundle — each interface
+has its own certificate and verify policy. See [cc_int_prof.md](cc_int_prof.md) for
+the params; generate a test PKI with `src/scripts/gen_tls_cert.sh`.
+
 
 See more information for some CallControl integrations :
 

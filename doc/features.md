@@ -64,8 +64,11 @@ SCTP transport, useful in telecom environments that already standardise on it
 
 #### TLSSupport
 
-TLS-secured transport for the RPC interface, for encrypted CallControl traffic
-over untrusted networks.
+TLS-secured transport for the CallControl interfaces (`my_cc` / `jsonrpc_cc`),
+for encrypted traffic over untrusted networks. Supports server-side TLS and
+optional mutual TLS (per-interface client-certificate verification); each
+interface has its own certificate and verify policy. See
+[cc_int_prof.md](cc_int_prof.md).
 
 ### Database engine modules
 
