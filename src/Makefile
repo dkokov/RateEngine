@@ -185,6 +185,13 @@ clean: modules_clean
 	@rm -fv $(CORE_LIB) $(CFG_OBJS) $(LOG_OBJS) $(DB_OBJS) $(MISC_OBJS) $(MOD_OBJS) $(EXTEN_OBJS) $(MEM_OBJS) \
 	$(PROC_OBJS) $(STAT_OBJS) $(NET_OBJS) $(MAIN_OBJ) $(MAIN_TARGET)
 
+.PHONY: e2e
+# Black-box CallControl end-to-end tests (jsonrpc_cc over tcp + TLS/mTLS).
+# Needs an INSTALLED engine (RE_PREFIX, default /usr/local/RateEngine) and a
+# reachable DB; override DB creds via env (see scripts/tests/e2e/run_e2e.sh).
+e2e:
+	@scripts/tests/e2e/run_e2e.sh
+
 .PHONY: help
 help:
 	-@echo ""
@@ -201,6 +208,7 @@ help:
 	-@echo "  make install PREFIX=/usr/local   - instalation in define path in PREFIX="
 	-@echo "  make uninstall                   - uninstalation from default path,PREFIX=/usr/local/RateEngine/"
 	-@echo "  make uninstall PREFIX=/usr/local - uninstalation from define path in PREFIX="
+	-@echo "  make e2e                         - CallControl e2e tests (needs installed engine + DB)"
 	-@echo ""
 	-@echo " DuckDB engine (mod/db_duckdb) - the ~70M SDK is fetched on demand, never kept in git:"
 	-@echo "  make module name=db_duckdb                          - build duckdb.so (auto-downloads SDK; dynamic lib)"
