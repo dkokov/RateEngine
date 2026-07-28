@@ -34,6 +34,24 @@ tcp_send() {
 	printf '%s' "$resp"
 }
 
+# _e2e_req PORT PAYLOAD [READ_TIMEOUT]  -> one request/reply on stdout.
+# Reads the whole reply until the server closes (EOF) or READ_TIMEOUT (default
+# 4s), using bash's own timed `read` - deliberately NO `cat`: a `cat` launched
+# under `timeout bash -c '...'` is an orphan grandchild that `timeout` (no -k)
+# never SIGKILLs, so a wedged server would hang the burst. `read -t` is bounded
+# and spawns no subprocess. Exported for `timeout bash -c '...'` child shells.
+_e2e_req() {
+	local to=${3:-4} reply=""
+	exec 3<>"/dev/tcp/127.0.0.1/$1" 2>/dev/null || return 1
+	printf '%s' "$2" >&3
+	# -d '' : read until NUL (never present) i.e. until EOF/timeout, capturing
+	# the full reply (no trailing-newline assumption); -t bounds the wait.
+	IFS= read -r -d '' -t "$to" reply <&3
+	printf '%s' "$reply"
+	exec 3<&- 3>&- 2>/dev/null || true
+}
+export -f _e2e_req
+
 # wait_port HOST PORT [TIMEOUT_SECONDS]  -> 0 once connectable, 1 on timeout.
 wait_port() {
 	local host=$1 port=$2 timeout=${3:-20} i=0 max

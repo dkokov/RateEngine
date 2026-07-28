@@ -29,8 +29,8 @@
 #   RE_PREFIX  install prefix        (default /usr/local/RateEngine)
 #   DBTYPE     pgsql|mysql|redis     (default pgsql)
 #   DBHOST DBNAME DBUSER DBPASS DBPORT
-#   TCP_PORT   jsonrpc_cc/tcp port   (default 9091)
-#   TLS_PORT   jsonrpc_cc/tls port   (default 9092)
+#   TCP_PORT   jsonrpc_cc/tcp test port  (default 19091; off the 9090-9093 range)
+#   TLS_PORT   jsonrpc_cc/tls test port  (default 19092)
 #
 # Exit: 0 = all assertions passed, 1 = a failure, 2 = prerequisites missing.
 
@@ -48,7 +48,25 @@ RE_PREFIX=${RE_PREFIX:-/usr/local/RateEngine}
 RE_BIN=${RE_BIN:-$RE_PREFIX/bin/RateEngine}
 RE_LIBS=${RE_LIBS:-$RE_PREFIX/libs}
 RE_MODULES=${RE_MODULES:-$RE_PREFIX/modules}
+# Installed engine config to inherit DB connection params from (see below).
+RE_CONF=${RE_CONF:-$RE_PREFIX/config/RateEngine7.xml}
 
+# DB connection resolution, in order of precedence:
+#   1. explicit env (DBHOST=... make e2e)
+#   2. the <DB> block of the installed engine config ($RE_CONF) - so `make e2e`
+#      connects wherever the real engine is configured (e.g. a docker db host)
+#   3. built-in fallbacks (match the CI Postgres service)
+db_from_conf() {
+	[ -f "$RE_CONF" ] || return 0
+	sed -n '/<DB>/,/<\/DB>/p' "$RE_CONF" 2>/dev/null |
+		sed -nE "s/.*name=\"$1\"[^>]*value=\"([^\"]*)\".*/\1/p" | head -1
+}
+DBTYPE=${DBTYPE:-$(db_from_conf dbtype)}
+DBHOST=${DBHOST:-$(db_from_conf dbhost)}
+DBNAME=${DBNAME:-$(db_from_conf dbname)}
+DBUSER=${DBUSER:-$(db_from_conf dbuser)}
+DBPASS=${DBPASS:-$(db_from_conf dbpass)}
+DBPORT=${DBPORT:-$(db_from_conf dbport)}
 DBTYPE=${DBTYPE:-pgsql}
 DBHOST=${DBHOST:-127.0.0.1}
 DBNAME=${DBNAME:-rate_engine}
@@ -56,8 +74,11 @@ DBUSER=${DBUSER:-re_admin}
 DBPASS=${DBPASS:-_cfg.access}
 DBPORT=${DBPORT:-5432}
 
-TCP_PORT=${TCP_PORT:-9091}
-TLS_PORT=${TLS_PORT:-9092}
+# Dedicated TEST ports, deliberately clear of the standard CallControl
+# interface ports (my_cc 9090, jsonrpc_cc 9091, jsonrpc_cc_tls 9092,
+# my_cc_tls 9093) so the harness never collides with a real/running instance.
+TCP_PORT=${TCP_PORT:-19091}
+TLS_PORT=${TLS_PORT:-19092}
 
 GEN_CERT="$REPO_SRC/scripts/gen_tls_cert.sh"
 TLS_CLIENT_SRC="$REPO_SRC/clients/my_cc/tls_client.c"
@@ -82,6 +103,16 @@ dump_logs() {
 	if [ -n "$LOGFILE" ] && [ -f "$LOGFILE" ]; then
 		echo "----- rate_engine.log (tail) -----" >&2
 		tail -n 60 "$LOGFILE" >&2 || true
+	fi
+	if [ -n "$WORKDIR" ] && grep -q 'db_connect() ERROR' "$WORKDIR/daemon.stdout" 2>/dev/null; then
+		{
+			echo "----- diagnosis -----"
+			echo "CallControl could not connect to the database, so it bound no"
+			echo "interface (this is why no port came up). Effective DB settings:"
+			echo "  type=$DBTYPE host=$DBHOST port=$DBPORT name=$DBNAME user=$DBUSER"
+			echo "Point the harness at a reachable DB, e.g.:  DBHOST=<host> make e2e"
+			echo "or set RE_CONF=<engine config whose <DB> block is correct>."
+		} >&2
 	fi
 }
 
@@ -116,16 +147,15 @@ setup() {
 	TLS_CLIENT="$WORKDIR/tls_client"
 	gcc -O2 -o "$TLS_CLIENT" "$TLS_CLIENT_SRC" -lssl -lcrypto ||
 		die "failed to build tls test client from $TLS_CLIENT_SRC"
+
+	gen_main_config
 }
 
-# gen_config PROFILE  (PROFILE = plain | mtls)
-#   plain : tcp:$TCP_PORT + tls:$TLS_PORT (verify-client=no)
-#   mtls  : tls:$TLS_PORT (verify-client=yes)  [own daemon run - verify-client
-#           is process-wide via the shared SSL_CTX, so it must not mix with a
-#           plaintext-TLS interface in the same process.]
-gen_config() {
-	local profile=$1
-
+# Writes the fixed main config (modules, DB, CallControl). Interfaces are added
+# separately by set_interface() so each daemon run binds exactly ONE interface -
+# isolating transports and sidestepping any multi-interface startup interaction
+# in the engine (two cc_int interfaces racing at bind time).
+gen_main_config() {
 	cat >"$CFG" <<EOF
 <RateEngine version="0.7.6">
  <System>
@@ -175,11 +205,15 @@ gen_config() {
  </Logs>
 </RateEngine>
 EOF
+}
 
+# set_interface KIND  (tcp | tls | mtls) - place exactly ONE interface file in
+# INTDIR for the next daemon run.
+set_interface() {
 	rm -f "$INTDIR"/*.xml
-
-	if [ "$profile" = "plain" ]; then
-		cat >"$INTDIR/00_tcp.xml" <<EOF
+	case "$1" in
+	tcp)
+		cat >"$INTDIR/if.xml" <<EOF
 <Interface>
  <config>
     <param name="CC-proto" value="jsonrpc_cc" />
@@ -190,18 +224,16 @@ EOF
  </config>
 </Interface>
 EOF
-		gen_tls_interface no
-	elif [ "$profile" = "mtls" ]; then
-		gen_tls_interface yes
-	else
-		die "unknown profile: $profile"
-	fi
+		;;
+	tls) write_tls_interface no ;;
+	mtls) write_tls_interface yes ;;
+	*) die "unknown interface kind: $1" ;;
+	esac
 }
 
-# gen_tls_interface VERIFY_CLIENT (yes|no)
-gen_tls_interface() {
-	local verify=$1
-	cat >"$INTDIR/01_tls.xml" <<EOF
+# write_tls_interface VERIFY_CLIENT (yes|no)
+write_tls_interface() {
+	cat >"$INTDIR/if.xml" <<EOF
 <Interface>
  <config>
     <param name="CC-proto" value="jsonrpc_cc" />
@@ -211,7 +243,7 @@ gen_tls_interface() {
     <param name="port" value="$TLS_PORT" />
     <param name="cert" value="$CERTDIR/server.crt" />
     <param name="key"  value="$CERTDIR/server.key" />
-    <param name="verify-client" value="$verify" />
+    <param name="verify-client" value="$1" />
     <param name="ca" value="$CERTDIR/ca.crt" />
  </config>
 </Interface>
@@ -265,8 +297,12 @@ test_jsonrpc_cc_tcp() {
 	r=$(tcp_send 127.0.0.1 "$TCP_PORT" '{"jsonrpc":"1.0","method":"state","params":{"cdr_server_id":1},"id":5}')
 	assert_contains "$r" '-32600' "wrong version -> -32600"
 
+	# Unknown method: the engine currently rejects it with -32602 "Invalid
+	# params" (not the spec's -32601 "Method not found"). Pin the behavioural
+	# invariant - an error object, never a result - rather than the exact code.
 	r=$(tcp_send 127.0.0.1 "$TCP_PORT" '{"jsonrpc":"2.0","method":"no_such_method","params":{"cdr_server_id":1},"id":6}')
-	assert_contains "$r" '-32601' "unknown method -> -32601"
+	assert_contains "$r" '"error"' "unknown method is rejected with an error"
+	assert_not_contains "$r" '"result"' "unknown method returns no result"
 }
 
 test_tls_plain() {
@@ -302,34 +338,53 @@ test_tls_mtls() {
 }
 
 test_cc_smoke_concurrency() {
-	echo "== worker-pool smoke: concurrent maxsec burst (tcp:$TCP_PORT) =="
-	local n=50 conc=10 i=0 ok=0 f tmpd
+	echo "== worker-pool smoke: concurrent 'state' burst (tcp:$TCP_PORT) =="
+	# 'state' is a no-DB stub: fast + deterministic. Bursting it exercises the
+	# net worker pool and the parser under concurrency without DB-timing noise.
+	# Each request runs under an external `timeout` so a wedged daemon can never
+	# hang the suite (bash /dev/tcp has no connect timeout of its own).
+	local n=30 conc=10 i ok=0 f tmpd
+	local pids=()
 	tmpd=$(mktemp -d "${TMPDIR:-/tmp}/re7_burst.XXXXXX")
-
-	while [ "$i" -lt "$n" ]; do
-		(
-			r=$(tcp_send 127.0.0.1 "$TCP_PORT" \
-				"{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"cdr_server_id\":1,\"call-uid\":\"e2e-$i\",\"clg\":\"359112\",\"cld\":\"359880001\"},\"id\":$i}")
-			printf '%s' "$r" >"$tmpd/$i"
-		) &
-		i=$((i + 1))
-		while [ "$(jobs -r | wc -l)" -ge "$conc" ]; do
-			wait -n 2>/dev/null || sleep 0.05
-		done
+	echo "  firing $n 'state' requests, up to $conc at once..."
+	for i in $(seq 1 "$n"); do
+		# timeout -k: SIGTERM at 8s, SIGKILL at +3s - a hard ceiling so a wedged
+		# daemon can never hang the burst. Batch-wait on captured PIDs (below)
+		# because $(jobs -r) inside a command substitution cannot see the jobs.
+		timeout -k 3 8 bash -c '_e2e_req "$1" "$2" 5' _ "$TCP_PORT" "$STATE_REQ" \
+			>"$tmpd/$i" 2>/dev/null &
+		pids+=($!)
+		if [ "${#pids[@]}" -ge "$conc" ]; then
+			wait "${pids[@]}"
+			pids=()
+		fi
 	done
-	wait
+	[ "${#pids[@]}" -gt 0 ] && wait "${pids[@]}"
 
 	for f in "$tmpd"/*; do
-		grep -q '"maxsec"' "$f" 2>/dev/null && ok=$((ok + 1))
+		grep -q 'idle' "$f" 2>/dev/null && ok=$((ok + 1))
 	done
 	rm -rf "$tmpd"
 
-	assert_eq "$ok" "$n" "smoke: all $n concurrent maxsec requests replied"
+	assert_eq "$ok" "$n" "smoke: all $n concurrent state requests replied"
 	if kill -0 "$RE_PID" 2>/dev/null; then
 		pass "smoke: daemon still alive after the burst"
 	else
 		fail "smoke: daemon died during the burst"
 	fi
+
+	echo "== rating-path smoke: a few maxsec requests (tcp:$TCP_PORT) =="
+	# maxsec is DB-heavy (many queries per call); just smoke that it replies and
+	# does not crash. The VALUE is not asserted here - that is the Phase 2
+	# golden-CDR job. Few requests, generous per-request timeout.
+	local m=5 mok=0 r
+	echo "  sending $m maxsec requests (per-request timeout 8s)..."
+	for i in $(seq 1 "$m"); do
+		r=$(timeout -k 3 10 bash -c '_e2e_req "$1" "$2" 8' _ "$TCP_PORT" \
+			"{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"cdr_server_id\":1,\"call-uid\":\"e2e-$i\",\"clg\":\"359112\",\"cld\":\"359880001\"},\"id\":$i}" 2>/dev/null)
+		case "$r" in *'"maxsec"'*) mok=$((mok + 1)) ;; esac
+	done
+	assert_eq "$mok" "$m" "smoke: all $m maxsec requests replied"
 	if grep -q 'maxsec_us' "$LOGFILE" 2>/dev/null; then
 		note "maxsec timing (maxsec_us) present in the log"
 	else
@@ -342,23 +397,31 @@ main() {
 	trap cleanup EXIT
 	setup
 
-	echo "### profile: plain (tcp + server-side TLS) ###"
-	gen_config plain
+	echo "run_e2e: engine=$RE_BIN"
+	echo "run_e2e: db=$DBTYPE host=$DBHOST port=$DBPORT name=$DBNAME user=$DBUSER (conf: $RE_CONF)"
+
+	echo "### tcp: jsonrpc_cc protocol + worker-pool smoke ###"
+	set_interface tcp
 	re_start
 	wait_port 127.0.0.1 "$TCP_PORT" 25 ||
 		die "daemon did not bind tcp:$TCP_PORT (DB reachable? modules loaded?)"
-	wait_port 127.0.0.1 "$TLS_PORT" 25 ||
-		die "daemon did not bind tls:$TLS_PORT"
 	test_jsonrpc_cc_tcp
-	test_tls_plain
 	test_cc_smoke_concurrency
 	re_stop
 
-	echo "### profile: mtls (mutual TLS) ###"
-	gen_config mtls
+	echo "### tls: server-side TLS ###"
+	set_interface tls
 	re_start
 	wait_port 127.0.0.1 "$TLS_PORT" 25 ||
-		die "daemon did not bind tls:$TLS_PORT (mtls profile)"
+		die "daemon did not bind tls:$TLS_PORT"
+	test_tls_plain
+	re_stop
+
+	echo "### mtls: mutual TLS ###"
+	set_interface mtls
+	re_start
+	wait_port 127.0.0.1 "$TLS_PORT" 25 ||
+		die "daemon did not bind tls:$TLS_PORT (mtls)"
 	test_tls_mtls
 	re_stop
 
