@@ -128,10 +128,11 @@ jobs:
             deps: libsctp-dev
           - name: udp
             deps: ""
-          - name: jsonrpc_rt
-            deps: ""
           - name: tls
             deps: libssl-dev
+          # jsonrpc_rt is intentionally NOT in this matrix: it is an unfinished
+          # v0.6-era stub (never ported to the current json_rpc API, and dead
+          # code even if it compiled). Add it back here only once it is fixed.
     steps:
       - uses: actions/checkout@v4
 
