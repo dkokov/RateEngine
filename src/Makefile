@@ -192,6 +192,13 @@ clean: modules_clean
 e2e:
 	@scripts/tests/e2e/run_e2e.sh
 
+.PHONY: rating-regression
+# Offline-rating golden regression (rt.so vs hand-computed prices) on a
+# throwaway DB seeded with synthetic tariffs/CDRs. Needs an installed engine
+# (pgsql/cdrm/rt modules) + a DB the user can create a database on.
+rating-regression:
+	@scripts/tests/rating/run_rating_regression.sh
+
 .PHONY: help
 help:
 	-@echo ""
@@ -209,6 +216,7 @@ help:
 	-@echo "  make uninstall                   - uninstalation from default path,PREFIX=/usr/local/RateEngine/"
 	-@echo "  make uninstall PREFIX=/usr/local - uninstalation from define path in PREFIX="
 	-@echo "  make e2e                         - CallControl e2e tests (needs installed engine + DB)"
+	-@echo "  make rating-regression          - offline rating golden test (needs installed engine + DB)"
 	-@echo ""
 	-@echo " DuckDB engine (mod/db_duckdb) - the ~70M SDK is fetched on demand, never kept in git:"
 	-@echo "  make module name=db_duckdb                          - build duckdb.so (auto-downloads SDK; dynamic lib)"

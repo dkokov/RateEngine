@@ -1,0 +1,8 @@
+# Golden rating results for the offline-rating regression.
+# Hand-computed from fixture.sql tariffs via calc_cprice_2 (verified by the
+# tariff_pricing.c unit test's reference implementation).
+# Columns:  call_uid <TAB> expected_call_price <TAB> expected_call_billsec
+# (call_price compared with a small tolerance; call_billsec is exact.)
+gold-persec	2.50	125
+gold-permin	0.20	120
+gold-tier	0.50	180

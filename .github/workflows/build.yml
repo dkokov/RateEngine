@@ -104,6 +104,16 @@ jobs:
           DBPORT: "5432"
         run: bash src/scripts/tests/e2e/run_e2e.sh
 
+      - name: Offline rating regression (rt.so vs golden)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBHOST: localhost
+          DBNAME: rate_engine
+          DBUSER: re_admin
+          DBPASS: _cfg.access
+          DBPORT: "5432"
+        run: bash src/scripts/tests/rating/run_rating_regression.sh
+
   # ---------------------------------------------------------------------------
   # Compile-check the modules that are commented out in src/config.md, so they
   # are NOT built by `make modules` above and would otherwise rot silently.
