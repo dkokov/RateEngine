@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# run_rating_regression.sh - offline-rating golden regression for rt.so.
+# run_rating_regression.sh - offline-rating regression for rt.so and rt_duckdb.so.
 #
 # Loads a SYNTHETIC schema+fixture into a THROWAWAY database, rates a set of
-# known CDRs with the offline Rating engine (rt.so), and asserts the produced
-# per-CDR price/billed-seconds against hand-computed golden values.
+# known CDRs with the offline Rating engine, and asserts the produced per-CDR
+# price/billed-seconds against hand-computed golden values. Runs each available
+# engine on its OWN fresh load of the fixture, then:
+#   * asserts rt.so        == golden
+#   * asserts rt_duckdb.so == golden        (skipped if duckdb not installed)
+#   * asserts rt.so        == rt_duckdb.so   (parity)
 #
 #   * Uses a dedicated test database (created + dropped here) - it NEVER touches
 #     the engine's real database.
@@ -12,19 +16,18 @@
 #   * Data:   fixture.sql + cdrs_seed.sql in this directory (all invented).
 #   * Golden: golden.tsv in this directory.
 #
-# This is the rt.so-vs-golden pass; rt_duckdb.so parity is a later addition.
-#
 # Prerequisites:
 #   * RateEngine installed under $RE_PREFIX (default /usr/local/RateEngine):
 #       bin/RateEngine, libs/libre7core.so, modules/{pgsql,cdrm,rt}.so
+#       (and modules/{duckdb,rt_duckdb}.so for the DuckDB parity pass).
 #   * A reachable PostgreSQL the DB user can CREATE/DROP a database on.
 #   * psql in PATH.
 #
 # Env (optional; DB params default to the installed engine config, then to the
 # CI Postgres): RE_PREFIX, RE_CONF, DBHOST, DBNAME, DBUSER, DBPASS, DBPORT,
-#               TESTDB (name of the throwaway db, default re7_rating_test).
+#               TESTDB (throwaway db name, default re7_rating_test).
 #
-# Exit: 0 all golden matches, 1 a mismatch/failure, 2 prerequisites missing.
+# Exit: 0 all checks pass, 1 a mismatch/failure, 2 prerequisites missing.
 
 set -u
 
@@ -41,7 +44,6 @@ RE_LIBS=${RE_LIBS:-$RE_PREFIX/libs}
 RE_MODULES=${RE_MODULES:-$RE_PREFIX/modules}
 RE_CONF=${RE_CONF:-$RE_PREFIX/config/RateEngine7.xml}
 
-# DB params: explicit env -> installed config <DB> block -> CI defaults.
 db_from_conf() {
 	[ -f "$RE_CONF" ] || return 0
 	sed -n '/<DB>/,/<\/DB>/p' "$RE_CONF" 2>/dev/null |
@@ -59,14 +61,14 @@ WORKDIR=""
 RE_PID=""
 LOGFILE=""
 DB_CREATED=""
+HAVE_DUCKDB=""
 PASS=0
 FAIL=0
 
 pass() { PASS=$((PASS + 1)); echo "  PASS: $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  FAIL: $1"; }
+note() { echo "  INFO: $*"; }
 
-# psql helpers. adm = maintenance connection (to the existing DB, only for
-# CREATE/DROP DATABASE); q = query the test DB, tuples-only unaligned.
 psql_adm() { psql -v ON_ERROR_STOP=1 -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -d "$DBNAME" "$@"; }
 psql_test() { psql -v ON_ERROR_STOP=1 -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -d "$TESTDB" "$@"; }
 q() { psql -tA -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -d "$TESTDB" -c "$1" 2>/dev/null; }
@@ -88,8 +90,15 @@ dump_logs() {
 	fi
 }
 
+re_stop() {
+	[ -n "$RE_PID" ] || return 0
+	kill -TERM "$RE_PID" 2>/dev/null || true
+	wait "$RE_PID" 2>/dev/null || true
+	RE_PID=""
+}
+
 cleanup() {
-	[ -n "$RE_PID" ] && { kill -TERM "$RE_PID" 2>/dev/null; wait "$RE_PID" 2>/dev/null; }
+	re_stop
 	if [ -n "$DB_CREATED" ]; then
 		psql_adm -c "DROP DATABASE IF EXISTS $TESTDB;" >/dev/null 2>&1 || true
 	fi
@@ -104,8 +113,8 @@ weekday_ts() {
 	base="$ym-15"
 	dow=$(date -d "$base" +%u 2>/dev/null || echo 3) # 1=Mon..7=Sun
 	case "$dow" in
-	6) base="$ym-17" ;; # Sat -> Mon
-	7) base="$ym-16" ;; # Sun -> Mon
+	6) base="$ym-17" ;;
+	7) base="$ym-16" ;;
 	esac
 	echo "$base 10:00:00"
 }
@@ -119,14 +128,19 @@ setup() {
 	[ -f "$SCHEMA_SQL" ] || die "schema not found: $SCHEMA_SQL"
 	command -v psql >/dev/null || die "psql not found in PATH"
 
+	# DuckDB parity pass is optional - only if its modules are installed.
+	if [ -e "$RE_MODULES/duckdb.so" ] && [ -e "$RE_MODULES/rt_duckdb.so" ]; then
+		HAVE_DUCKDB=1
+	fi
+
 	WORKDIR=$(mktemp -d "${TMPDIR:-/tmp}/re7_rating.XXXXXX") || die "mktemp failed"
 	ln -s "$RE_MODULES" "$WORKDIR/modules"
 	mkdir -p "$WORKDIR/logs" "$WORKDIR/config/cdr_profiles"
 	LOGFILE="$WORKDIR/logs/rate_engine.log"
 }
 
+# (Re)create the throwaway DB and load schema + synthetic fixture + CDRs.
 build_db() {
-	echo "run_rating: (re)creating throwaway db '$TESTDB' on $DBHOST:$DBPORT (user $DBUSER)"
 	psql_adm -c "DROP DATABASE IF EXISTS $TESTDB;" >/dev/null 2>&1 || true
 	psql_adm -c "CREATE DATABASE $TESTDB;" >/dev/null 2>&1 ||
 		die "could not CREATE DATABASE $TESTDB (does $DBUSER have CREATEDB? is $DBHOST reachable?)"
@@ -134,8 +148,7 @@ build_db() {
 	psql_test -q -f "$SCHEMA_SQL" >/dev/null || die "failed to load schema $SCHEMA_SQL"
 	# rt_pgsql.sql ships 'db_screenshot' change-tracking RULES (DELETE+INSERT of
 	# the table name) that collide with multi-row seed inserts (UNIQUE tbl_name).
-	# The offline rater doesn't read db_screenshot, so drop these rules in the
-	# throwaway DB to let the fixture load cleanly.
+	# The offline rater doesn't read db_screenshot, so drop these rules.
 	psql_test -q -c "DO \$\$ DECLARE r record; BEGIN
 	  FOR r IN SELECT tablename, rulename FROM pg_rules WHERE rulename LIKE 'db_screenshot%'
 	  LOOP EXECUTE format('DROP RULE %I ON public.%I', r.rulename, r.tablename); END LOOP;
@@ -143,11 +156,24 @@ build_db() {
 	psql_test -q -f "$FIXTURE_SQL" >/dev/null || die "failed to load fixture $FIXTURE_SQL"
 	local ts
 	ts=$(weekday_ts)
-	echo "run_rating: seeding CDRs with call_ts=$ts"
 	psql_test -q -v call_ts="$ts" -f "$CDRS_SQL" >/dev/null || die "failed to seed CDRs $CDRS_SQL"
 }
 
+# gen_config ENGINE  (rt.so | rt_duckdb.so) - offline rating config for one engine.
 gen_config() {
+	local engine=$1 modules rating_mod=""
+	if [ "$engine" = "rt_duckdb.so" ]; then
+		modules='    <param name="module" value="pgsql.so" />
+    <param name="module" value="cdrm.so" />
+    <param name="module" value="duckdb.so" />
+    <param name="module" value="rt_duckdb.so" />'
+		rating_mod='    <param name="RatingModule" value="rt_duckdb.so" />'
+	else
+		modules='    <param name="module" value="pgsql.so" />
+    <param name="module" value="cdrm.so" />
+    <param name="module" value="rt.so" />'
+	fi
+
 	cat >"$WORKDIR/config/RateEngine7.xml" <<EOF
 <RateEngine version="0.7.6">
  <System>
@@ -155,9 +181,7 @@ gen_config() {
     <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
  <LoadModules>
-    <param name="module" value="pgsql.so" />
-    <param name="module" value="cdrm.so" />
-    <param name="module" value="rt.so" />
+$modules
  </LoadModules>
  <DB>
     <param name="dbtype" value="pgsql" />
@@ -171,9 +195,11 @@ gen_config() {
  </DB>
  <Rating>
     <param name="active" value="no" />
+$rating_mod
     <param name="leg" value="a" />
     <param name="RatingInterval" value="300" />
     <param name="WaitRatingInterval" value="500" />
+    <param name="BatchLimit" value="5000" />
     <param name="UsePCard" value="no" />
     <param name="BillingDay" value="01" />
  </Rating>
@@ -191,9 +217,8 @@ gen_config() {
 EOF
 }
 
-# Rate leg a: rt.so rates one batch (active=no) then the process idles in the
-# keeper loop, so we run it in the background, poll until no unrated CDR
-# remains, then stop it.
+# Rate leg a: the engine rates one batch (active=no) then idles in the keeper
+# loop, so run it in the background, poll until no unrated CDR remains, stop it.
 run_rating() {
 	local cfg="$WORKDIR/config/RateEngine7.xml" i unrated
 	: >"$LOGFILE" 2>/dev/null || true
@@ -204,10 +229,8 @@ run_rating() {
 	) >"$WORKDIR/daemon.stdout" 2>&1 &
 	RE_PID=$!
 
-	for i in $(seq 1 60); do          # up to ~30s
-		if ! kill -0 "$RE_PID" 2>/dev/null; then
-			break                     # process exited on its own
-		fi
+	for i in $(seq 1 60); do
+		kill -0 "$RE_PID" 2>/dev/null || break
 		unrated=$(q "SELECT count(*) FROM cdrs WHERE leg_a = 0;")
 		[ "${unrated:-1}" = "0" ] && return 0
 		sleep 0.5
@@ -216,54 +239,90 @@ run_rating() {
 	[ "${unrated:-1}" = "0" ]
 }
 
-compare_golden() {
-	echo "== offline rating: rt.so vs golden =="
-	local total rated
-	total=$(q "SELECT count(*) FROM cdrs;")
-	rated=$(q "SELECT count(*) FROM cdrs WHERE leg_a > 0;")
-	if [ "$rated" = "$total" ]; then
-		pass "all $total CDRs rated (leg_a > 0)"
-	else
-		fail "only $rated/$total CDRs rated (leg_a > 0)"
-	fi
+# capture_results OUTFILE - one line per CDR: call_uid|sum_price|sum_billsec
+# (LEFT JOIN so an unrated CDR shows as 0|0 rather than vanishing).
+capture_results() {
+	q "SELECT c.call_uid||'|'||COALESCE(SUM(r.call_price),0)||'|'||COALESCE(SUM(r.call_billsec),0)
+	     FROM cdrs c LEFT JOIN rating r ON r.call_id = c.id
+	    GROUP BY c.call_uid ORDER BY c.call_uid;" >"$1"
+}
 
-	local uid want_price want_bs got
+# rate_engine ENGINE OUTFILE - fresh DB, config, rate, capture, stop.
+rate_engine() {
+	local engine=$1 out=$2
+	build_db
+	gen_config "$engine"
+	if ! run_rating; then
+		dump_logs
+		die "rating with $engine did not complete (CDRs still unrated) - see log above"
+	fi
+	capture_results "$out"
+	re_stop
+}
+
+# res_get FILE UID -> "price|billsec" for that CDR from a results file.
+res_get() { awk -F'|' -v u="$2" '$1==u{print $2"|"$3}' "$1"; }
+
+# compare_golden RESULTS_FILE LABEL
+compare_golden() {
+	local res=$1 label=$2 uid want_price want_bs got got_price got_bs
+	echo "== $label vs golden =="
 	while IFS=$'\t' read -r uid want_price want_bs; do
 		case "$uid" in ''|\#*) continue ;; esac
-		# per-CDR aggregate (a CDR may split into >1 rating rows).
-		got=$(q "SELECT COALESCE(SUM(r.call_price),0)||'|'||COALESCE(SUM(r.call_billsec),0)
-		           FROM cdrs c JOIN rating r ON r.call_id = c.id
-		          WHERE c.call_uid = '$uid';")
-		local got_price="${got%%|*}" got_bs="${got##*|}"
-		if [ -z "$got" ] || [ "$got" = "|" ]; then
-			fail "$uid: no rating row produced"
+		got=$(res_get "$res" "$uid")
+		got_price="${got%%|*}"; got_bs="${got##*|}"
+		if [ -z "$got" ]; then
+			fail "$label $uid: no result row"
 			continue
 		fi
-		# price within tolerance, billsec exact.
-		awk -v gp="$got_price" -v wp="$want_price" 'BEGIN{d=gp-wp; if(d<0)d=-d; exit (d<0.005)?0:1}' &&
-			pass "$uid: price $got_price ~= $want_price" ||
-			fail "$uid: price $got_price != $want_price"
+		awk -v g="$got_price" -v w="$want_price" 'BEGIN{d=g-w;if(d<0)d=-d;exit (d<0.005)?0:1}' &&
+			pass "$label $uid: price $got_price ~= $want_price" ||
+			fail "$label $uid: price $got_price != $want_price"
 		[ "$got_bs" = "$want_bs" ] &&
-			pass "$uid: billsec $got_bs == $want_bs" ||
-			fail "$uid: billsec $got_bs != $want_bs"
+			pass "$label $uid: billsec $got_bs == $want_bs" ||
+			fail "$label $uid: billsec $got_bs != $want_bs"
 	done <"$GOLDEN_TSV"
+}
+
+# compare_parity FILE_A FILE_B - per-CDR equality between two engines.
+compare_parity() {
+	local a=$1 b=$2 uid pa_price pa_bs pb pb_price pb_bs
+	echo "== rt.so vs rt_duckdb.so parity =="
+	while IFS='|' read -r uid pa_price pa_bs; do
+		pb=$(res_get "$b" "$uid")
+		local pb_price="${pb%%|*}" pb_bs="${pb##*|}"
+		awk -v x="$pa_price" -v y="$pb_price" 'BEGIN{d=x-y;if(d<0)d=-d;exit (d<0.005)?0:1}' &&
+			pass "$uid: price parity ($pa_price ~= $pb_price)" ||
+			fail "$uid: price differs (rt=$pa_price duckdb=$pb_price)"
+		[ "$pa_bs" = "$pb_bs" ] &&
+			pass "$uid: billsec parity ($pa_bs)" ||
+			fail "$uid: billsec differs (rt=$pa_bs duckdb=$pb_bs)"
+	done <"$a"
 }
 
 main() {
 	trap cleanup EXIT
 	setup
-	echo "run_rating: engine=$RE_BIN  db=$DBHOST:$DBPORT testdb=$TESTDB"
-	build_db
-	gen_config
-	if ! run_rating; then
-		dump_logs
-		die "rating did not complete (CDRs still unrated) - see log above"
+	echo "run_rating: engine=$RE_BIN  db=$DBHOST:$DBPORT testdb=$TESTDB  duckdb=${HAVE_DUCKDB:-no}"
+
+	local res_rt="$WORKDIR/res_rt.tsv" res_duck="$WORKDIR/res_duckdb.tsv"
+
+	rate_engine "rt.so" "$res_rt"
+	compare_golden "$res_rt" "rt.so"
+
+	if [ -n "$HAVE_DUCKDB" ]; then
+		rate_engine "rt_duckdb.so" "$res_duck"
+		compare_golden "$res_duck" "rt_duckdb.so"
+		compare_parity "$res_rt" "$res_duck"
+	else
+		note "duckdb.so / rt_duckdb.so not installed - skipping DuckDB parity pass"
 	fi
-	compare_golden
 
 	echo
+	local duck_state=skipped
+	[ -n "$HAVE_DUCKDB" ] && duck_state=yes
 	echo "================= rating regression summary ================="
-	echo "  PASS=$PASS  FAIL=$FAIL"
+	echo "  PASS=$PASS  FAIL=$FAIL  (duckdb parity pass: $duck_state)"
 	echo "============================================================="
 	[ "$FAIL" -eq 0 ]
 }

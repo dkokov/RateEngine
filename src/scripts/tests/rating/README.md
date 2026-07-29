@@ -63,9 +63,19 @@ Exit: `0` all golden matched, `1` a mismatch, `2` prerequisites missing.
    rated (`leg_a > 0`).
 4. Joins `rating` to `cdrs` and compares each CDR's aggregate to `golden.tsv`.
 
-## Scope / next
+## Engines compared
 
-This is the **rt.so vs golden** pass. Adding `rt_duckdb.so` parity is a planned
-follow-up; per `duckdb_match_diagnostic.sql` the two engines take different
-lookup paths (direct vs `bill_plan_tree`, `pos=1` vs all `pos`), so DuckDB
-parity needs its own tariff set and is intentionally deferred.
+The runner rates the same CDRs with each available engine on its own fresh load
+of the fixture, then asserts:
+
+- `rt.so` == golden
+- `rt_duckdb.so` == golden  — **skipped** if `duckdb.so`/`rt_duckdb.so` are not
+  installed (so the test still runs in rt.so-only environments)
+- `rt.so` == `rt_duckdb.so`  (parity)
+
+The two-tier case (`gold-tier`) is the discriminating one: `duckdb_match_diagnostic.sql`
+noted the DuckDB path historically used `calc_function pos=1` only and rated
+`rate` directly (vs `/Rating` via `bill_plan_tree` + all `pos`). Our fixtures use
+direct rates (no `bill_plan_tree`), so the remaining question is whether DuckDB
+now honors all tariff tiers. If it diverges on `gold-tier`, this test reports it
+as a real finding rather than hiding it.
