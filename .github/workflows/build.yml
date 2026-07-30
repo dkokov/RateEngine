@@ -115,6 +115,34 @@ jobs:
         run: bash src/scripts/tests/rating/run_rating_regression.sh
 
   # ---------------------------------------------------------------------------
+  # Second-compiler check: build the whole engine with clang. clang is NOT a
+  # production toolchain here (we ship gcc) - it runs purely as a static checker
+  # that catches defects gcc stays quiet about. EXTRA_CFLAGS promotes real bugs
+  # (e.g. a non-void function that falls off the end - undefined behaviour) to
+  # hard errors so they fail CI instead of scrolling past as warnings. clang
+  # uses -flto=thin (it has no -flto=auto).
+  # ---------------------------------------------------------------------------
+  build-clang:
+    name: build with clang (second-compiler check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang lld make libxml2-dev libjson-c-dev libpq-dev
+
+      - name: Build core + main (clang, warnings-as-errors)
+        working-directory: src
+        run: make CC=clang LTO=-flto=thin EXTRA_CFLAGS="-Wall -Werror=return-type"
+
+      - name: Build modules (clang, warnings-as-errors)
+        working-directory: src
+        run: make CC=clang LTO=-flto=thin EXTRA_CFLAGS="-Wall -Werror=return-type" modules
+
+  # ---------------------------------------------------------------------------
   # Compile-check the modules that are commented out in src/config.md, so they
   # are NOT built by `make modules` above and would otherwise rot silently.
   # Each entry builds the core lib (a `make module` prerequisite) + one module

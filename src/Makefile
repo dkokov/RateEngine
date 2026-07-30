@@ -64,7 +64,7 @@ RE7Core: $(CFG_OBJS) $(LOG_OBJS) $(DB_OBJS) $(MISC_OBJS) $(MOD_OBJS) $(EXTEN_OBJ
 MAIN_OBJ = $(MAIN_SRC:.c=.o)
 
 RateEngine: $(MAIN_OBJ)
-	$(CC) $(FLAGS) -o $(MAIN_TARGET) $(MAIN_OBJ) -L. -lre7core
+	$(CC) $(FLAGS) $(LTO) -o $(MAIN_TARGET) $(MAIN_OBJ) -L. -lre7core
 
 # RateEngine's modules
 name ?= 

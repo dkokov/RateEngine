@@ -21,8 +21,23 @@ FLAGS   = -Wall
 # strtol/atof/scanf to __isoc23_* symbols that are missing on older runtime libc
 # (e.g. dlopen rt.so -> "undefined symbol: __isoc23_strtol"). gnu17 keeps the GNU
 # extensions the code uses but emits the classic, portable libc symbols.
-CFLAGS  = -std=gnu17 -fPIC -Ofast -I/usr/include/libxml2/ -I$(PGSQL_INCLUDEDIR)
-LDFLAGS = -shared
+# Optimization level. NOT -Ofast: -Ofast implies -ffast-math, which enables
+# -fno-signed-zeros / reassociation and is a correctness hazard in a billing
+# engine (prices are double/float; free-billsec tracking relies on -0.0 vs 0.0
+# and on 'call_price < 0'). -O2 + strict FP keeps monetary math deterministic.
+# Overridable from the command line for A/B builds, e.g. make OPT="-O3".
+OPT ?= -O2 -fno-fast-math -ffp-contract=off
+
+# Link-Time Optimization. Must be on BOTH compile and link to trigger the LTO
+# recompile; -flto alone in CFLAGS relied on the linker plugin firing implicitly.
+# =auto parallelizes the LTO stage across cores. Note: LTO only optimizes within
+# the core lib and within each module -- it cannot cross the dlopen/.so + bind-API
+# function-pointer boundaries that the rating hot path goes through. Set LTO= to
+# disable (e.g. make LTO= for faster debug builds).
+LTO ?= -flto=auto
+
+CFLAGS  = -std=gnu17 -fPIC $(OPT) -I/usr/include/libxml2/ -I$(PGSQL_INCLUDEDIR)
+LDFLAGS = -shared $(LTO)
 LDLIBS  = -lpq
 
 # uname -p , print the processor type (non-portable)
@@ -44,9 +59,14 @@ ifeq ($(GCC_VERSION),8)
 endif
 
 # CPU ARCH
+# RE is always compiled on the host it runs on (binaries are never moved between
+# machines), so -march=native tunes each build for its own CPU with full ISA use
+# and no portability risk. Overridable, e.g. make MARCH="-march=x86-64-v3".
+# (was: -march=nocona -mtune=generic -mavx2 -- an incoherent P4-schedule +
+#  bolted-on AVX2 combo. -funroll-loops dropped: -O2/-O3 unroll selectively.)
+MARCH ?= -march=native -mtune=native
 ifeq ($(HOST_ARCH),x86_64)
-#	CFLAGS += -m64 -march=nocona -mtune=generic -mfpmath=sse -flto -funroll-loops
-	CFLAGS += -m64 -march=nocona -mtune=generic -mavx2 -flto -funroll-loops
+	CFLAGS += -m64 $(MARCH) $(LTO)
 else
 ifeq ($(HOST_ARCH),i386)
 	CFLAGS += -m32
@@ -69,6 +89,12 @@ RT_RATES_NOCACHE ?= 0
 ifeq ($(RT_RATES_NOCACHE),1)
 	CFLAGS += -DRATES_NOCACHE
 endif
+
+# Extra compile flags, appended last so they win. Empty by default (no effect on
+# normal builds). Used by the clang CI job to promote real defects to errors,
+# e.g. make CC=clang EXTRA_CFLAGS="-Wall -Werror=return-type".
+EXTRA_CFLAGS ?=
+CFLAGS += $(EXTRA_CFLAGS)
 
 CORE_DIR = ./
 

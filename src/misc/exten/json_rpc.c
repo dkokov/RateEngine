@@ -189,11 +189,6 @@ char *json_rpc_jrpc_get_method(jsonrpc_t *jrpc)
 	return method;
 }
 
-int json_rpc_jrpc_cpy_proto_type()
-{
-	
-}
-
 void json_rpc_proto_init(jsonrpc_t *jrpc,json_ext_obj_t *pobj)
 {
 	json_ext_obj_t *new;
