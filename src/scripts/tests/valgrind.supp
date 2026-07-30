@@ -1,0 +1,26 @@
+# Valgrind suppressions for RateEngine memory checks.
+#
+# Only THIRD-PARTY / toolchain false positives belong here - never suppress a
+# real RateEngine defect. Keep each entry tightly scoped and commented.
+
+# glibc dynamic linker (ld.so) RPATH/DST handling: is_dst() uses an SSE strncmp
+# that reads 8 bytes at a time and over-reads a few bytes past a strdup'd rpath
+# token (staying within the mapped page). Harmless, well-known glibc artifact
+# triggered by every dlopen() of a module. Not a RateEngine bug.
+{
+   glibc-ldso-is_dst-rpath-overread-Addr8
+   Memcheck:Addr8
+   ...
+   fun:is_dst
+   ...
+}
+
+# Same over-read reported as an uninitialised-value/conditional in some glibc
+# builds - keep a matching entry so CI is stable across distros.
+{
+   glibc-ldso-is_dst-rpath-overread-Cond
+   Memcheck:Cond
+   ...
+   fun:is_dst
+   ...
+}
