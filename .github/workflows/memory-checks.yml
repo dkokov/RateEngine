@@ -1,0 +1,125 @@
+name: memory-checks
+
+# Memory / leak analysis - a SEPARATE, slow, non-gating workflow (not part of
+# the PR build gate). It runs the engine under valgrind and reports memory
+# errors and definite leaks. Sanitizer (ASan/UBSan/TSan) jobs are intended to
+# join this file later, once a `SAN=` build switch exists in config.mk.
+#
+# Runs nightly and on demand only - never on push/PR, so a pre-existing issue
+# here does not red-gate normal development.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'      # nightly 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: memcheck-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # valgrind on the clean-exit startup path (`RateEngine -t db`): CLI + config
+  # parse, module dlopen/init, DB connect + query, and module teardown. This
+  # path exits normally, so leaks/errors are attributable (no daemon kill).
+  # ---------------------------------------------------------------------------
+  valgrind:
+    name: valgrind (startup + db + teardown)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: rate_engine
+          POSTGRES_USER: re_admin
+          POSTGRES_PASSWORD: _cfg.access
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc make libxml2-dev libjson-c-dev libpq-dev postgresql-client valgrind
+
+      - name: Build core + modules
+        working-directory: src
+        run: |
+          make
+          make modules
+
+      - name: Install
+        working-directory: src
+        run: sudo make install
+
+      - name: Load schema into the CI database
+        env:
+          PGPASSWORD: _cfg.access
+        run: psql -h localhost -U re_admin -d rate_engine -f src/scripts/sql/rt_pgsql.sql
+
+      - name: Write a minimal config (pgsql + cdrm + rt)
+        run: |
+          sudo tee /usr/local/RateEngine/config/memcheck.xml >/dev/null <<'XML'
+          <RateEngine version="0.7.6">
+           <System>
+              <param name="DIR" value="/usr/local/RateEngine/" />
+              <param name="PIDFile" value="logs/rate_engine.pid" />
+           </System>
+           <LoadModules>
+              <param name="module" value="pgsql.so" />
+              <param name="module" value="cdrm.so" />
+              <param name="module" value="rt.so" />
+           </LoadModules>
+           <DB>
+              <param name="dbtype" value="pgsql" />
+              <param name="dbhost" value="localhost" />
+              <param name="dbname" value="rate_engine" />
+              <param name="dbuser" value="re_admin" />
+              <param name="dbpass" value="_cfg.access" />
+              <param name="dbport" value="5432" />
+              <param name="NumberRetries" value="3" />
+              <param name="IntervalRetries" value="1" />
+           </DB>
+           <Rating>
+              <param name="active" value="no" />
+              <param name="leg" value="a" />
+           </Rating>
+           <CDRMediator>
+              <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
+           </CDRMediator>
+           <Logs>
+              <param name="LogFile" value="logs/rate_engine.log" />
+              <param name="LogMaxFileSize" value="40960000" />
+              <param name="LogSeparator" value="|" />
+              <param name="LogDebugLevel" value="1" />
+           </Logs>
+          </RateEngine>
+          XML
+          sudo mkdir -p /usr/local/RateEngine/config/cdr_profiles
+
+      - name: valgrind memcheck (RateEngine -t db)
+        run: |
+          export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
+          # Fail on memory ERRORS (invalid read/write, use-after-free) and on
+          # DEFINITE/INDIRECT leaks; "still reachable" (common benign lib state)
+          # is reported but not failed. Add suppressions later if third-party
+          # noise appears.
+          valgrind \
+            --tool=memcheck \
+            --leak-check=full \
+            --show-leak-kinds=definite,indirect \
+            --errors-for-leak-kinds=definite,indirect \
+            --track-origins=yes \
+            --num-callers=30 \
+            --error-exitcode=1 \
+            /usr/local/RateEngine/bin/RateEngine \
+              -c /usr/local/RateEngine/config/memcheck.xml -t db
