@@ -424,14 +424,18 @@ int rt_data_q_bal_add_sql(db_t *dbp,racc_t *rtp,char *start,char *end)
 
 	
 	if(rtp->bal_ptr->id > 0) {
-		sprintf(str,"update balance set amount = %f,last_update = now() where id = %d",rtp->bal_ptr->amount,rtp->bal_ptr->id);
-		
+		/* ATOMIC delta: add cprice inside the DB (not a read-modify-write of an
+		 * absolute value computed in C), so concurrent charges to the same balance
+		 * row can't lose updates - Postgres serializes them on the row lock. This
+		 * is what lets rt_balance_exec drop the global mutex on this path. */
+		sprintf(str,"update balance set amount = amount + %f,last_update = now() where id = %d",rtp->pre->cprice,rtp->bal_ptr->id);
+
 		ret = db_update(dbp,str);
 	} else {
 		sprintf(str,"insert into balance (billing_account_id,start_date,end_date,active,amount,last_update) values (%d,'%s','%s','t',%f,'now()')",
 				rtp->bacc_ptr->id,start,end,rtp->bal_ptr->amount);
-		
-		ret = db_insert(dbp,str);	
+
+		ret = db_insert(dbp,str);
 	}
 
 	return ret;

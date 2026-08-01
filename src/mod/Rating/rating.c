@@ -155,22 +155,26 @@ void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 	if(rtp->pre == NULL) return;
 	if(rtp->bal_ptr == NULL) return;
 
-	pthread_mutex_lock(&config.sync_bt_thread);
-
 	if(rtp->bal_ptr->id > 0) {
-		/* balance already loaded from prerating - just update with cprice */
+		/* Common path: balance row known. rt_data_q_bal_add now does an ATOMIC
+		 * delta (amount = amount + cprice) in SQL, so NO lock is needed - concurrent
+		 * charges to the same balance serialize on the Postgres row lock, different
+		 * balances run fully in parallel. (Phase 2) */
 		rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
 		rt_data_q_bal_add(dbp,rtp,start,end);
 	} else {
-		/* no balance loaded yet - query first */
+		/* Rare path: no balance row yet -> create it. Still guarded: two threads
+		 * could otherwise INSERT a duplicate row for the same period (no unique key
+		 * to rely on for an UPSERT). Once the row exists, subsequent CDRs take the
+		 * lock-free atomic-delta path above. */
+		pthread_mutex_lock(&config.sync_bt_thread);
 		int ret = rt_data_q_bal(dbp,rtp,start,end);
 		if(ret == 0) {
 			rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
 			rt_data_q_bal_add(dbp,rtp,start,end);
 		}
+		pthread_mutex_unlock(&config.sync_bt_thread);
 	}
-
-	pthread_mutex_unlock(&config.sync_bt_thread);
 }
 
 int rt_prerating_process(db_t *dbp,racc_t *rtp)
@@ -353,16 +357,16 @@ void rt_rating_save(db_t *dbp,racc_t *rtp)
 	int ret;
 	
 	if(rtp->pre->cdr_id > 0) {
-		pthread_mutex_lock(&config.sync_bt_thread);
-		
+		/* No lock: each worker inserts an INDEPENDENT rating row on its OWN db
+		 * connection (worker_dbp[t]), and the pool partitions CDRs by index so no
+		 * two threads touch the same call_id. The old global sync_bt_thread lock
+		 * here only serialized independent inserts for no reason. (Phase 1) */
 		ret = rt_data_q_rating_add(dbp,rtp);
-		
+
 		if(ret < 0) {
-			
+
 		}
-		
-		pthread_mutex_unlock(&config.sync_bt_thread);
-	}	
+	}
 }
 
 void rt_exec(db_t *dbp,racc_t *rtp,char leg)
