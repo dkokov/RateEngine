@@ -10,6 +10,9 @@ whole *pipeline* — the `calling_number → billing_account → bill_plan → r
 prefix → tariff → calc_function` lookup chain, the time-condition/pcard gates,
 and the write-back into the `rating` table.
 
+> For **throughput** and **`rt.so` vs `rt_duckdb.so` billing parity** on real
+> data, see [BENCHMARKS.md](BENCHMARKS.md).
+
 ## Data policy
 
 **All fixture data is synthetic.** No customer data is used. The only shipped
