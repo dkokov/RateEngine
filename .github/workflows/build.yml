@@ -114,6 +114,37 @@ jobs:
           DBPORT: "5432"
         run: bash src/scripts/tests/rating/run_rating_regression.sh
 
+      # Broader billing-parity gate on a SYNTHETIC benchmark DB (no real data):
+      # generate a small synthetic rating DB, then assert rt.so and rt_duckdb.so
+      # bill identically over it. Synthetic-only by construction - SRCDB points at
+      # the generated DB, and CI's Postgres holds no real data. (The throughput
+      # tool bench_rating_replay.sh is intentionally NOT run in CI: it is a perf
+      # benchmark, not a pass/fail gate.)
+      - name: Build synthetic benchmark DB (small)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBHOST: localhost
+          DBNAME: rate_engine        # maintenance connection only (CREATE DATABASE)
+          DBUSER: re_admin
+          DBPASS: _cfg.access
+          DBPORT: "5432"
+          BENCH_DB: re7_bench_ci
+          N_ACCOUNTS: "2000"
+          N_CDRS: "20000"
+        run: bash src/scripts/tests/rating/gen_bench_db.sh
+
+      - name: Rating parity on synthetic DB (rt.so vs rt_duckdb.so)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBHOST: localhost
+          DBUSER: re_admin
+          DBPASS: _cfg.access
+          DBPORT: "5432"
+          SRCDB: re7_bench_ci        # SYNTHETIC source (never a real DB)
+          N: "5000"
+          THREADS: "2"
+        run: bash src/scripts/tests/rating/parity_real.sh
+
   # ---------------------------------------------------------------------------
   # Second-compiler check: build the whole engine with clang. clang is NOT a
   # production toolchain here (we ship gcc) - it runs purely as a static checker
