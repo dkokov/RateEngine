@@ -199,6 +199,13 @@ e2e:
 rating-regression:
 	@scripts/tests/rating/run_rating_regression.sh
 
+.PHONY: bench-db
+# Build a SYNTHETIC benchmark database (default re7_bench) - no real data. Scale
+# with N_ACCOUNTS / N_CDRS env; then benchmark with SRCDB=re7_bench against the
+# perf/parity tools (see scripts/tests/rating/BENCHMARKS.md).
+bench-db:
+	@scripts/tests/rating/gen_bench_db.sh
+
 .PHONY: help
 help:
 	-@echo ""
@@ -217,6 +224,7 @@ help:
 	-@echo "  make uninstall PREFIX=/usr/local - uninstalation from define path in PREFIX="
 	-@echo "  make e2e                         - CallControl e2e tests (needs installed engine + DB)"
 	-@echo "  make rating-regression          - offline rating golden test (needs installed engine + DB)"
+	-@echo "  make bench-db                   - build synthetic benchmark DB (no real data)"
 	-@echo ""
 	-@echo " DuckDB engine (mod/db_duckdb) - the ~70M SDK is fetched on demand, never kept in git:"
 	-@echo "  make module name=db_duckdb                          - build duckdb.so (auto-downloads SDK; dynamic lib)"

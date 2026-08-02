@@ -7,9 +7,14 @@ parity* between the two rating engines.
 
 | script | question it answers |
 |--------|---------------------|
+| [`gen_bench_db.sh`](gen_bench_db.sh) | build a **synthetic** rating DB at scale (no real data) to benchmark against |
 | [`rating_perf_report.sh`](rating_perf_report.sh) | how fast did a rating run go? (parse a log → ms/cdr, cdr/s) |
-| [`bench_rating_replay.sh`](bench_rating_replay.sh) | throughput of `rt.so` vs `rt_duckdb.so` on **real** CDRs (safe, on a clone) |
-| [`parity_real.sh`](parity_real.sh) | do `rt.so` and `rt_duckdb.so` **bill identically** on real CDRs? |
+| [`bench_rating_replay.sh`](bench_rating_replay.sh) | throughput of `rt.so` vs `rt_duckdb.so` on a DB (safe, on a clone) |
+| [`parity_real.sh`](parity_real.sh) | do `rt.so` and `rt_duckdb.so` **bill identically** on a DB? |
+
+The perf/parity tools clone a **source** DB (`SRCDB`, default `rate_engine`). Point
+them at a synthetic DB built by `gen_bench_db.sh` to benchmark **without any real
+data**: `SRCDB=re7_bench ./bench_rating_replay.sh`.
 
 There is also a build-toolchain benchmark one level up,
 [`../bench_toolchain.sh`](../bench_toolchain.sh) (gcc vs clang: build time +
@@ -37,7 +42,33 @@ DB credentials default to the installed engine config
 
 ---
 
-## 1. `bench_rating_replay.sh` — throughput on real CDRs
+## 0. `gen_bench_db.sh` — synthetic benchmark DB (no real data)
+
+Builds a persistent DB (default `re7_bench`) from the committed schema
+`rt_pgsql.sql` filled with generated, **non-customer** data: 5 tariff plans,
+`N_ACCOUNTS` subscribers (billing_account + calling_number + pcard), and
+`N_CDRS` CDRs (random src from the accounts, dst from 10 prefixes, weekday
+timestamps). CDRs are marked `leg_a=1` ("rated") so the clone-and-replay tools
+below accept it as a production stand-in.
+
+```sh
+cd src/scripts/tests/rating
+./gen_bench_db.sh                              # 50k accounts, 1e6 CDRs (default)
+N_ACCOUNTS=5000 N_CDRS=100000 ./gen_bench_db.sh   # smaller
+
+# then benchmark / parity-check against it (SRCDB, not DBNAME):
+SRCDB=re7_bench ./bench_rating_replay.sh
+SRCDB=re7_bench MODULE=rt_duckdb.so ./bench_rating_replay.sh
+SRCDB=re7_bench ./parity_real.sh
+```
+
+It refuses to target the real DB name, and only uses the configured DB as the
+maintenance connection to `CREATE/DROP` the bench DB. Tariffs set
+`free_billsec_id=0`, so `rt.so` and `rt_duckdb.so` bill identically here
+(parity is a clean `MATCH`); the free-billsec drawdown difference seen on real
+data needs a dedicated free-billsec fixture to reproduce.
+
+## 1. `bench_rating_replay.sh` — throughput on CDRs
 
 Clones the live DB read-only, `VACUUM ANALYZE`s the clone (so query plans are
 representative), resets the newest `N` already-rated CDRs to unrated, and re-rates
