@@ -57,6 +57,8 @@ Parameters used only for DB sources:
     <param name="sql-where-const" value="billsec > 0" />
     <!-- Start scheduler timestamp (start date) -->
     <param name="SchedTS" value="2018-12-01 00:00:00" />
+    <!-- rows per remote-read cursor FETCH (pgsql); bounds ingestion memory. Optional, default 50000 -->
+    <param name="fetch-chunk" value="50000" />
 ```
 
 Params used only for CSV files. The key one is `file-field-num` - the number of
@@ -97,6 +99,8 @@ If you don't set `cdr-rec-type` as a param in the profile file, the Rating uses 
 | `sql-col-where-type` | `ts` (timestamp) or `epoch` (integer) |
 | `sql-where-const` | extra static WHERE clause, e.g. `billsec > 0` |
 | `SchedTS` | start timestamp for the scheduler (DB) |
+| `dbport` | remote DB port (DB) |
+| `fetch-chunk` | rows per remote-read cursor `FETCH` (pgsql); bounds ingestion memory. Optional, default `50000` |
 | `cdr-rec-type` | record type for Rating: `unkn`, `isup`, `sms`, `voip-audio`, `voip-video`, `voip-trunk` (defaults to `unkn`) |
 
 #### CDRFormat
@@ -157,10 +161,13 @@ If a param has no value (`value=""`), the CDRMediator ignores that field.
 
 `PrefixFiltering` normalizes the **called number** before rating - handy for
 turning short or internal numbers into full E.164. It works the same for CSV and
-DB sources, and is applied only when `CalledNumberFiltering` is `yes`. Each
-`<filter>` is one rule:
+DB sources, and is applied only when `CalledNumberFiltering` is `yes`.
 
-| Field | Meaning |
+Each rule is one `<filter>` element, and the four fields are **attributes** on
+that element (the parser reads them with `xmlGetProp`; `<param>` sub-elements are
+**not** supported here):
+
+| Attribute | Meaning |
 |---|---|
 | `prefix` | leading digit(s) the called number must start with |
 | `len` | rule fires only when the called number has exactly this many digits |
@@ -169,35 +176,10 @@ DB sources, and is applied only when `CalledNumberFiltering` is `yes`. Each
 
 ``` XML
   <PrefixFiltering>
-    <filter>
-    <param name="prefix" value="2" />
-    <param name="num" value="1" />
-    <param name="replace" value="359429372" />
-    <param name="len" value="3" />
-    </filter>
-    <filter>
-    <param name="prefix" value="4" />
-    <param name="num" value="1" />
-    <param name="replace" value="359241194" />
-    <param name="len" value="3" />
-    </filter>
-    <filter>
-    <param name="prefix" value="6" />
-    <param name="num" value="1" />
-    <param name="replace" value="359241196" />
-    <param name="len" value="3" />
-    </filter>
-    <filter>
-    <param name="prefix" value="7" />
-    <param name="num" value="1" />
-    <param name="replace" value="359241197" />
-    <param name="len" value="3" />
-    </filter>
-    <filter>
-    <param name="prefix" value="9" />
-    <param name="num" value="1" />
-    <param name="replace" value="359241199" />
-    <param name="len" value="3" />
-    </filter>
+    <filter prefix="2" num="1" replace="359429372" len="3" />
+    <filter prefix="4" num="1" replace="359241194" len="3" />
+    <filter prefix="6" num="1" replace="359241196" len="3" />
+    <filter prefix="7" num="1" replace="359241197" len="3" />
+    <filter prefix="9" num="1" replace="359241199" len="3" />
   </PrefixFiltering>
 ```

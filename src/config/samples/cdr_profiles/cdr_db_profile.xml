@@ -16,10 +16,13 @@
     <param name="dbuser" value="your_username" />
     <param name="dbpass" value="your_password" />
     <param name="dbname" value="your_dbname" />
+    <param name="dbport" value="5432" />
     <!-- DB type (pgsql,mysql,oracle,...) -->
     <param name="dbtype" value="db_engine" />
     <!-- SQL Query into the remote db server -->
     <param name="cdr-table" value="cdrs" />
+    <!-- rows per remote-read cursor FETCH; bounds ingestion memory (pgsql; default 50000) -->
+    <param name="fetch-chunk" value="50000" />
     <!-- 'timestamp' or 'integer(epoch)' type -->
     <param name="sql-col-where" value="ts" />
     <!-- 'ts' or 'epoch' -->
