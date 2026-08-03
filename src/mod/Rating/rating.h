@@ -44,6 +44,7 @@ typedef struct rate_engine
 
     unsigned short bal_num;
     unsigned short num_threads;
+    int batch_limit;   /* CDRs fetched per cycle (from <Rating> BatchLimit; 0 = default) */
 
     /* worker threads */
     rt_worker_t workers[RT_MAX_THREADS];

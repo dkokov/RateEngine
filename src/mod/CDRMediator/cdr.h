@@ -50,11 +50,14 @@ typedef struct cdr {
     /* Service(REC) Type ID */ 
     unsigned short cdr_rec_type_id;
     
-    /* LegA ID in the rating */
+    /* Rating state / result for each leg (the cdrs.leg_a / leg_b column):
+     *    0   = unrated  (pending; the rating fetch selects WHERE leg = 0)
+     *   >0   = rated    (the value IS the rating.id for this CDR)
+     *   -1   = unmatched(evaluated but no account/rate resolved -> skipped next cycle)
+     * Both rt.so and rt_duckdb.so use this convention. */
     unsigned int leg_a;
-    
-    /* LegB ID in the rating */
-    unsigned int leg_b;    
+
+    unsigned int leg_b;
     
     /* Call Unique ID */
     char call_uid[CALL_UID_LEN]; 
@@ -201,7 +204,7 @@ int cdr_add_in_db_query(db_t *dbp,cdr_t *cdr_pt);
 int cdr_add_in_db_set(db_t *dbp,cdr_t *cdr_pt);
 
 int cdr_get_cdr_id(db_t *dbp,cdr_t *the_cdr);
-cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig);
+cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig,int limit);
 void cdr_update_cdr(db_t *dbp,int rating_id,int cdr_id,char leg,char *call_uid);
 
 extern cdr_table_t *cdr_tbl_cpy_ptr;

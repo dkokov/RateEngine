@@ -80,7 +80,11 @@ void rt_cfg_get(rt_cfg_t *cfg)
 			
 			if(strcmp(params->name,"BalActiveNum") == 0) {
 				cfg->bal_num = atoi(params->value);
-			}			
+			}
+
+			if(strcmp(params->name,"BatchLimit") == 0) {
+				cfg->batch_limit = atoi(params->value);
+			}
 
 			if(strcmp(params->name,"RatingJSONConfigDIR") == 0) {
 				strcpy(cfg->rt_cfg_json_dir,params->value);

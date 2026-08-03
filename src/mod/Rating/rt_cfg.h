@@ -37,6 +37,8 @@ typedef struct rt_cfg {
 
 	unsigned short rating_threads;
 
+	int batch_limit;   /* CDRs fetched per rating cycle (<Rating> BatchLimit; 0 = default) */
+
 	char rt_cfg_json_dir[256];
 }rt_cfg_t;
 

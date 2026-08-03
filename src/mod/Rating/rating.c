@@ -787,7 +787,7 @@ int rt_loop(rate_engine_t *rt_eng)
 		t1 = tim.tv_sec+(tim.tv_usec/1000000.0);
 	}
 
-	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0);
+	cdrs = cdrm_api->get_cdrs(rt_eng->dbp,rt_eng->leg,0,rt_eng->batch_limit);
 
 	if(cdrs) {
 		/* count CDRs in batch */
@@ -1028,6 +1028,9 @@ void *RateEngine(void *dt)
 
 	if(cfg->rating_threads > 1) rt_eng.num_threads = cfg->rating_threads;
 	else rt_eng.num_threads = RT_DEFAULT_THREADS;
+
+	/* fetch-batch size; 0 -> cdr_get_cdrs falls back to CDR_BATCH_LIMIT */
+	rt_eng.batch_limit = cfg->batch_limit;
 
 	if(rt_eng.num_threads > RT_MAX_THREADS) rt_eng.num_threads = RT_MAX_THREADS;
 

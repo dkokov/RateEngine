@@ -388,11 +388,15 @@ cdr_t *cdr_get_from_db(char *call_uid)
 }*/
 
 /* Get all no rating CDRs */
-cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig)
+cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig,int limit)
 {
 	int c,p;
-	char *columns;	
+	char *columns;
     char str[SQL_BUF_LEN];
+
+	/* caller (rt.so) controls the fetch-batch size via <Rating> BatchLimit;
+	 * fall back to the compile-time default when unset/invalid */
+	if(limit <= 0) limit = CDR_BATCH_LIMIT;
 
 	db_sql_result_t *result;
 	db_nosql_result_t *tmp;
@@ -405,7 +409,7 @@ cdr_t *cdr_get_cdrs(db_t *dbp,char leg,int dig)
 		if(columns != NULL) {
 			bzero(str,sizeof(str));
 			
-			sprintf(str,"select %s from %s where leg_%c = %d order by id limit %d",columns,CDR_TABLE_NAME,leg,dig,CDR_BATCH_LIMIT);
+			sprintf(str,"select %s from %s where leg_%c = %d order by id limit %d",columns,CDR_TABLE_NAME,leg,dig,limit);
 
 			mem_free(columns);
 			

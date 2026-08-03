@@ -8,7 +8,7 @@
 #include "cdr_mediator.h"
 
 typedef void* (*cdr_mediator_eng_f) (void *dt);
-typedef cdr_t* (*cdr_get_cdrs_f) (db_t *dbp,char leg,int dig);
+typedef cdr_t* (*cdr_get_cdrs_f) (db_t *dbp,char leg,int dig,int limit);
 typedef void (*cdr_update_cdr_f) (db_t *dbp,int rating_id,int cdr_id,char leg,char *call_uid);
 typedef int (*cdr_add_in_db_f) (db_t *dbp,cdr_t *cdr_pt,filter *filters);
 typedef int (*cdr_get_cdr_id_f)(db_t *dbp,cdr_t *the_cdr);

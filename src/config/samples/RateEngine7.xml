@@ -56,6 +56,10 @@
     <param name="RatingInterval" value="300" />
     <!-- in micro seconds -->
     <param name="WaitRatingInterval" value="500" />
+    <!-- CDRs fetched/rated per cycle. Honored by BOTH engines: rt.so passes it
+         to the CDRMediator fetch, rt_duckdb.so uses it as its window LIMIT.
+         Empty/unset -> 1000 (rt.so) / 5000 (rt_duckdb.so). -->
+    <param name="BatchLimit" value="1000" />
     <!-- When you want to use pcard for all subscribers,
          set this param with 'yes' -->
     <param name="UsePCard" value="no" />
