@@ -87,60 +87,116 @@ void cdr_storage_sql_query_parser(cdr_storage_profile_t *profile)
  * Insert CDR in the local DB.
  * 
  */
+/* Map one remote result row -> cdr_t and insert it locally. Returns 1 if the
+ * insert reported success (incl. an ON CONFLICT no-op), 0 otherwise. */
+static int cdr_storage_insert_row(cdr_storage_profile_t *profile,db_sql_result_t *result,int i)
+{
+	int c;
+	cdr_t the_cdr;
+	cdr_storage_col_t *cols = profile->cols;
+
+	memset(&the_cdr,0,sizeof(the_cdr));
+
+	the_cdr.cdr_server_id   = profile->cdr_server_id;
+	the_cdr.cdr_rec_type_id = profile->cdr_rec_type_id;
+
+	for(c = 0;c < (profile->cols_num - 1);c++) {
+		(*cols[c].func)(&the_cdr,result->cols_list[c].rows_list[i].row);
+	}
+
+	strcpy(the_cdr.profile_name,profile->profile_name);
+
+	return (cdr_add_in_db(profile->dbp,&the_cdr,profile->filters) == 0) ? 1 : 0;
+}
+
 int cdr_storage_get_remote_cdrs(cdr_storage_profile_t *profile)
-{ 
-    int i,c,p;    
+{
+    int i,p,fetched,rows;
     char ts[21];
-    
-    cdr_t the_cdr;    
-    cdr_storage_col_t *cols;
+
 	db_sql_result_t *result;
 
 	if(profile->rem_dbp == NULL) return -1;
+	if(profile->rem_dbp->t != sql) return 0;
 
-	if(profile->rem_dbp->t == sql) {
-		p = 0;
-		cols = profile->cols;
-	
-		bzero(ts,21);
-		convert_epoch_to_ts(profile->ts,ts);
-	
+	p = 0;
+	fetched = 0;
+
+	bzero(ts,21);
+	convert_epoch_to_ts(profile->ts,ts);
+
+	/* Rows are inserted locally with autocommit (each visible+durable at once,
+	 * so rating runs concurrently and a restart loses only the last row). Dedup
+	 * is via cdrs.call_uid UNIQUE + ON CONFLICT. Only the REMOTE read is wrapped
+	 * (read-only) below when a server-side cursor is used. */
+
+	if(strcmp(profile->rem_dbp->conn->enginename,"pgsql") == 0) {
+		/* Bounded-memory path: stream the remote result through a server-side
+		 * cursor in chunks instead of materializing millions of rows at once. */
+		int chunk = (profile->fetch_chunk > 0) ? profile->fetch_chunk : CDR_FETCH_CHUNK;
+		char decl[SQL_BUF_LEN + 128];
+		char fetchq[128];
+
+		snprintf(decl,sizeof(decl),"DECLARE %s CURSOR FOR %s",CDR_CURSOR_NAME,profile->sql_query);
+		snprintf(fetchq,sizeof(fetchq),"FETCH %d FROM %s",chunk,CDR_CURSOR_NAME);
+
+		db_query(profile->rem_dbp,"BEGIN",1);            /* cursor needs a tx (read-only) */
+		db_query(profile->rem_dbp,decl,1);
+
+		for(;;) {
+			db_query(profile->rem_dbp,fetchq,0);         /* keep result for db_fetch */
+			db_fetch(profile->rem_dbp);
+
+			if(profile->rem_dbp->conn->result == NULL) break;
+			result = (db_sql_result_t *)profile->rem_dbp->conn->result;
+			rows = result->rows;
+
+			for(i = 0;i < rows;i++) {
+				p += cdr_storage_insert_row(profile,result,i);
+
+				if((p > 0) && (p % CDR_PROGRESS_STEP == 0))
+					LOG("cdr_storage_get_romote_cdrs()",
+						"progress: inserted %d,cdr_server_id: %d",p,profile->cdr_server_id);
+			}
+
+			fetched += rows;
+
+			db_sql_result_free(result);
+			profile->rem_dbp->conn->result = NULL;
+
+			if(rows < chunk) break;                      /* last (partial) chunk */
+		}
+
+		db_query(profile->rem_dbp,"CLOSE " CDR_CURSOR_NAME,1);
+		db_query(profile->rem_dbp,"COMMIT",1);
+	} else {
+		/* Non-pgsql engines: single fetch (cursor/FETCH syntax is pg-specific). */
 		db_select(profile->rem_dbp,profile->sql_query);
 		db_fetch(profile->rem_dbp);
-	
+
 		if(profile->rem_dbp->conn->result != NULL) {
 			result = (db_sql_result_t *)profile->rem_dbp->conn->result;
-			
-			if(result->rows > 0) {
-				/* Autocommit per insert (no wrapping transaction): each CDR
-				 * becomes visible+durable immediately, so the rating engine can
-				 * process them concurrently and a restart loses only the last
-				 * row instead of the whole batch. Dedup is handled by the
-				 * cdrs.call_uid UNIQUE constraint + ON CONFLICT in the insert. */
-				for (i = 0; i < result->rows ;i++) {
-					memset(&the_cdr,0,sizeof(the_cdr));
+			rows = result->rows;
 
-					the_cdr.cdr_server_id = profile->cdr_server_id;
-					the_cdr.cdr_rec_type_id = profile->cdr_rec_type_id;
+			for(i = 0;i < rows;i++) {
+				p += cdr_storage_insert_row(profile,result,i);
 
-					for(c = 0;c < (profile->cols_num - 1);c++) {
-						(*cols[c].func)(&the_cdr,result->cols_list[c].rows_list[i].row);
-					}
-
-					strcpy(the_cdr.profile_name,profile->profile_name);
-					if(cdr_add_in_db(profile->dbp,&the_cdr,profile->filters) == 0) p++;
-				}
+				if((p > 0) && (p % CDR_PROGRESS_STEP == 0))
+					LOG("cdr_storage_get_romote_cdrs()",
+						"progress: inserted %d,cdr_server_id: %d",p,profile->cdr_server_id);
 			}
-			
-			LOG("cdr_storage_get_romote_cdrs()",
-				"get cdrs num: %d,cdr_server_id: %d,inserted cdrs: %d(%.2f%),ts: %s (%d)",
-				result->rows,profile->cdr_server_id,p,(((float)p/(float)result->rows)*100),ts,profile->ts);
-		
+
+			fetched = rows;
+
 			db_sql_result_free(result);
 			profile->rem_dbp->conn->result = NULL;
 		}
 	}
-	
+
+	LOG("cdr_storage_get_romote_cdrs()",
+		"get cdrs num: %d,cdr_server_id: %d,inserted cdrs: %d(%.2f%),ts: %s (%d)",
+		fetched,profile->cdr_server_id,p,(fetched > 0 ? (((float)p/(float)fetched)*100) : 0),ts,profile->ts);
+
 	return p;
 }
 

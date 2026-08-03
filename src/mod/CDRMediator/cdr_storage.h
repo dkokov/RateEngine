@@ -3,6 +3,12 @@
 
 #define CDR_COL_LEN 32
 
+/* Remote read is fetched through a server-side cursor in bounded chunks so a
+ * huge backfill does not materialize the whole result set in memory. */
+#define CDR_FETCH_CHUNK   50000            /* default rows per FETCH */
+#define CDR_PROGRESS_STEP 100000           /* LOG a progress line every N inserts */
+#define CDR_CURSOR_NAME   "re7_cdr_cur"
+
 typedef struct cdr_storage_col {
 	unsigned short col_id;
 	char col_name[CDR_COL_LEN];
@@ -32,7 +38,8 @@ typedef struct cdr_storage_profile {
     char dbuser[64];
     char dbpass[64];
     int dbport;
-    				
+    int fetch_chunk;   /* rows per cursor FETCH (0 => CDR_FETCH_CHUNK) */
+
 	char *sql_query;	
 	char cdr_table[128];
 	

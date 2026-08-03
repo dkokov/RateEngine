@@ -212,7 +212,13 @@ void cdr_profile_cfg_get(cdr_profile_cfg_t *cfg)
 				
 				if(strcmp(params->name,"dbport") == 0) {
 					cfg->profile_db_type->dbport = atoi(params->value);
-				}				
+				}
+
+				/* Rows per server-side cursor FETCH on the remote read
+				 * (0/absent => CDR_FETCH_CHUNK). Bounds ingestion memory. */
+				if(strcmp(params->name,"fetch-chunk") == 0) {
+					cfg->profile_db_type->fetch_chunk = atoi(params->value);
+				}
 				
 				if(strcmp(params->name,"dbtype") == 0) {
 					strcpy(cfg->profile_db_type->dbtype,params->value);
