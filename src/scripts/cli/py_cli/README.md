@@ -45,6 +45,7 @@ Dependencies only (no console script): `pip install -r requirements.txt`, then r
 ./re7commander.py dump MobilePromo1 --format json   # csv (default) | json | yaml
 re7commander dump P --format json > P.json && re7commander import P.json   # round-trip
 ./re7commander.py test MobilePromo1 100 --start 0 --amount 20   # create 100 test accounts
+./re7commander.py test MobilePromo1 10 --sm-bill-plan SMS-Promo1  # + secondary SMS plan
 ./re7commander.py gen-cdrs --count 50            # insert 50 random CDRs into fs_cdrs
 ```
 

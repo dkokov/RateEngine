@@ -231,8 +231,13 @@ constants with module constants / argparse args. Reads `testing_phone_number.csv
         `insert_cdr` (53 cols, parameterized) + `make_test_cdr`/`insert_test_cdrs`;
         `create_test_calling_number_accounts` reimplements the account-creation flow on
         `re7/db.py` (§4.8), per-account transaction. Wired as `test` and `gen-cdrs`.
-        `sm_bill_plan` is accepted but ignored (re7 insert_rating_account has no slot).
         Pending: run against a live DB.
+- [x] **Post-port enhancement — `sm_bill_plan_id`** (beyond the PHP): `insert_rating_account`
+        now sets the secondary/SMS plan on `calling_number_deff` (only that `_deff` has the
+        column; ignored for other modes). Exposed via CSV mode-3 column 9, the `test
+        --sm-bill-plan` flag, and `create_test_calling_number_accounts(sm_bill_plan=...)`.
+        Rating modes 1–6 (calling_number, account_code, src/dst_context, src/dst_tgroup)
+        are all provisionable; trunk groups (5/6) carry clg_nadi/cld_nadi.
 - [x] **Phase 5 — Cutover** (done)
   - [x] Update `test_bp/readme` examples to the new CLI invocation.
   - [x] Move PHP `RE6Commander` + `config.app.php` + `lib/` + `readme` to `legacy_php/`

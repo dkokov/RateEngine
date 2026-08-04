@@ -293,12 +293,17 @@ def insert_pcard(
 
 
 def insert_rating_account(
-    db: Database, rating_mode: str, rating_account: str, billing_account_id: int, bill_plan_id: int
+    db: Database, rating_mode: str, rating_account: str, billing_account_id: int,
+    bill_plan_id: int, sm_bill_plan_id: int | None = None,
 ) -> int:
     """Create a rating account + its _deff row, return the account id.
 
     Inserts into the per-mode table and ``<mode>_deff``; the mode name drives the
     table/column identifiers (composed, never interpolated). PHP: insert_rating_account().
+
+    ``sm_bill_plan_id`` (secondary/SMS bill plan) is written only for the
+    ``calling_number`` mode — it is the only ``_deff`` table with that column. It is
+    ignored (with a note) for any other mode.
     """
     from psycopg import sql
 
@@ -307,10 +312,21 @@ def insert_rating_account(
     ).format(tbl=sql.Identifier(rating_mode), col=sql.Identifier(rating_mode))
     rid = db.insert_returning(ins, (rating_account, billing_account_id))
 
-    deff = sql.SQL(
-        "insert into {tbl} ({col}, bill_plan_id) values (%s, %s)"
-    ).format(tbl=sql.Identifier(f"{rating_mode}_deff"), col=sql.Identifier(f"{rating_mode}_id"))
-    db.execute(deff, (rid, bill_plan_id))
+    use_sm = sm_bill_plan_id is not None and rating_mode == "calling_number"
+    if sm_bill_plan_id is not None and not use_sm:
+        print(f"note: sm_bill_plan ignored for rating mode {rating_mode!r} "
+              f"(only calling_number has sm_bill_plan_id)", file=sys.stderr)
+
+    if use_sm:
+        deff = sql.SQL(
+            "insert into {tbl} ({col}, bill_plan_id, sm_bill_plan_id) values (%s, %s, %s)"
+        ).format(tbl=sql.Identifier(f"{rating_mode}_deff"), col=sql.Identifier(f"{rating_mode}_id"))
+        db.execute(deff, (rid, bill_plan_id, sm_bill_plan_id))
+    else:
+        deff = sql.SQL(
+            "insert into {tbl} ({col}, bill_plan_id) values (%s, %s)"
+        ).format(tbl=sql.Identifier(f"{rating_mode}_deff"), col=sql.Identifier(f"{rating_mode}_id"))
+        db.execute(deff, (rid, bill_plan_id))
     return rid
 
 

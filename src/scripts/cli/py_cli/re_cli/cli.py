@@ -123,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("--amount", default=20, help="prepaid card amount (default 20)")
     p_test.add_argument("--prefix", default="35910", help="number prefix (default 35910)")
     p_test.add_argument("--sm-bill-plan", dest="sm_bill_plan", default=None,
-                        help="secondary bill plan (currently ignored)")
+                        help="secondary/SMS bill plan for calling_number accounts")
     p_test.set_defaults(func=cmd_test)
 
     p_gen = sub.add_parser("gen-cdrs", help="insert random test CDRs into fs_cdrs")

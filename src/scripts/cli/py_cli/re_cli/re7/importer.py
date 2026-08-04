@@ -10,6 +10,13 @@ PHP entry: ``re6_import_settings($file)``. Each line's first field is a
     4  prepaid card (for the current billing account)
     5  bill plan tree (root + children)
 
+Mode-3 columns:
+    3,billing_account,leg,currency_id,rating_mode_id,rating_account,cdr_server_id,
+      clg_nadi,cld_nadi,sm_bill_plan
+The last two (clg_nadi/cld_nadi) apply to trunk-group modes (5/6); the optional
+sm_bill_plan (column 9, a bill-plan *name*) sets the secondary/SMS plan on
+calling_number accounts only. Columns 8+ may be omitted for the common cases.
+
 State carried across rows (current bill plan / tariff / billing account) lives in
 :class:`ImportState` instead of the PHP loop-local variables. The PHP
 "insert-then-goto-reselect" loops become get-or-create using the RETURNING-based
@@ -19,6 +26,8 @@ Deviations from the PHP, all faithful to intent (see MIGRATION.md §6):
   * FIX-4 — the mode-3 branch chooses insert_rating_account vs _2 by the rating
     *mode id* (<=4 vs >=5), not by the mode *name* string as the PHP did (a string
     compared to an int — broken under PHP 8).
+  * sm_bill_plan (calling_number secondary/SMS plan, calling_number_deff.sm_bill_plan_id)
+    — a column added here; the PHP importer had no field for it.
   * The commented-out free_billsec / time_condition blocks in mode 2 stay omitted.
 """
 
@@ -181,12 +190,19 @@ def _mode_accounts(db: Database, state: ImportState, row: Sequence[str]) -> None
     cdr_server_id = _int(_get(row, 6))
     clg_nadi = _int(_get(row, 7)) if _get(row, 7).strip() else None
     cld_nadi = _int(_get(row, 8)) if _get(row, 8).strip() else None
+    sm_bill_plan = _strip_quotes(_get(row, 9))  # optional: secondary/SMS plan (calling_number)
 
     if rating_mode_id == 0:
         return
     rating_mode = q.get_rating_mode(db, rating_mode_id)
     if not rating_mode:
         return
+
+    sm_bill_plan_id = None
+    if sm_bill_plan:
+        sm_bill_plan_id = q.get_bill_plan_id(db, sm_bill_plan)
+        if not sm_bill_plan_id:
+            raise CliError(f"sm_bill_plan not found: {sm_bill_plan!r}")
 
     billing_account_id = q.get_billing_account_id(db, billing_account)
     if not billing_account_id:
@@ -197,7 +213,8 @@ def _mode_accounts(db: Database, state: ImportState, row: Sequence[str]) -> None
     if not rating_account_id:
         # FIX-4: branch on the mode id, not the mode name (see module docstring).
         if rating_mode_id <= 4:
-            q.insert_rating_account(db, rating_mode, rating_account, billing_account_id, state.bill_plan_id)
+            q.insert_rating_account(db, rating_mode, rating_account, billing_account_id,
+                                    state.bill_plan_id, sm_bill_plan_id)
         else:
             q.insert_rating_account_2(
                 db, rating_mode, rating_account, billing_account_id, state.bill_plan_id, clg_nadi, cld_nadi

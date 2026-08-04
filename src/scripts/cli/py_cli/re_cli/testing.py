@@ -13,8 +13,6 @@ insert_rating_account and is therefore ignored — noted as a limitation.
 
 from __future__ import annotations
 
-import sys
-
 from .database import Database
 from .errors import CliError
 from .re7 import db as q
@@ -48,9 +46,12 @@ def create_test_calling_number_accounts(
     if not bill_plan_id:
         raise CliError(f"bill plan not found: {bill_plan!r}")
 
+    # Secondary/SMS bill plan for the calling_number_deff (optional).
+    sm_bill_plan_id = None
     if sm_bill_plan:
-        print(f"warning: sm_bill_plan ({sm_bill_plan!r}) is not supported by the re7 "
-              f"rating-account insert and will be ignored", file=sys.stderr)
+        sm_bill_plan_id = q.get_bill_plan_id(db, sm_bill_plan)
+        if not sm_bill_plan_id:
+            raise CliError(f"sm_bill_plan not found: {sm_bill_plan!r}")
 
     # Resolve pcard type/status once (PHP looked them up per account).
     type_id = q.get_pcard_type_id(db, PCARD_TYPE) or 2
@@ -67,7 +68,8 @@ def create_test_calling_number_accounts(
                 or q.insert_billing_account(db, bacc_username, CURR_ID, LEG, CDR_SERVER_ID)
             )
             if not q.get_rating_account_id(db, RATING_MODE, number):
-                q.insert_rating_account(db, RATING_MODE, number, bacc_id, bill_plan_id)
+                q.insert_rating_account(db, RATING_MODE, number, bacc_id, bill_plan_id,
+                                        sm_bill_plan_id)
             if not q.get_pcard_id(db, bacc_id, type_id, status_id, amount, None, None):
                 q.insert_pcard(db, bacc_id, type_id, status_id, amount, None, None)
 
