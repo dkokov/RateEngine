@@ -4,7 +4,7 @@
 
 function insert_cdr($arrXml)
 {
-    $conn = pg_connect("host=127.0.0.1 port=5432 dbname=fs_cdrs user=global password=_cfg.access");
+    $conn = pg_connect("host=127.0.0.1 port=5432 dbname=fs_cdrs user=global password=change_me");
 
     if(empty($arrXml['variables']['sip_h_X-freetdm-rdnis-screen'])) $arrXml['variables']['sip_h_X-freetdm-rdnis-screen'] = 0;
     if(empty($arrXml['variables']['sip_h_X-freetdm-rdnis-presentation'])) $arrXml['variables']['sip_h_X-freetdm-rdnis-presentation'] = 0;

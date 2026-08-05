@@ -43,7 +43,7 @@ Parameters used only for DB sources:
     <!-- Get CDR 'db' config -->
     <param name="dbhost" value="localhost" />
     <param name="dbuser" value="global" />
-    <param name="dbpass" value="_cfg.access" />
+    <param name="dbpass" value="change_me" />
     <param name="dbname" value="fs_cdrs" />
     <param name="dbport" value="5432" />
     <!-- DB type: pgsql, mysql -->

@@ -1,8 +1,7 @@
 FROM postgres:15.1
 
-ENV POSTGRES_DB=rate_engine
-ENV POSTGRES_USER=re_admin
-ENV POSTGRES_PASSWORD=_cfg.access
+# POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD are provided by
+# docker-compose (from docker/.env) — never bake the password into the image.
 
 EXPOSE 5432
 

@@ -26,7 +26,7 @@ jobs:
         env:
           POSTGRES_DB: rate_engine
           POSTGRES_USER: re_admin
-          POSTGRES_PASSWORD: _cfg.access
+          POSTGRES_PASSWORD: ci_dev_only_pw
         ports:
           - 5432:5432
         options: >-
@@ -59,7 +59,7 @@ jobs:
 
       - name: Init database schema
         env:
-          PGPASSWORD: _cfg.access
+          PGPASSWORD: ci_dev_only_pw
         # Use the COMMITTED schema (rt_pgsql_v2.sql: structure + generic lookups,
         # no customer data). Not rate_engine_0.6.13.sql - that file is untracked
         # (holds real customer data) and is absent in CI, so the old step
@@ -71,7 +71,7 @@ jobs:
           sudo sed -i 's/your_hostname/localhost/' /usr/local/RateEngine/config/RateEngine7.xml
           sudo sed -i 's/your_dbname/rate_engine/' /usr/local/RateEngine/config/RateEngine7.xml
           sudo sed -i 's/your_user/re_admin/' /usr/local/RateEngine/config/RateEngine7.xml
-          sudo sed -i 's/your_password/_cfg.access/' /usr/local/RateEngine/config/RateEngine7.xml
+          sudo sed -i 's/your_password/ci_dev_only_pw/' /usr/local/RateEngine/config/RateEngine7.xml
 
       - name: Start RateEngine (smoke test)
         run: |
@@ -98,7 +98,7 @@ jobs:
           DBHOST: localhost
           DBNAME: rate_engine
           DBUSER: re_admin
-          DBPASS: _cfg.access
+          DBPASS: ci_dev_only_pw
           DBPORT: "5432"
         run: bash src/scripts/tests/e2e/run_e2e.sh
 
@@ -108,7 +108,7 @@ jobs:
           DBHOST: localhost
           DBNAME: rate_engine
           DBUSER: re_admin
-          DBPASS: _cfg.access
+          DBPASS: ci_dev_only_pw
           DBPORT: "5432"
         run: bash src/scripts/tests/rating/run_rating_regression.sh
 
@@ -124,7 +124,7 @@ jobs:
           DBHOST: localhost
           DBNAME: rate_engine        # maintenance connection only (CREATE DATABASE)
           DBUSER: re_admin
-          DBPASS: _cfg.access
+          DBPASS: ci_dev_only_pw
           DBPORT: "5432"
           BENCH_DB: re7_bench_ci
           N_ACCOUNTS: "2000"
@@ -136,7 +136,7 @@ jobs:
           RE_PREFIX: /usr/local/RateEngine
           DBHOST: localhost
           DBUSER: re_admin
-          DBPASS: _cfg.access
+          DBPASS: ci_dev_only_pw
           DBPORT: "5432"
           SRCDB: re7_bench_ci        # SYNTHETIC source (never a real DB)
           N: "5000"

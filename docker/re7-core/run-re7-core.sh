@@ -10,8 +10,18 @@ PSQL=/usr/bin/psql
 if [ ! -f /root/.pgpass ]; then
     cp -vfR /re7-core/tmp/* $APP_DIR/
     cp -vfR /re7-core/docker/re7-core/samples/* $APP_DIR/config/
-    cp -vf /re7-core/docker/re7-core/.pgpass /root/.pgpass
+
+    # inject the DB password from the environment (never stored in the image).
+    : "${RE7_DB_PASS:?RE7_DB_PASS not set (docker/.env)}"
+    printf 're7-db:*:rate_engine:re_admin:%s\n' "$RE7_DB_PASS" > /root/.pgpass
     chmod 0600 /root/.pgpass
+    # fill the '__RE7_DB_PASS__' placeholder in the copied config (bash expansion
+    # handles any special chars in the password)
+    for f in $(find "$APP_DIR/config" -name '*.xml'); do
+        tmp=$(mktemp)
+        while IFS= read -r line; do printf '%s\n' "${line//__RE7_DB_PASS__/$RE7_DB_PASS}"; done < "$f" > "$tmp"
+        mv "$tmp" "$f"
+    done
 
     # wait for db
     echo "waiting for re7-db ..."

@@ -14,7 +14,7 @@
     <!-- Get CDR 'db' config -->
     <param name="dbhost" value="hpvp-db" />
     <param name="dbuser" value="hpvp_admin" />
-    <param name="dbpass" value="_cfg.access" />
+    <param name="dbpass" value="__RE7_DB_PASS__" />
     <param name="dbname" value="hpvp_cdr" />
     <!-- DB type (pgsql,mysql,oracle) -->
     <param name="dbtype" value="pgsql" />

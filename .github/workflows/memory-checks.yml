@@ -33,7 +33,7 @@ jobs:
         env:
           POSTGRES_DB: rate_engine
           POSTGRES_USER: re_admin
-          POSTGRES_PASSWORD: _cfg.access
+          POSTGRES_PASSWORD: ci_dev_only_pw
         ports:
           - 5432:5432
         options: >-
@@ -63,7 +63,7 @@ jobs:
 
       - name: Load schema into the CI database
         env:
-          PGPASSWORD: _cfg.access
+          PGPASSWORD: ci_dev_only_pw
         run: psql -h localhost -U re_admin -d rate_engine -f src/scripts/sql/rt_pgsql_v2.sql
 
       - name: Write a minimal config (pgsql + cdrm + rt)
@@ -84,7 +84,7 @@ jobs:
               <param name="dbhost" value="localhost" />
               <param name="dbname" value="rate_engine" />
               <param name="dbuser" value="re_admin" />
-              <param name="dbpass" value="_cfg.access" />
+              <param name="dbpass" value="ci_dev_only_pw" />
               <param name="dbport" value="5432" />
               <param name="NumberRetries" value="3" />
               <param name="IntervalRetries" value="1" />

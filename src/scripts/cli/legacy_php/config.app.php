@@ -14,7 +14,7 @@
  $RE['dbhost'] = "127.0.0.1";
  $RE['dbname'] = "re7";
  $RE['dbuser'] = "global";
- $RE['dbpass'] = "_cfg.access";
+ $RE['dbpass'] = "change_me";
  
  $dbconn = conn();
  

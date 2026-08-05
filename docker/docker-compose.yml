@@ -32,6 +32,9 @@ services:
     container_name: re7-db
     environment:
       - TZ=Europe/Sofia
+      - POSTGRES_DB=rate_engine
+      - POSTGRES_USER=re_admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/.env}
 
   re7-core:
     image: re7-core-image
@@ -53,6 +56,7 @@ services:
       - re7-db
     environment:
       - TZ=Europe/Sofia
+      - RE7_DB_PASS=${RE7_DB_PASS:?set RE7_DB_PASS in docker/.env}
 
   re7-api-server:
     image: re7-api-server-image
@@ -76,13 +80,12 @@ services:
       - RE7_DB_PORT=5432
       - RE7_DB_NAME=rate_engine
       - RE7_DB_USER=re_admin
-      - RE7_DB_PASS=_cfg.access
-      # JWT + seeded admin — CHANGE THESE for anything but local testing.
-      # HS256 needs a >=32-char secret (firebase/php-jwt v7); the entrypoint
-      # regenerates a strong one if this is too short.
-      - JWT_SECRET=change_me_in_production_use_openssl_rand_base64_32
-      - API_ADMIN_USER=admin
-      - API_ADMIN_PASS=admin12345
+      - RE7_DB_PASS=${RE7_DB_PASS:?set RE7_DB_PASS in docker/.env}
+      # Secrets come from docker/.env (git-ignored). JWT_SECRET blank => the
+      # entrypoint generates a strong one; set a >=32-char value to pin it.
+      - JWT_SECRET=${JWT_SECRET:-}
+      - API_ADMIN_USER=${API_ADMIN_USER:-admin}
+      - API_ADMIN_PASS=${API_ADMIN_PASS:?set API_ADMIN_PASS in docker/.env}
 
 networks:
   re7_network:

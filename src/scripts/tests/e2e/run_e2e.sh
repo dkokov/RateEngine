@@ -71,7 +71,7 @@ DBTYPE=${DBTYPE:-pgsql}
 DBHOST=${DBHOST:-127.0.0.1}
 DBNAME=${DBNAME:-rate_engine}
 DBUSER=${DBUSER:-re_admin}
-DBPASS=${DBPASS:-_cfg.access}
+DBPASS=${DBPASS:-change_me}
 DBPORT=${DBPORT:-5432}
 
 # Dedicated TEST ports, deliberately clear of the standard CallControl

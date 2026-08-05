@@ -13,7 +13,7 @@
     <param name="dbhost" value="re7-db" />
     <param name="dbname" value="rate_engine" />
     <param name="dbuser" value="re_admin" />
-    <param name="dbpass" value="_cfg.access" />
+    <param name="dbpass" value="__RE7_DB_PASS__" />
     <param name="dbport" value="5432" />
 
     <param name="NumberRetries" value="10" />

@@ -52,7 +52,7 @@ db_from_conf() {
 DBHOST=${DBHOST:-$(db_from_conf dbhost)}; DBHOST=${DBHOST:-127.0.0.1}
 DBNAME=${DBNAME:-$(db_from_conf dbname)}; DBNAME=${DBNAME:-rate_engine}
 DBUSER=${DBUSER:-$(db_from_conf dbuser)}; DBUSER=${DBUSER:-re_admin}
-DBPASS=${DBPASS:-$(db_from_conf dbpass)}; DBPASS=${DBPASS:-_cfg.access}
+DBPASS=${DBPASS:-$(db_from_conf dbpass)}; DBPASS=${DBPASS:-change_me}
 DBPORT=${DBPORT:-$(db_from_conf dbport)}; DBPORT=${DBPORT:-5432}
 TESTDB=${TESTDB:-re7_rating_test}
 export PGPASSWORD="$DBPASS"

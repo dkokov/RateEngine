@@ -31,7 +31,7 @@ make e2e
 
 # or directly, overriding defaults via env:
 RE_PREFIX=/usr/local/RateEngine \
-DBHOST=127.0.0.1 DBNAME=rate_engine DBUSER=re_admin DBPASS=_cfg.access DBPORT=5432 \
+DBHOST=127.0.0.1 DBNAME=rate_engine DBUSER=re_admin DBPASS=change_me DBPORT=5432 \
 scripts/tests/e2e/run_e2e.sh
 ```
 
