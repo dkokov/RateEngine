@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Sofia
 
 RUN apt-get update && \
-    apt-get install -y nginx libpq-dev libsqlite3-dev openssl ca-certificates && \
+    apt-get install -y nginx libpq-dev libsqlite3-dev openssl ca-certificates unzip git && \
     docker-php-ext-install pdo pdo_pgsql pdo_sqlite && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
