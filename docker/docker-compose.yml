@@ -50,6 +50,34 @@ services:
     environment:
       - TZ=Europe/Sofia
 
+  re7-api-server:
+    image: re7-api-server-image
+    build:
+        context: ../
+        dockerfile: docker/re7-api-server/Dockerfile
+    ports:
+      - "8443:8443"
+    networks:
+      - re7_network
+    volumes:
+      - re7_api_data:/app/data
+    hostname: re7-api-server
+    container_name: re7-api-server
+    depends_on:
+      - re7-db
+    environment:
+      - TZ=Europe/Sofia
+      # RE7 billing DB (the re7-db service)
+      - RE7_DB_HOST=re7-db
+      - RE7_DB_PORT=5432
+      - RE7_DB_NAME=rate_engine
+      - RE7_DB_USER=re_admin
+      - RE7_DB_PASS=_cfg.access
+      # JWT + seeded admin — CHANGE THESE for anything but local testing
+      - JWT_SECRET=change_me_in_production
+      - API_ADMIN_USER=admin
+      - API_ADMIN_PASS=admin12345
+
 networks:
   re7_network:
     driver: bridge
@@ -58,3 +86,4 @@ volumes:
   re7_pgdata:
   re7_conf:
   re7_logs:
+  re7_api_data:
