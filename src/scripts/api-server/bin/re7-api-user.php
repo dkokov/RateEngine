@@ -63,7 +63,12 @@ switch ($cmd) {
             exit(2);
         }
 
-        $id = (new UserRepository($db))->create($username, $password, $roles[$role]);
+        try {
+            $id = (new UserRepository($db))->create($username, $password, $roles[$role]);
+        } catch (Throwable $e) {
+            fwrite(STDERR, "user '{$username}' not created (already exists?)\n");
+            exit(1);
+        }
         fwrite(STDOUT, "created user '{$username}' (id={$id}, role={$role})\n");
         break;
 
