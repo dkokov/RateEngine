@@ -1,6 +1,6 @@
 # RE7 API — function (handler) catalog
 
-Derived from the **RE7 schema** (`src/scripts/sql/rt_pgsql.sql`) and RE7's actual
+Derived from the **RE7 schema** (`src/scripts/sql/rt_pgsql_v2.sql`) and RE7's actual
 functionality (rating flow, CallControl, legacy `lib.re5.php`, a legacy SOAP provisioning service)
 — **not** from prose docs. This is the authoritative list of endpoints the API
 should expose. Bulk CSV import stays in the CLI; this API is step-by-step.

@@ -9,6 +9,8 @@ use RateEngine\RE7\Api\Http\Request;
 use RateEngine\RE7\Api\Http\Response;
 use RateEngine\RE7\Db;
 use RateEngine\RE7\Exception\InUseException;
+use RateEngine\RE7\Exception\ProvisioningException;
+use RateEngine\RE7\Provisioning\ServiceProvisioner;
 use RateEngine\RE7\Repository\BillingAccountRepository;
 use RateEngine\RE7\Repository\BillPlanRepository;
 use RateEngine\RE7\Repository\CallingNumberRepository;
@@ -73,6 +75,21 @@ final class AccountHandler
         }
 
         return Response::json(['username' => $username, 'updated' => true]);
+    }
+
+    /** DELETE /accounts/{username} — FK-safe teardown (same as DeleteService). */
+    public function delete(Request $req, array $params): Response
+    {
+        $username = $params['username'] ?? '';
+        try {
+            $deleted = (new ServiceProvisioner($this->db))->deleteService($username);
+        } catch (ProvisioningException $e) {
+            throw new ApiException(404, $e->getMessage());
+        } catch (InUseException $e) {
+            throw new ApiException(409, $e->getMessage());
+        }
+
+        return Response::json(['deleted' => $deleted]);
     }
 
     /** POST /accounts/{username}/numbers { number, bill_plan, sm_bill_plan? } */

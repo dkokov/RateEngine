@@ -12,7 +12,7 @@
 #
 #   * Uses a dedicated test database (created + dropped here) - it NEVER touches
 #     the engine's real database.
-#   * Schema: src/scripts/sql/rt_pgsql.sql (structure + generic lookups only).
+#   * Schema: src/scripts/sql/rt_pgsql_v2.sql (structure + generic lookups only).
 #   * Data:   fixture.sql + cdrs_seed.sql in this directory (all invented).
 #   * Golden: golden.tsv in this directory.
 #
@@ -33,7 +33,7 @@ set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO_SRC=$(cd "$HERE/../../.." && pwd)           # rating -> tests -> scripts -> src
-SCHEMA_SQL="$REPO_SRC/scripts/sql/rt_pgsql.sql"
+SCHEMA_SQL="$REPO_SRC/scripts/sql/rt_pgsql_v2.sql"
 FIXTURE_SQL="$HERE/fixture.sql"
 CDRS_SQL="$HERE/cdrs_seed.sql"
 GOLDEN_TSV="$HERE/golden.tsv"
@@ -146,7 +146,7 @@ build_db() {
 		die "could not CREATE DATABASE $TESTDB (does $DBUSER have CREATEDB? is $DBHOST reachable?)"
 	DB_CREATED=1
 	psql_test -q -f "$SCHEMA_SQL" >/dev/null || die "failed to load schema $SCHEMA_SQL"
-	# rt_pgsql.sql ships 'db_screenshot' change-tracking RULES (DELETE+INSERT of
+	# rt_pgsql_v2.sql ships 'db_screenshot' change-tracking RULES (DELETE+INSERT of
 	# the table name) that collide with multi-row seed inserts (UNIQUE tbl_name).
 	# The offline rater doesn't read db_screenshot, so drop these rules.
 	psql_test -q -c "DO \$\$ DECLARE r record; BEGIN

@@ -52,6 +52,14 @@ assert_code() {
     else fail "$2 (got $REPLY_CODE want $1; body: $REPLY_BODY)"; fi
 }
 
+# assert_created LABEL  - get-or-create success: 201 (new) or 200 (already existed)
+assert_created() {
+    case "$REPLY_CODE" in
+        200 | 201) pass "$1 ($REPLY_CODE)" ;;
+        *) fail "$1 (got $REPLY_CODE want 200/201; body: $REPLY_BODY)" ;;
+    esac
+}
+
 # assert_contains NEEDLE LABEL  (searches REPLY_BODY)
 assert_contains() {
     case "$REPLY_BODY" in

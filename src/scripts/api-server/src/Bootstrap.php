@@ -15,6 +15,7 @@ use RateEngine\RE7\Api\Handler\AuthHandler;
 use RateEngine\RE7\Api\Handler\BalanceHandler;
 use RateEngine\RE7\Api\Handler\BillPlanHandler;
 use RateEngine\RE7\Api\Handler\CalcFunctionHandler;
+use RateEngine\RE7\Api\Handler\FreeBillsecHandler;
 use RateEngine\RE7\Api\Handler\NumberHandler;
 use RateEngine\RE7\Api\Handler\PcardHandler;
 use RateEngine\RE7\Api\Handler\PrefixHandler;
@@ -23,6 +24,7 @@ use RateEngine\RE7\Api\Handler\ReferenceHandler;
 use RateEngine\RE7\Api\Handler\ReportHandler;
 use RateEngine\RE7\Api\Handler\ServiceHandler;
 use RateEngine\RE7\Api\Handler\TariffHandler;
+use RateEngine\RE7\Api\Handler\TimeConditionHandler;
 use RateEngine\RE7\Api\Http\Request;
 use RateEngine\RE7\Api\Http\Response;
 use RateEngine\RE7\Api\Http\Router;
@@ -74,6 +76,8 @@ final class Bootstrap
         $account = new AccountHandler($re7);
         $calc = new CalcFunctionHandler($re7);
         $ref = new ReferenceHandler($re7);
+        $timeCond = new TimeConditionHandler($re7);
+        $freeBs = new FreeBillsecHandler($re7);
 
         // public
         $router->add('GET', '/health', static fn (Request $r, array $p) => Response::json(['status' => 'ok']));
@@ -91,6 +95,11 @@ final class Bootstrap
         $router->add('POST', '/tariffs/{name}/calc-functions', [$calc, 'create'], 'provisioning:write');
         $router->add('GET', '/tariffs/{name}/calc-functions', [$calc, 'list'], 'provisioning:read');
         $router->add('DELETE', '/tariffs/{name}/calc-functions/{pos}', [$calc, 'delete'], 'provisioning:write');
+        $router->add('POST', '/tariffs/{name}/time-conditions', [$timeCond, 'create'], 'provisioning:write');
+        $router->add('GET', '/tariffs/{name}/time-conditions', [$timeCond, 'list'], 'provisioning:read');
+        $router->add('DELETE', '/tariffs/{name}/time-conditions/{id}', [$timeCond, 'delete'], 'provisioning:write');
+        $router->add('POST', '/free-billsec', [$freeBs, 'create'], 'provisioning:write');
+        $router->add('GET', '/free-billsec', [$freeBs, 'list'], 'provisioning:read');
         $router->add('POST', '/prefixes', [$prefix, 'create'], 'provisioning:write');
         $router->add('GET', '/prefixes/{prefix}', [$prefix, 'get'], 'provisioning:read');
         $router->add('POST', '/rates', [$rate, 'create'], 'provisioning:write');
@@ -101,6 +110,7 @@ final class Bootstrap
         $router->add('GET', '/accounts', [$account, 'list'], 'provisioning:read');
         $router->add('GET', '/accounts/{username}', [$account, 'get'], 'provisioning:read');
         $router->add('PATCH', '/accounts/{username}', [$account, 'update'], 'provisioning:write');
+        $router->add('DELETE', '/accounts/{username}', [$account, 'delete'], 'provisioning:write');
         $router->add('POST', '/accounts/{username}/numbers', [$account, 'addNumber'], 'provisioning:write');
 
         // reference data

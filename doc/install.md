@@ -147,7 +147,7 @@ cd /usr/local/RateEngine/scripts/sql/
 
 PostgreSQL:
 ```
-psql -h localhost -U youruser yourdbname -f rt_pgsql.sql
+psql -h localhost -U youruser yourdbname -f rt_pgsql_v2.sql
 ```
 
 MySQL:

@@ -16,7 +16,7 @@ and the write-back into the `rating` table.
 ## Data policy
 
 **All fixture data is synthetic.** No customer data is used. The only shipped
-input is the structure-and-lookups schema `src/scripts/sql/rt_pgsql.sql`; the
+input is the structure-and-lookups schema `src/scripts/sql/rt_pgsql_v2.sql`; the
 account/tariff/rating rows (`fixture.sql`) and CDRs (`cdrs_seed.sql`) are
 invented for the test.
 
@@ -57,7 +57,7 @@ Exit: `0` all golden matched, `1` a mismatch, `2` prerequisites missing.
 1. Creates a **throwaway** database (`re7_rating_test`, dropped on exit) — it
    never touches the engine's real DB; the configured DB is used only as the
    maintenance connection to issue `CREATE/DROP DATABASE`.
-2. Loads `rt_pgsql.sql` (schema+lookups) + `fixture.sql` + `cdrs_seed.sql`. CDR
+2. Loads `rt_pgsql_v2.sql` (schema+lookups) + `fixture.sql` + `cdrs_seed.sql`. CDR
    timestamps are a mid-month weekday injected at run time (satisfies the
    mon-sun time-condition and the current-period pcard, keeping the test
    date-independent).

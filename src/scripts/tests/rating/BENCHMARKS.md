@@ -45,7 +45,7 @@ DB credentials default to the installed engine config
 ## 0. `gen_bench_db.sh` — synthetic benchmark DB (no real data)
 
 Builds a persistent DB (default `re7_bench`) from the committed schema
-`rt_pgsql.sql` filled with generated, **non-customer** data: 5 tariff plans,
+`rt_pgsql_v2.sql` filled with generated, **non-customer** data: 5 tariff plans,
 `N_ACCOUNTS` subscribers (billing_account + calling_number + pcard), and
 `N_CDRS` CDRs (random src from the accounts, dst from 10 prefixes, weekday
 timestamps). CDRs are marked `leg_a=1` ("rated") so the clone-and-replay tools

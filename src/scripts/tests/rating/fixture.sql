@@ -8,7 +8,7 @@
 --   B) per-minute block  (delta=60, fee, iterations=0)
 --   C) two-tier          (delta=60, fee1, iterations=1) + (delta=60, fee2, 0)
 --
--- Load AFTER rt_pgsql.sql (schema + generic lookups). The CDRs live in
+-- Load AFTER rt_pgsql_v2.sql (schema + generic lookups). The CDRs live in
 -- cdrs_seed.sql (loaded separately so the runner can inject a weekday
 -- timestamp). Expected prices are pinned in golden.tsv.
 --

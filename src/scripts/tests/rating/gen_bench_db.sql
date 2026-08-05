@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- Synthetic benchmark dataset for offline rating (NO customer data).
 --
--- Load AFTER rt_pgsql.sql (schema + generic lookups) into a throwaway/bench DB.
+-- Load AFTER rt_pgsql_v2.sql (schema + generic lookups) into a throwaway/bench DB.
 -- Populates the full rating chain at scale so rt.so / rt_duckdb.so can be
 -- benchmarked and parity-checked WITHOUT ever touching the real database.
 --
@@ -32,7 +32,7 @@
 
 \echo Generating synthetic bench data: :n_accounts accounts, :n_cdrs CDRs
 
--- rt_pgsql.sql ships db_screenshot change-tracking RULES on `rate` (DELETE+
+-- rt_pgsql_v2.sql ships db_screenshot change-tracking RULES on `rate` (DELETE+
 -- INSERT of the table name) that collide with the multi-row rate insert below
 -- (UNIQUE tbl_name). Not needed for rating; drop them in this bench DB.
 DO $$ DECLARE r record; BEGIN

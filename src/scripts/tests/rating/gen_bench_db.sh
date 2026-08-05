@@ -3,7 +3,7 @@
 # gen_bench_db.sh - build a SYNTHETIC benchmark database for offline rating.
 #
 # Creates a persistent database (default: re7_bench) from the committed schema
-# rt_pgsql.sql and fills it with generated, non-customer data at scale:
+# rt_pgsql_v2.sql and fills it with generated, non-customer data at scale:
 #   * 5 tariff plans (bill_plan/tariff/rate/prefix)
 #   * N_ACCOUNTS subscribers (billing_account + calling_number + pcard)
 #   * N_CDRS unrated leg-A CDRs (random src from the accounts, dst from prefixes)
@@ -28,7 +28,7 @@ set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO_SRC=$(cd "$HERE/../../.." && pwd)           # rating -> tests -> scripts -> src
-SCHEMA_SQL="$REPO_SRC/scripts/sql/rt_pgsql.sql"
+SCHEMA_SQL="$REPO_SRC/scripts/sql/rt_pgsql_v2.sql"
 GEN_SQL="$HERE/gen_bench_db.sql"
 
 RE_PREFIX=${RE_PREFIX:-/usr/local/RateEngine}
@@ -72,7 +72,7 @@ psql_maint -c "DROP DATABASE IF EXISTS $BENCH_DB;" >/dev/null 2>&1 || true
 psql_maint -c "CREATE DATABASE $BENCH_DB;" ||
 	die "could not CREATE DATABASE $BENCH_DB (does $DBUSER have CREATEDB? is $DBHOST reachable?)"
 
-echo "gen_bench_db: loading schema (rt_pgsql.sql)..."
+echo "gen_bench_db: loading schema (rt_pgsql_v2.sql)..."
 psql_bench -q -f "$SCHEMA_SQL" >/dev/null || die "failed to load schema"
 
 echo "gen_bench_db: generating data (this can take a minute for 1e6 CDRs)..."

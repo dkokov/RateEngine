@@ -60,11 +60,11 @@ jobs:
       - name: Init database schema
         env:
           PGPASSWORD: _cfg.access
-        # Use the COMMITTED schema (rt_pgsql.sql: structure + generic lookups,
+        # Use the COMMITTED schema (rt_pgsql_v2.sql: structure + generic lookups,
         # no customer data). Not rate_engine_0.6.13.sql - that file is untracked
         # (holds real customer data) and is absent in CI, so the old step
         # silently skipped DB init and left rate_engine schema-less.
-        run: psql -v ON_ERROR_STOP=1 -h localhost -U re_admin rate_engine -f src/scripts/sql/rt_pgsql.sql
+        run: psql -v ON_ERROR_STOP=1 -h localhost -U re_admin rate_engine -f src/scripts/sql/rt_pgsql_v2.sql
 
       - name: Prepare config for CI
         run: |
