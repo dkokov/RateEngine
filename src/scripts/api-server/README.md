@@ -58,14 +58,80 @@ curl -s -X POST $BASE/bill-plans -H "Authorization: Bearer $ACCESS" \
 
 ## Endpoints (current)
 
-| Method | Path | Scope |
-|--------|------|-------|
-| GET  | `/health` | public |
+| Method(s) | Path | Scope |
+|-----------|------|-------|
+| GET | `/health` | public |
 | POST | `/auth/login` · `/auth/refresh` · `/auth/logout` | public |
-| POST | `/bill-plans` | provisioning:write |
-| GET  | `/bill-plans/{name}` | provisioning:read |
+| POST · GET | `/bill-plans` · `/bill-plans/{name}` | write · read |
+| POST · GET | `/tariffs` · `/tariffs/{name}` | write · read |
+| POST · GET · DELETE | `/tariffs/{name}/calc-functions[/{pos}]` | write · read · write |
+| POST · GET · DELETE | `/tariffs/{name}/time-conditions[/{id}]` | write · read · write |
+| POST · GET | `/prefixes` · `/prefixes/{prefix}` | write · read |
+| POST · GET | `/rates` · `/rates?bill_plan=` | write · read |
+| POST · GET | `/free-billsec` | write · read |
+| POST · GET · PATCH · DELETE | `/accounts` · `/accounts/{username}` | write · read · write · write |
+| POST | `/accounts/{username}/numbers` | write |
+| GET · PATCH | `/numbers/{number}` · `/numbers/{number}/bill-plan` | read · write |
+| POST · GET | `/accounts/{username}/pcards` | write · read |
+| PATCH | `/pcards/{id}/status` · `/pcards/{id}/limit` | write |
+| GET | `/accounts/{username}/balance` | read |
+| POST · GET · DELETE | `/services` · `/services/{username}` | write · read · write |
+| GET | `/ref/{resource}` (currencies, pcard-types/statuses, round/rating-modes, bill-plan-types) | read |
+| GET | `/reports/rated-calls?account=&from=&to=&limit=` | rating:read |
 
-_To come: tariffs, prefixes, rates, accounts, pcards, balance (read), reports, rating (delegated)._
+_Not yet wired: `POST /rate` (engine `cprice`/`rate` are stubs)._
+
+## Curl cheat-sheet
+
+All calls are HTTPS with a self-signed cert (`-k`). First create a user, then log
+in and reuse the token (`$AT`). Replace `apiuser` / `s3cret-pass` with your own.
+
+```bash
+# one-time: create an API user in the SQLite auth store
+php bin/re7-api-user.php add apiuser --role admin      # prompts for a password
+
+BASE=https://127.0.0.1:8443
+# login -> capture the access token
+AT=$(curl -k -s -X POST $BASE/auth/login -H 'Content-Type: application/json' \
+      -d '{"username":"apiuser","password":"s3cret-pass"}' \
+    | php -r '$d=json_decode(stream_get_contents(STDIN),true);echo $d["access_token"]??"";')
+H="Authorization: Bearer $AT"
+
+# rate plan: plan -> prefix/tariff -> rate -> pricing formula
+curl -k -s -X POST $BASE/bill-plans -H "$H" -H 'Content-Type: application/json' -d '{"name":"PLAN_A","type":"prepaid"}'
+curl -k -s -X POST $BASE/tariffs    -H "$H" -H 'Content-Type: application/json' -d '{"name":"TAR_STD"}'
+curl -k -s -X POST $BASE/prefixes   -H "$H" -H 'Content-Type: application/json' -d '{"prefix":"359"}'
+curl -k -s -X POST $BASE/rates      -H "$H" -H 'Content-Type: application/json' -d '{"bill_plan":"PLAN_A","prefix":"359","tariff":"TAR_STD"}'
+curl -k -s -X POST $BASE/tariffs/TAR_STD/calc-functions -H "$H" -H 'Content-Type: application/json' -d '{"pos":1,"delta_time":60,"fee":"0.05","iterations":1}'
+
+# subscriber: whole service in one call, then check it
+curl -k -s -X POST $BASE/services -H "$H" -H 'Content-Type: application/json' \
+     -d '{"username":"ACC1","number":"35910000001","bill_plan":"PLAN_A","pcard":{"amount":20,"status":"active"},"balance":{"amount":0}}'
+curl -k -s -H "$H" $BASE/services/ACC1
+
+# change ops
+curl -k -s -X PATCH $BASE/numbers/35910000001/bill-plan -H "$H" -H 'Content-Type: application/json' -d '{"bill_plan":"PLAN_A"}'
+curl -k -s -X POST  $BASE/accounts/ACC1/pcards -H "$H" -H 'Content-Type: application/json' -d '{"amount":50,"status":"active"}'
+curl -k -s -H "$H" $BASE/accounts/ACC1/balance
+
+# reference lists + report
+curl -k -s -H "$H" $BASE/ref/currencies
+curl -k -s -H "$H" "$BASE/reports/rated-calls?account=ACC1&limit=5"
+
+# teardown
+curl -k -s -X DELETE $BASE/services/ACC1 -H "$H"
+```
+
+## Tests
+
+Black-box functional + performance harness lives in
+[`scripts/tests/api`](../tests/api/README.md):
+
+```bash
+cd ../tests/api
+BASE=https://127.0.0.1:8443 API_USER=apiuser API_PASS=s3cret-pass ./run_api_test.sh   # 24 assertions
+BASE=https://127.0.0.1:8443 API_USER=apiuser API_PASS=s3cret-pass ./api_perf.sh /ref/currencies 1000 16
+```
 
 ## Deploy (nginx + php-fpm, HTTPS only on :8443)
 
