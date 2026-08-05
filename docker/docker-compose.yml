@@ -73,8 +73,10 @@ services:
       - RE7_DB_NAME=rate_engine
       - RE7_DB_USER=re_admin
       - RE7_DB_PASS=_cfg.access
-      # JWT + seeded admin — CHANGE THESE for anything but local testing
-      - JWT_SECRET=change_me_in_production
+      # JWT + seeded admin — CHANGE THESE for anything but local testing.
+      # HS256 needs a >=32-char secret (firebase/php-jwt v7); the entrypoint
+      # regenerates a strong one if this is too short.
+      - JWT_SECRET=change_me_in_production_use_openssl_rand_base64_32
       - API_ADMIN_USER=admin
       - API_ADMIN_PASS=admin12345
 

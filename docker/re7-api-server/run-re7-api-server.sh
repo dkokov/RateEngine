@@ -18,6 +18,13 @@ if [ ! -f "$APP/certs/server.crt" ]; then
     chown www-data:www-data "$APP/certs/server.key" "$APP/certs/server.crt"
 fi
 
+# HS256 requires a key of at least 32 bytes (firebase/php-jwt v7 enforces this).
+# Generate a strong secret if none was supplied or it is too short.
+if [ -z "${JWT_SECRET:-}" ] || [ "${#JWT_SECRET}" -lt 32 ]; then
+    JWT_SECRET="$(openssl rand -base64 32)"
+    echo "[re7-api] JWT_SECRET missing or <32 chars — generated a strong random one"
+fi
+
 # 2) .env from environment (defaults target the compose stack)
 cat > "$APP/.env" <<EOF
 API_AUTH_DB=${API_AUTH_DB:-/app/data/auth.sqlite}
@@ -26,7 +33,7 @@ RE7_DB_PORT=${RE7_DB_PORT:-5432}
 RE7_DB_NAME=${RE7_DB_NAME:-rate_engine}
 RE7_DB_USER=${RE7_DB_USER:-re_admin}
 RE7_DB_PASS=${RE7_DB_PASS:-_cfg.access}
-JWT_SECRET=${JWT_SECRET:-$(openssl rand -base64 32)}
+JWT_SECRET=${JWT_SECRET}
 JWT_ALG=HS256
 JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-900}
 JWT_REFRESH_TTL=${JWT_REFRESH_TTL:-28800}
