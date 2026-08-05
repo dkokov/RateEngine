@@ -1,0 +1,6 @@
+/vendor/
+/.env
+composer.lock
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

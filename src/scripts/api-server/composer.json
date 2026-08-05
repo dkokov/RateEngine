@@ -1,0 +1,29 @@
+{
+    "name": "rateengine/re7-api",
+    "description": "RE7 provisioning REST API (JSON/HTTP, JWT auth, SQLite auth store) over rateengine/re7-lib.",
+    "type": "project",
+    "license": "proprietary",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../lib/php"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "firebase/php-jwt": "^6.11",
+        "rateengine/re7-lib": "@dev",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "RateEngine\\RE7\\Api\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

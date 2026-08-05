@@ -1,0 +1,19 @@
+{
+    "name": "rateengine/re7-lib",
+    "description": "RE7 provisioning + data-access library (RE7 schema native). Shared PHP funnel for the web-API portal.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "RateEngine\\RE7\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

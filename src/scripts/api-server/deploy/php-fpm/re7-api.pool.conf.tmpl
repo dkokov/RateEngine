@@ -1,0 +1,22 @@
+; RE7 API — dedicated php-fpm pool. Rendered by install.sh into the pool.d dir.
+[re7-api]
+user  = @@FPM_USER@@
+group = @@FPM_GROUP@@
+
+listen       = @@FPM_SOCK@@
+listen.owner = @@NGINX_USER@@
+listen.group = @@NGINX_GROUP@@
+listen.mode  = 0660
+
+pm                   = dynamic
+pm.max_children      = 10
+pm.start_servers     = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 4
+
+; the app reads its own .env; keep the fpm environment clean
+clear_env = yes
+
+catch_workers_output = yes
+php_admin_value[error_log] = @@LOG_DIR@@/php-error.log
+php_admin_flag[log_errors] = on

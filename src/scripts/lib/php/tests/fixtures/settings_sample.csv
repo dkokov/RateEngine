@@ -1,0 +1,16 @@
+# RE7 sample provisioning fixture (SYNTHETIC — no customer data).
+# Columns by mode:
+#   1,<bill_plan>,<type>,<start_period>,<end_period>
+#   2,<prefix>,<prefix_desc>,<tariff>,<start_period>,<end_period>,<free_billsec_id>
+#
+# mode 1: two bill plans
+1,TEST_PLAN_A,postpaid,0,0
+# mode 2: prefixes + tariffs + rates under TEST_PLAN_A
+2,359,Bulgaria fixed,TEST_TARIFF_STD,0,0,0
+2,3598,Bulgaria mobile,TEST_TARIFF_MOB,0,0,0
+1,TEST_PLAN_B,prepaid,0,0
+# reuse existing prefix/tariff (get-or-create), only a new rate row is created
+2,359,Bulgaria fixed,TEST_TARIFF_STD,0,0,0
+# modes below are not yet implemented — expected to be reported as skipped(pending)
+4,ignored,pcard,row
+5,TEST_PLAN_B,TEST_PLAN_A

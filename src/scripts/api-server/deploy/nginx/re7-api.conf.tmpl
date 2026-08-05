@@ -1,0 +1,51 @@
+# RE7 API — HTTPS only on :@@PORT@@ (no port 80, no redirect). Rendered by install.sh.
+# Placed in the nginx conf.d/ directory (included inside the http{} context).
+
+limit_req_zone $binary_remote_addr zone=re7api_login:10m rate=10r/m;
+
+server {
+    listen      @@PORT@@ ssl;
+    listen      [::]:@@PORT@@ ssl;
+    http2       on;
+    server_name @@SERVER_NAME@@;
+
+    ssl_certificate     @@CERT@@;
+    ssl_certificate_key @@KEY@@;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:RE7API:10m;
+    ssl_session_timeout 1h;
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "DENY" always;
+    server_tokens off;
+
+    root  @@APP_ROOT@@/public;
+    index index.php;
+
+    client_max_body_size 2m;
+
+    # brute-force throttle on login
+    location = /auth/login {
+        limit_req zone=re7api_login burst=5 nodelay;
+        try_files $uri /index.php$is_args$args;
+    }
+
+    # everything routes through the front controller
+    location / {
+        try_files $uri /index.php$is_args$args;
+    }
+
+    location = /index.php {
+        include fastcgi_params;
+        fastcgi_pass  unix:@@FPM_SOCK@@;
+        fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+        fastcgi_param HTTPS on;
+    }
+
+    # never serve any other .php or dotfiles directly
+    location ~ \.php$ { return 404; }
+    location ~ /\.    { deny all; }
+}
