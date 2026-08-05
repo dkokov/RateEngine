@@ -22,6 +22,47 @@ final class BillingAccountRepository extends AbstractRepository
         return $this->db->one('SELECT * FROM billing_account WHERE username = ?', [$username]);
     }
 
+    public function list(int $limit = 500): array
+    {
+        return $this->db->all(
+            'SELECT id, username, currency_id, leg, billing_day, round_mode_id, day_of_payment
+             FROM billing_account ORDER BY username LIMIT ?',
+            [$limit],
+        );
+    }
+
+    /**
+     * Update only the provided columns (ChangeBillingAccount). Guarded.
+     *
+     * @param array $opts any of currency_id, leg, cdr_server_id, billing_day, round_mode_id, day_of_payment
+     *
+     * @return bool false if the account does not exist
+     */
+    public function update(string $username, array $opts): bool
+    {
+        $id = $this->findId($username);
+        if ($id === null) {
+            return false;
+        }
+        $this->gate->assertNotInUse('billing_account', $id);
+
+        $cols = [];
+        $params = [];
+        foreach (['currency_id', 'leg', 'cdr_server_id', 'billing_day', 'round_mode_id', 'day_of_payment'] as $k) {
+            if (array_key_exists($k, $opts)) {
+                $cols[] = $k . ' = ?';
+                $params[] = $opts[$k];
+            }
+        }
+        if ($cols === []) {
+            return true;
+        }
+        $params[] = $id;
+        $this->db->execute('UPDATE billing_account SET ' . implode(', ', $cols) . ' WHERE id = ?', $params);
+
+        return true;
+    }
+
     /**
      * Get-or-create a billing account by unique username.
      *

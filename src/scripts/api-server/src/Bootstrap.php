@@ -10,13 +10,16 @@ use RateEngine\RE7\Api\Auth\TokenService;
 use RateEngine\RE7\Api\Db\AuthDb;
 use RateEngine\RE7\Api\Db\TokenRepository;
 use RateEngine\RE7\Api\Db\UserRepository;
+use RateEngine\RE7\Api\Handler\AccountHandler;
 use RateEngine\RE7\Api\Handler\AuthHandler;
 use RateEngine\RE7\Api\Handler\BalanceHandler;
 use RateEngine\RE7\Api\Handler\BillPlanHandler;
+use RateEngine\RE7\Api\Handler\CalcFunctionHandler;
 use RateEngine\RE7\Api\Handler\NumberHandler;
 use RateEngine\RE7\Api\Handler\PcardHandler;
 use RateEngine\RE7\Api\Handler\PrefixHandler;
 use RateEngine\RE7\Api\Handler\RateHandler;
+use RateEngine\RE7\Api\Handler\ReferenceHandler;
 use RateEngine\RE7\Api\Handler\ReportHandler;
 use RateEngine\RE7\Api\Handler\ServiceHandler;
 use RateEngine\RE7\Api\Handler\TariffHandler;
@@ -68,6 +71,9 @@ final class Bootstrap
         $pcard = new PcardHandler($re7);
         $balance = new BalanceHandler($re7);
         $report = new ReportHandler($re7);
+        $account = new AccountHandler($re7);
+        $calc = new CalcFunctionHandler($re7);
+        $ref = new ReferenceHandler($re7);
 
         // public
         $router->add('GET', '/health', static fn (Request $r, array $p) => Response::json(['status' => 'ok']));
@@ -82,10 +88,23 @@ final class Bootstrap
         // rate-plan definition
         $router->add('POST', '/tariffs', [$tariff, 'create'], 'provisioning:write');
         $router->add('GET', '/tariffs/{name}', [$tariff, 'get'], 'provisioning:read');
+        $router->add('POST', '/tariffs/{name}/calc-functions', [$calc, 'create'], 'provisioning:write');
+        $router->add('GET', '/tariffs/{name}/calc-functions', [$calc, 'list'], 'provisioning:read');
+        $router->add('DELETE', '/tariffs/{name}/calc-functions/{pos}', [$calc, 'delete'], 'provisioning:write');
         $router->add('POST', '/prefixes', [$prefix, 'create'], 'provisioning:write');
         $router->add('GET', '/prefixes/{prefix}', [$prefix, 'get'], 'provisioning:read');
         $router->add('POST', '/rates', [$rate, 'create'], 'provisioning:write');
         $router->add('GET', '/rates', [$rate, 'list'], 'provisioning:read');
+
+        // billing accounts (granular)
+        $router->add('POST', '/accounts', [$account, 'create'], 'provisioning:write');
+        $router->add('GET', '/accounts', [$account, 'list'], 'provisioning:read');
+        $router->add('GET', '/accounts/{username}', [$account, 'get'], 'provisioning:read');
+        $router->add('PATCH', '/accounts/{username}', [$account, 'update'], 'provisioning:write');
+        $router->add('POST', '/accounts/{username}/numbers', [$account, 'addNumber'], 'provisioning:write');
+
+        // reference data
+        $router->add('GET', '/ref/{resource}', [$ref, 'get'], 'provisioning:read');
 
         // composite service (CreateService / CheckService / DeleteService)
         $router->add('POST', '/services', [$service, 'create'], 'provisioning:write');
