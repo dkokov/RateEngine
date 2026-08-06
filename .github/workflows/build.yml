@@ -98,19 +98,22 @@ jobs:
       # supervisor path is untested.
       - name: Foreground service mode (-f)
         run: |
-          set -u
-          export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
+          set -eu
           BIN=/usr/local/RateEngine/bin/RateEngine
           CFG=/usr/local/RateEngine/config/RateEngine7.xml
           PIDF=/usr/local/RateEngine/logs/rate_engine.pid
           RELOG=/usr/local/RateEngine/logs/rate_engine.log
+          LIBS=/usr/local/RateEngine/libs
+
+          # sudo drops LD_LIBRARY_PATH from the environment even with -E, so
+          # pass it explicitly via env(1) on every invocation.
+          re() { sudo env LD_LIBRARY_PATH="$LIBS" "$BIN" -c "$CFG" "$@"; }
 
           sudo rm -f "$PIDF" "$RELOG"
 
           # 'timeout' is a backstop: if -f ever fails to stay up (or to exit),
           # the job must not hang for the full workflow timeout.
-          sudo -E timeout 120 "$BIN" -c "$CFG" -f &
-          JOB=$!
+          re -f & JOB=$!
 
           for _ in $(seq 1 40); do
             sudo test -s "$PIDF" && break
@@ -124,33 +127,32 @@ jobs:
             { echo "FAIL: no service-selection line"; sudo tail -40 "$RELOG"; exit 1; }
 
           # a second instance must be refused by the pid file lock
-          if sudo -E timeout 30 "$BIN" -c "$CFG" -f 2>/tmp/second.err; then
+          if re -f 2>/tmp/second.err; then
             echo "FAIL: a second instance was allowed to start"; exit 1
           fi
           grep -q 'already running' /tmp/second.err ||
             { echo "FAIL: second instance did not report 'already running'"; cat /tmp/second.err; exit 1; }
 
-          sudo -E "$BIN" -c "$CFG" --stat
+          re --stat
 
           # -k must shut it down cleanly and clean up after itself
-          sudo -E "$BIN" -c "$CFG" -k
+          re -k
           wait "$JOB" || { echo "FAIL: unclean shutdown"; sudo tail -40 "$RELOG"; exit 1; }
           sudo test ! -e "$PIDF" || { echo "FAIL: pid file left behind"; exit 1; }
 
           # and a crashed instance must not lock out the next start: the kernel
           # releases the lock on death, so a stale pid file is harmless
-          sudo -E "$BIN" -c "$CFG" -f &
-          JOB=$!
+          re -f & JOB=$!
           for _ in $(seq 1 40); do sudo test -s "$PIDF" && break; sleep 0.5; done
           sudo test -s "$PIDF" || { echo "FAIL: no pid file on 2nd start"; exit 1; }
           sudo kill -KILL "$(sudo cat "$PIDF")" 2>/dev/null || true
           wait "$JOB" 2>/dev/null || true
-          sudo -E timeout 60 "$BIN" -c "$CFG" -f &
-          JOB=$!
+
+          re -f & JOB=$!
           for _ in $(seq 1 40); do sudo test -s "$PIDF" && break; sleep 0.5; done
           sudo test -s "$PIDF" ||
             { echo "FAIL: stale pid file blocked restart after SIGKILL"; exit 1; }
-          sudo -E "$BIN" -c "$CFG" -k
+          re -k
           wait "$JOB" || true
 
           echo "foreground service mode OK"
