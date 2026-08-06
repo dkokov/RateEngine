@@ -7,10 +7,10 @@
 
 define("DEBUG",true);
 
-define("PORT1",9999);
+define("PORT1",9090);
 define("IP1",'127.0.0.1');
 
-define("PORT2",9090);
+define("PORT2",9091);
 define("IP2",'127.0.0.2');
 
 define("ID",4);
