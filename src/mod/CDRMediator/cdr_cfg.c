@@ -176,16 +176,22 @@ void cdr_profile_cfg_get(cdr_profile_cfg_t *cfg)
 					strcpy(cfg->profile_file_type->dst_dir,params->value);
 				}
 			
+				/* Bounded: these are small fixed fields fed straight from the
+				 * profile XML, so a typo like cols-separator=";;" used to
+				 * corrupt memory. Truncate instead. */
 				if(strcmp(params->name,"cols-separator") == 0) {
-					strcpy(cfg->profile_file_type->col_sep,params->value);
+					snprintf(cfg->profile_file_type->col_sep,
+						sizeof(cfg->profile_file_type->col_sep),"%s",params->value);
 				}
-				
+
 				if(strcmp(params->name,"col-delimiter") == 0) {
-					strcpy(cfg->profile_file_type->col_delimiter,params->value);
+					snprintf(cfg->profile_file_type->col_delimiter,
+						sizeof(cfg->profile_file_type->col_delimiter),"%s",params->value);
 				}
-			
+
 				if(strcmp(params->name,"line-end") == 0) {
-					strcpy(cfg->profile_file_type->line_end,params->value);
+					snprintf(cfg->profile_file_type->line_end,
+						sizeof(cfg->profile_file_type->line_end),"%s",params->value);
 				}
 				
 				if(strcmp(params->name,"file-field-num") == 0) {

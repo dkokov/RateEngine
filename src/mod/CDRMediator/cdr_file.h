@@ -41,7 +41,12 @@ typedef struct cdr_file_profile {
 	char  col_sep[2];
 	char  hdr_comm;
 	char  *hdr_sep;
-	char  line_end[2];
+	/* Holds the config string VERBATIM, and that is not one character: the
+	 * shipped cdr_file_profile.xml sets line-end="\n", which in XML is the two
+	 * characters backslash+n (3 bytes with the NUL), so char[2] overflowed on
+	 * every file-profile load. Sized to also take "\r\n".
+	 * (col_sep/col_delimiter stay [2] - those really are one character.) */
+	char  line_end[8];
 
 //	PGconn *conn;
 	db_t *dbp;

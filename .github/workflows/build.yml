@@ -112,27 +112,6 @@ jobs:
           DBPORT: "5432"
         run: bash src/scripts/tests/rating/run_rating_regression.sh
 
-      # TEMPORARY diagnostic - remove once the abort is fixed.
-      # '-f' dies with "*** buffer overflow detected ***" here but not in the
-      # Debian 12 dev container, because Ubuntu's gcc enables _FORTIFY_SOURCE by
-      # default and Debian's does not. The overflow is real and pre-existing;
-      # this step captures the frame. continue-on-error so it never blocks CI.
-      - name: Foreground abort backtrace (temporary diagnostic)
-        continue-on-error: true
-        run: |
-          set -eu
-          sudo apt-get install -y -qq gdb
-          BIN=/usr/local/RateEngine/bin/RateEngine
-          CFG=/usr/local/RateEngine/config/RateEngine7.xml
-          LIBS=/usr/local/RateEngine/libs
-          sudo rm -f /usr/local/RateEngine/logs/rate_engine.pid \
-                     /usr/local/RateEngine/logs/rate_engine.log
-          sudo timeout 90 env LD_LIBRARY_PATH="$LIBS" \
-            gdb -q -batch -ex run -ex "thread apply all bt full" \
-                --args "$BIN" -c "$CFG" -f || true
-          echo "----- engine log -----"
-          sudo tail -60 /usr/local/RateEngine/logs/rate_engine.log || true
-
       # Service mode ('-f'/'-d') is what a container or a systemd unit runs, and
       # it is the only path that exercises run_mode, the config-driven service
       # selection, the pid file lock and the signal shutdown. Every other test
