@@ -4,14 +4,27 @@
     <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
  <LoadModules>
-    <param name="module" value="redis.so" />
+    <!-- Only list modules that are actually built+installed (see config.md):
+         a missing .so logs a dlopen error at every start, and if a service
+         below is active="yes" while its module is absent, startup FAILS. -->
     <param name="module" value="pgsql.so" />
     <param name="module" value="cdrm.so" />
     <param name="module" value="rt.so" />
+    <!-- redis.so is not built by 'make modules' (not in config.md) -->
+    <!-- <param name="module" value="redis.so" /> -->
     <!-- RatingDuckDB: analytical batch rater. Load it (alongside rt.so) only
          if <Rating> RatingModule is set to rt_duckdb.so. Requires duckdb.so. -->
     <!-- <param name="module" value="duckdb.so" /> -->
     <!-- <param name="module" value="rt_duckdb.so" /> -->
+    <!-- CallControl (online charging). Uncomment ALL of these together with
+         <CallControl> active="yes" below: the server (cc.so), at least one
+         session protocol (my_cc.so / jsonrpc_cc.so) and the transport(s) named
+         in config/cc_int/*.xml (tcp.so / tls.so). -->
+    <!-- <param name="module" value="cc.so" /> -->
+    <!-- <param name="module" value="my_cc.so" /> -->
+    <!-- <param name="module" value="jsonrpc_cc.so" /> -->
+    <!-- <param name="module" value="tcp.so" /> -->
+    <!-- <param name="module" value="tls.so" /> -->
  </LoadModules>
  <DB>
     <!-- pgsql,mysql,redis -->
@@ -28,8 +41,11 @@
  <CallControl>
     <!-- Start the CallControl server? In service mode (-d/-f) RateEngine starts
          only the services marked active="yes" here; a missing param means yes.
-         An explicit CLI flag (-2c/-r/-g) overrides this and runs just that one. -->
-    <param name="active" value="yes" />
+         An explicit CLI flag (-2c/-r/-g) overrides this and runs just that one.
+         Default 'no': enabling it REQUIRES uncommenting cc.so + a protocol
+         module + the transports in <LoadModules> above, otherwise startup
+         fails with "The module 'cc.so' is not find!". -->
+    <param name="active" value="no" />
 
     <!-- server sleeping in microseconds -->
     <param name="CCServerMicroSleep" value="60000" />
