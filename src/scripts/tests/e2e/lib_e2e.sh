@@ -67,6 +67,25 @@ wait_port() {
 	return 1
 }
 
+# wait_port_free HOST PORT [TIMEOUT] - the inverse: block until nothing accepts
+# on the port any more. The test groups reuse the same ports one after another,
+# so starting the next daemon while the previous listener is still up means the
+# new one fails to bind and every assertion silently runs against the OLD
+# process (e.g. an mtls client checked against a verify-client=no listener).
+wait_port_free() {
+	local host=$1 port=$2 timeout=${3:-15} i=0 max
+	max=$((timeout * 10))
+	while [ "$i" -lt "$max" ]; do
+		if ! (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
+			return 0
+		fi
+		exec 3<&- 3>&- 2>/dev/null || true
+		sleep 0.1
+		i=$((i + 1))
+	done
+	return 1
+}
+
 # assert_contains HAYSTACK NEEDLE LABEL
 assert_contains() {
 	case "$1" in

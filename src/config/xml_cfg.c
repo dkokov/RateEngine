@@ -46,10 +46,22 @@ int xml_cfg_params_get(xmlNode *root,xml_node_t *node)
 {
 	xml_param_t *param;
 	xml_param_t *params;
-	
+
 	params = NULL;
-	xmlNode *curr = NULL;	
-	
+	xmlNode *curr = NULL;
+
+	/* Clear the caller's list FIRST. Callers reuse one xml_node_t for section
+	 * after section (get -> walk -> xml_cfg_params_free), and this function
+	 * only assigned node->params when it actually found a matching section
+	 * with <param> children. For a section that is absent or empty, the field
+	 * kept pointing at the previous section's list - which the caller had
+	 * already freed - so the next walk read freed memory and the next
+	 * xml_cfg_params_free() was a double free. That is a hard SIGSEGV here,
+	 * because mem_free() calls malloc_trim(0) and hands the pages back.
+	 * Hit by any config without a <CallControl> section (e.g. the rating
+	 * regression fixture) once main_cfg started reading that section. */
+	node->params = NULL;
+
 	for(curr = root->children;curr;curr = curr->next) {
 		if(!xmlStrcmp(curr->name,(xmlChar *) node->node_name)) {
 		
