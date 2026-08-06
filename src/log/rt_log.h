@@ -9,11 +9,18 @@
 
 #define LOG_SEPARATOR '|'
 
+/* Size of a log timestamp buffer: "YYYY-mm-dd HH:MM:SS.uuuuuu" is 26 chars,
+ * so 27 bytes are needed; 32 keeps it aligned. Use this for every buffer
+ * passed to re5_timestamp(). */
+#define RE5_TS_LEN 32
+
 #define LOG_MNG_PAUSE 2
 #define LOG_MAX_FILE_SIZE 20480000
 
 FILE *re_open_syslog(char *file);
 int   re_open_syslog_2(char *file);
+
+void re5_timestamp(char *ts_str,size_t size);
 
 void re_write_syslog(FILE *fp,char *func,char *msg,...);
 void re_write_syslog_2(int fp,char *func,char *msg,...);

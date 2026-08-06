@@ -12,19 +12,32 @@
 #include "../misc/globals.h"
 
 // strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&(ptr->ts))); ???
-void re5_timestamp(char *ts_str)
+/* Writes exactly 26 chars + NUL, e.g. "2026-08-05 17:47:06.739580".
+ * The callers' buffers were 'char re5_ts[21]', so every single log line
+ * overflowed the stack by 6 bytes; at -O2 the 21-byte array is padded to a
+ * 32-byte slot, which is why it stayed invisible instead of crashing. Buffers
+ * are now RE5_TS_LEN and this uses snprintf with the size so it cannot recur. */
+void re5_timestamp(char *ts_str,size_t size)
 {
 	time_t ts;
-	struct tm *tm;
+	struct tm tmv;
 	struct timeval times;
-	
+
 	gettimeofday(&times, NULL);
 
 	ts = times.tv_sec;
 
-	tm = localtime(&ts);
-	
-	sprintf(ts_str,"%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.6d",(tm->tm_year + 1900),(tm->tm_mon + 1),tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec,((int)times.tv_usec));
+	/* localtime() returns a pointer to a shared static struct tm - with the
+	 * rating workers, CDR profile threads and CallControl all logging
+	 * concurrently that is a data race; localtime_r keeps it per-thread. */
+	if(localtime_r(&ts,&tmv) == NULL) {
+		snprintf(ts_str,size,"0000-00-00 00:00:00.000000");
+		return;
+	}
+
+	snprintf(ts_str,size,"%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.6d",
+			(tmv.tm_year + 1900),(tmv.tm_mon + 1),tmv.tm_mday,
+			tmv.tm_hour,tmv.tm_min,tmv.tm_sec,((int)times.tv_usec));
 }
 
 FILE *re_open_syslog(char *file)
@@ -89,9 +102,9 @@ void re_put_in_syslog(FILE *fp,char *func,char *msg,va_list ap)
     int len;
 	
 	if(fp != NULL) {
-		char re5_ts[21];
+		char re5_ts[RE5_TS_LEN];
 				
-		re5_timestamp(re5_ts);
+		re5_timestamp(re5_ts,sizeof(re5_ts));
 		
 		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
@@ -117,14 +130,14 @@ void re_put_in_syslog_v2(int fp,char *func,char *msg,va_list ap)
     int len;
 	
 	if(fp) {
-		char re5_ts[21];
+		char re5_ts[RE5_TS_LEN];
 				
-		re5_timestamp(re5_ts);
+		re5_timestamp(re5_ts,sizeof(re5_ts));
 		
 		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
 
-		sprintf(dt,
+		snprintf(dt,sizeof(dt)-1,
 				"%c%s%c%s%c%s%c\n",
 				log_separator,re5_ts,log_separator,func,log_separator,va_msg,log_separator);
 	           
@@ -156,9 +169,9 @@ void re_put_in_syslog_v3(int fp,const char *func,int line,char *msg,va_list ap)
     int len;
 	
 	if(fp) {
-		char re5_ts[21];
+		char re5_ts[RE5_TS_LEN];
 				
-		re5_timestamp(re5_ts);
+		re5_timestamp(re5_ts,sizeof(re5_ts));
 		
 		if(strchr(msg,'%') != NULL) vsnprintf(va_msg,sizeof(va_msg)-1,msg,ap);
 		else strcpy(va_msg,msg);
