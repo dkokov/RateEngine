@@ -278,7 +278,13 @@ int main(int argc, char *argv[])
 		} else {
 			if(run_foreground(mcfg->system_dir, mcfg->system_pid_file)) {
 				LOG("RateEngine","The RateEngine foreground mode cannot be started!");
-				goto end;
+
+				/* Fail with a non-zero status, like the '-d' path does: a
+				 * refused start (another instance holds the pid file lock)
+				 * must be visible to whoever supervises us - docker, systemd
+				 * or a shell. 'goto end' would fall through to the closing
+				 * pthread_exit(NULL) and report success. */
+				exit(EXIT_FAILURE);
 			}
 
 			LOG("RateEngine","The RateEngine foreground is starting...");

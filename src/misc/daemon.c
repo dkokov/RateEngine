@@ -78,31 +78,59 @@ void daemonShutdown(void)
 	remove(mcfg->system_pid_file);
 }
 
-/* Single-instance guard: if the pid file names a process that is still alive,
- * refuse to start a second instance (clear message on the tty). A stale pid
- * file (process gone) is ignored and gets overwritten later.
- * Returns RE_SUCCESS when it is safe to start, RE_ERROR when already running. */
-static int daemon_chk_running(char *pidfile)
+/* Read the pid recorded in the pid file, 0 when unreadable/empty. Used only to
+ * make the "already running" message informative - never to decide whether we
+ * are allowed to start. */
+static int daemon_pidfile_read(char *pidfile)
 {
+    int rpid = 0;
     int pf = open(pidfile, O_RDONLY, 0600);
 
     if(pf >= 0) {
         char pbuf[16];
-        int rpid;
 
         bzero(pbuf,sizeof(pbuf));
 
-        if(read(pf,pbuf,sizeof(pbuf)-1) > 0) {
-            rpid = atoi(pbuf);
+        if(read(pf,pbuf,sizeof(pbuf)-1) > 0) rpid = atoi(pbuf);
 
-            if(rpid > 0 && kill(rpid,0) == 0) {
-                close(pf);
-                fprintf(stderr,"\nRateEngine is already running (PID %d)! "
-                               "Cannot start a second instance.\n",rpid);
-                LOG("daemon_chk_running()","RateEngine is already running (PID %d), "
-                                  "refusing to start a second instance",rpid);
-                return RE_ERROR;
-            }
+        close(pf);
+    }
+
+    return rpid;
+}
+
+/* Single-instance guard, part 1 of 2: is the pid file already locked by a LIVE
+ * instance?
+ *
+ * F_TEST reports a lock held by another process. The previous probe read the
+ * pid and called kill(pid,0), which is wrong in a container: foreground mode
+ * records pid 1, so on the next start the new RateEngine is *itself* pid 1,
+ * kill(1,0) succeeded and it refused to start - any crash/docker kill/OOM
+ * bricked startup until the file was deleted by hand. A lock cannot go stale:
+ * the kernel drops it when the holder dies. It also lives on the inode, so it
+ * works across containers bind-mounting the same file.
+ *
+ * The authoritative lock is taken later by daemon_pidfile_write(); this check
+ * exists so that '-d' can report the failure BEFORE fork() - record locks are
+ * not inherited across fork, so the child takes the real lock only after the
+ * parent has already printed "RE process created" and exited 0.
+ *
+ * Returns RE_SUCCESS when it is safe to start, RE_ERROR when already running. */
+static int daemon_chk_running(char *pidfile)
+{
+    int pf = open(pidfile, O_RDWR, 0600);
+
+    if(pf >= 0) {
+        if(lockf(pf,F_TEST,0) == -1) {
+            int rpid = daemon_pidfile_read(pidfile);
+
+            close(pf);
+
+            fprintf(stderr,"\nRateEngine is already running (PID %d)! "
+                           "Cannot start a second instance.\n",rpid);
+            LOG("daemon_chk_running()","RateEngine is already running (PID %d), "
+                              "refusing to start a second instance",rpid);
+            return RE_ERROR;
         }
 
         close(pf);
@@ -143,24 +171,42 @@ static void daemon_setup_signals(void)
 	sigaction(SIGKILL, &newSigAction, NULL);
 }
 
-/* Open+lock the pid file and write our pid into it. Must run AFTER the final
- * pid is known (i.e. after fork() in the -d path). Returns RE_SUCCESS/RE_ERROR. */
+/* Single-instance guard, part 2 of 2, and the authoritative one: open the pid
+ * file, take an exclusive advisory lock, then record our pid. Must run AFTER
+ * the final pid is known (i.e. after fork() in the -d path, since record locks
+ * are not inherited across fork). The lock is held for the process lifetime -
+ * 'pidFilehandle' must stay open. Returns RE_SUCCESS/RE_ERROR. */
 static int daemon_pidfile_write(char *pidfile)
 {
     char str[16];
 
-    /* Ensure only one copy */
-    pidFilehandle = open(pidfile, O_RDWR|O_CREAT|O_TRUNC, 0600);
+    /* NOT O_TRUNC: truncating before we own the lock would wipe the pid of a
+     * running instance. The file is truncated below, once the lock is ours. */
+    pidFilehandle = open(pidfile, O_RDWR|O_CREAT, 0600);
     if(pidFilehandle == -1 ) {
        LOG("daemon_pidfile_write()","Could not open PID lock file %s, exiting", pidfile);
        fprintf(stderr,"\nCould not open PID lock file %s, exiting\n",pidfile);
        return RE_ERROR;
     }
 
-    /* Try to lock file */
+    /* Try to lock file - failure means another live instance holds it */
     if(lockf(pidFilehandle,F_TLOCK,0) == -1) {
-        LOG("daemon_pidfile_write()","Could not lock PID lock file %s, exiting", pidfile);
-        fprintf(stderr,"\nCould not lock PID lock file %s,exiting\n",pidfile);
+        int rpid = daemon_pidfile_read(pidfile);
+
+        LOG("daemon_pidfile_write()","RateEngine is already running (PID %d), "
+                          "could not lock PID file %s",rpid,pidfile);
+        fprintf(stderr,"\nRateEngine is already running (PID %d)! "
+                       "Could not lock PID file %s.\n",rpid,pidfile);
+
+        close(pidFilehandle);
+        pidFilehandle = 0;
+
+        return RE_ERROR;
+    }
+
+    /* The lock is ours - drop any stale pid left by a crashed instance */
+    if(ftruncate(pidFilehandle,0) < 0) {
+        LOG("daemon_pidfile_write()","Could not truncate PID file %s", pidfile);
         return RE_ERROR;
     }
 

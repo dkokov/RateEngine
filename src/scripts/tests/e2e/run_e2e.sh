@@ -104,7 +104,10 @@ dump_logs() {
 		echo "----- rate_engine.log (tail) -----" >&2
 		tail -n 60 "$LOGFILE" >&2 || true
 	fi
-	if [ -n "$WORKDIR" ] && grep -q 'db_connect() ERROR' "$WORKDIR/daemon.stdout" 2>/dev/null; then
+	# Engine LOG() output goes to the log file whenever LogDebugLevel > 0, and
+	# only falls back to stderr (daemon.stdout) at level 0 - so look in both.
+	if [ -n "$WORKDIR" ] &&
+		grep -qs 'db_connect() ERROR' "$WORKDIR/daemon.stdout" "$LOGFILE"; then
 		{
 			echo "----- diagnosis -----"
 			echo "CallControl could not connect to the database, so it bound no"
