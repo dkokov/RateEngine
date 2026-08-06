@@ -253,6 +253,13 @@ int net_listen(net_conn_t *conn)
 		tmp = (struct sockaddr *)&serv_loc;
 	} else return NET_ERROR_BIND;
 	
+	/* SO_REUSEADDR must be non-zero to have any effect. 'conn->opt' is not set
+	 * by ANY caller and net_init() zeroes the struct, so this call was passing
+	 * 0 and actively disabling the option it looks like it enables: after a
+	 * restart the port stayed unbindable for the whole TIME_WAIT window (~60s)
+	 * once clients had connected, and net_listen() failed with no diagnostic. */
+	if(conn->opt == 0) conn->opt = 1;
+
 	if(setsockopt(conn->sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&conn->opt, sizeof(conn->opt)) < 0 )
 		return NET_ERROR_SETSOCKOPT;
 		

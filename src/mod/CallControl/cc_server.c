@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
+#include <string.h>
 
 #include "../../misc/globals.h"
 #include "../../db/db.h"
@@ -336,11 +338,27 @@ void *cc_server_thread_int(void *dt)
 	
 	LOG("cc_server_thread_int()","net_proto_bind() for '%s'",cc_int->proto);
 
-	if(net_open(np) < 0) goto _end;
-	
-	LOG("cc_server_thread_int()","net_open() success");	
-	
-	if(net_listen(np->conn) < 0) goto _end;
+	/* net_open()/net_listen() only return a code - say WHICH interface failed
+	 * and why, otherwise a busy port or a bad ip/port looks identical to a
+	 * working start that simply never bound (the thread just exits at _end). */
+	ret = net_open(np);
+	if(ret < 0) {
+		LOG("cc_server_thread_int()","net_open() ERROR %d for %s %s:%d (%s)",
+			ret,cc_int->proto,
+			(strlen(cc_int->ip) ? cc_int->ip : "0.0.0.0"),cc_int->port,strerror(errno));
+		goto _end;
+	}
+
+	LOG("cc_server_thread_int()","net_open() success");
+
+	ret = net_listen(np->conn);
+	if(ret < 0) {
+		LOG("cc_server_thread_int()","net_listen() ERROR %d for %s %s:%d (%s) "
+			"- port already in use?",
+			ret,cc_int->proto,
+			(strlen(cc_int->ip) ? cc_int->ip : "0.0.0.0"),cc_int->port,strerror(errno));
+		goto _end;
+	}
 
 	LOG("cc_server_thread_int()","net_listen() success");
 
