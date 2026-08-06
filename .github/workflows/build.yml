@@ -91,6 +91,27 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/RateEngine/libs:$LD_LIBRARY_PATH
           /usr/local/RateEngine/bin/RateEngine -v
 
+      - name: CallControl E2E (jsonrpc_cc over tcp + TLS/mTLS)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBTYPE: pgsql
+          DBHOST: localhost
+          DBNAME: rate_engine
+          DBUSER: re_admin
+          DBPASS: ci_dev_only_pw
+          DBPORT: "5432"
+        run: bash src/scripts/tests/e2e/run_e2e.sh
+
+      - name: Offline rating regression (rt.so vs golden)
+        env:
+          RE_PREFIX: /usr/local/RateEngine
+          DBHOST: localhost
+          DBNAME: rate_engine
+          DBUSER: re_admin
+          DBPASS: ci_dev_only_pw
+          DBPORT: "5432"
+        run: bash src/scripts/tests/rating/run_rating_regression.sh
+
       # Service mode ('-f'/'-d') is what a container or a systemd unit runs, and
       # it is the only path that exercises run_mode, the config-driven service
       # selection, the pid file lock and the signal shutdown. Every other test
@@ -156,27 +177,6 @@ jobs:
           wait "$JOB" || true
 
           echo "foreground service mode OK"
-
-      - name: CallControl E2E (jsonrpc_cc over tcp + TLS/mTLS)
-        env:
-          RE_PREFIX: /usr/local/RateEngine
-          DBTYPE: pgsql
-          DBHOST: localhost
-          DBNAME: rate_engine
-          DBUSER: re_admin
-          DBPASS: ci_dev_only_pw
-          DBPORT: "5432"
-        run: bash src/scripts/tests/e2e/run_e2e.sh
-
-      - name: Offline rating regression (rt.so vs golden)
-        env:
-          RE_PREFIX: /usr/local/RateEngine
-          DBHOST: localhost
-          DBNAME: rate_engine
-          DBUSER: re_admin
-          DBPASS: ci_dev_only_pw
-          DBPORT: "5432"
-        run: bash src/scripts/tests/rating/run_rating_regression.sh
 
       # Broader billing-parity gate on a SYNTHETIC benchmark DB (no real data):
       # generate a small synthetic rating DB, then assert rt.so and rt_duckdb.so
