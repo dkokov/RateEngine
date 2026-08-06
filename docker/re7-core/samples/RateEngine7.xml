@@ -49,6 +49,9 @@
     <param name="KLimitMin" value="0.05" />
  </Rating>
  <CDRMediator>
+    <!-- Start the CDR fetching service? In service mode (-d/-f) only the
+         sections marked active="yes" are started. Missing param = yes. -->
+    <param name="active" value="yes" />
     <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
  </CDRMediator>
  <Logs>

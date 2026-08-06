@@ -42,7 +42,14 @@ if [ ! -f /root/.pgpass ]; then
 fi
 
 echo "starting RateEngine7 ..."
-$CLI -c $CONF -d
 
-# keep container alive, follow the log
-exec tail -f $APP_DIR/logs/rate_engine.log
+# Follow the log in the background so 'docker logs' shows it (the engine writes
+# to the file, not stdout). -F survives the log rollover done by re7_manager().
+touch "$APP_DIR/logs/rate_engine.log"
+tail -F "$APP_DIR/logs/rate_engine.log" &
+
+# Foreground mode: RateEngine becomes pid 1 of the container, so SIGTERM from
+# 'docker stop' reaches it (clean shutdown) and the container exit status is the
+# engine's. '-d' cannot be used here: it forks away and the container would look
+# healthy with nothing running.
+exec $CLI -c $CONF -f
