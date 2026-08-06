@@ -20,6 +20,7 @@ unsigned short rating_flag;
 char cdr_storage_sched_ts[64];
 unsigned short get_cdrs_flag;
 unsigned short demonize;
+run_mode_t run_mode;
 unsigned int log_max_file_size;
 char log_separator;
 unsigned short log_debug_level;
@@ -35,6 +36,8 @@ void init_globals(void)
     call_control_flag = 0;
     call_maxsec_limit = 0;
     get_cdrs_mode = 0;
+
+    run_mode = RUN_ONESHOT;
 	
 	bzero(billing_day,sizeof(billing_day));
 	day_of_payment = 0;

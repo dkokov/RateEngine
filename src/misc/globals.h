@@ -44,6 +44,23 @@ extern unsigned int log_max_file_size;
 /* A flag for demonize of the RE5 */
 extern unsigned short demonize;
 
+/* How this process runs - keep it apart from 'daemon_flag'(=did we fork).
+ *
+ *   RUN_ONESHOT : an explicit CLI action (-g / -r / -2c). The starter joins the
+ *                 service thread, the action finishes and the process exits.
+ *   RUN_SERVICE : a long-running supervisor (-d background or -f foreground).
+ *                 Every enabled service is started detached and re7_manager()
+ *                 is the blocking loop of the process.
+ *
+ * Before this split 'daemon_flag' carried both meanings, so '-f' with all
+ * services enabled blocked in the CDRMediator join and never started rating. */
+typedef enum run_mode_e {
+	RUN_ONESHOT = 0,
+	RUN_SERVICE = 1
+}run_mode_t;
+
+extern run_mode_t run_mode;
+
 /* A flag for CDRMediator starting */
 extern unsigned short get_cdrs_flag;
 
@@ -136,6 +153,7 @@ typedef struct opt_cli {
 	char cfgfile[512];
 
 	unsigned short daemon_flag;
+    unsigned short foreground_flag;
     unsigned short kill_flag;
     unsigned short test_flag;
 	unsigned short test_mode;

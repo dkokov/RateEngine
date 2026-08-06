@@ -78,47 +78,46 @@ void daemonShutdown(void)
 	remove(mcfg->system_pid_file);
 }
 
-void daemonize(char *rundir, char *pidfile)
+/* Single-instance guard: if the pid file names a process that is still alive,
+ * refuse to start a second instance (clear message on the tty). A stale pid
+ * file (process gone) is ignored and gets overwritten later.
+ * Returns RE_SUCCESS when it is safe to start, RE_ERROR when already running. */
+static int daemon_chk_running(char *pidfile)
 {
-    int fd;
-    int pid, sid;
-    char str[10];
+    int pf = open(pidfile, O_RDONLY, 0600);
+
+    if(pf >= 0) {
+        char pbuf[16];
+        int rpid;
+
+        bzero(pbuf,sizeof(pbuf));
+
+        if(read(pf,pbuf,sizeof(pbuf)-1) > 0) {
+            rpid = atoi(pbuf);
+
+            if(rpid > 0 && kill(rpid,0) == 0) {
+                close(pf);
+                fprintf(stderr,"\nRateEngine is already running (PID %d)! "
+                               "Cannot start a second instance.\n",rpid);
+                LOG("daemon_chk_running()","RateEngine is already running (PID %d), "
+                                  "refusing to start a second instance",rpid);
+                return RE_ERROR;
+            }
+        }
+
+        close(pf);
+    }
+
+    return RE_SUCCESS;
+}
+
+/* Signal disposition shared by background(-d) and foreground(-f) service mode.
+ * Foreground also needs it: without a SIGTERM/SIGINT handler 'docker stop' and
+ * Ctrl-C kill the process hard, leaving a stale pid file and SHM segment. */
+static void daemon_setup_signals(void)
+{
     struct sigaction newSigAction;
     sigset_t newSigSet;
-    
-    /* Check if parent process id is set */
-    if (getppid() == 1) {
-        exit(EXIT_FAILURE);
-    }
-
-    /* Single-instance guard: if the pid file names a process that is still
-     * alive, refuse to start a second instance (clear message on the tty).
-     * A stale pid file (process gone) is ignored and gets overwritten below. */
-    {
-        int pf = open(pidfile, O_RDONLY, 0600);
-
-        if(pf >= 0) {
-            char pbuf[16];
-            int rpid;
-
-            bzero(pbuf,sizeof(pbuf));
-
-            if(read(pf,pbuf,sizeof(pbuf)-1) > 0) {
-                rpid = atoi(pbuf);
-
-                if(rpid > 0 && kill(rpid,0) == 0) {
-                    close(pf);
-                    fprintf(stderr,"\nRateEngine is already running (PID %d)! "
-                                   "Cannot start a second instance.\n",rpid);
-                    LOG("daemonize()","RateEngine is already running (PID %d), "
-                                      "refusing to start a second instance",rpid);
-                    exit(EXIT_FAILURE);
-                }
-            }
-
-            close(pf);
-        }
-    }
 
     /* Set signal mask - signals we want to block */
     sigemptyset(&newSigSet);
@@ -133,11 +132,84 @@ void daemonize(char *rundir, char *pidfile)
     sigemptyset(&newSigAction.sa_mask);
     newSigAction.sa_flags = 0;
 
-    /* Signals to handle */
+    /* Signals to handle. SIGKILL cannot be caught - the sigaction() call for it
+     * just fails harmlessly; SIGINT/SIGHUP matter for the foreground path
+     * (Ctrl-C, 'docker stop' sends SIGTERM then SIGKILL). */
     sigaction(SIGUSR1, &newSigAction, NULL);
     sigaction(SIGUSR2, &newSigAction, NULL);
     sigaction(SIGTERM, &newSigAction, NULL);
+    sigaction(SIGINT,  &newSigAction, NULL);
+    sigaction(SIGHUP,  &newSigAction, NULL);
 	sigaction(SIGKILL, &newSigAction, NULL);
+}
+
+/* Open+lock the pid file and write our pid into it. Must run AFTER the final
+ * pid is known (i.e. after fork() in the -d path). Returns RE_SUCCESS/RE_ERROR. */
+static int daemon_pidfile_write(char *pidfile)
+{
+    char str[16];
+
+    /* Ensure only one copy */
+    pidFilehandle = open(pidfile, O_RDWR|O_CREAT|O_TRUNC, 0600);
+    if(pidFilehandle == -1 ) {
+       LOG("daemon_pidfile_write()","Could not open PID lock file %s, exiting", pidfile);
+       fprintf(stderr,"\nCould not open PID lock file %s, exiting\n",pidfile);
+       return RE_ERROR;
+    }
+
+    /* Try to lock file */
+    if(lockf(pidFilehandle,F_TLOCK,0) == -1) {
+        LOG("daemon_pidfile_write()","Could not lock PID lock file %s, exiting", pidfile);
+        fprintf(stderr,"\nCould not lock PID lock file %s,exiting\n",pidfile);
+        return RE_ERROR;
+    }
+
+    /* Get and format PID */
+    sprintf(str,"%d\n",getpid());
+
+    /* write pid to lockfile */
+    if(write(pidFilehandle, str, strlen(str)) < 0) {
+        LOG("daemon_pidfile_write()","Could not write PID to %s", pidfile);
+        return RE_ERROR;
+    }
+
+    return RE_SUCCESS;
+}
+
+/* Foreground service mode (-f): everything daemonize() does except the fork,
+ * the setsid() and the /dev/null redirect - stdout/stderr stay attached so a
+ * container/systemd sees the process and its output directly. */
+int run_foreground(char *rundir, char *pidfile)
+{
+    if(daemon_chk_running(pidfile)) return RE_ERROR;
+
+    daemon_setup_signals();
+
+    /* change running directory - the pid file path is relative to it */
+    if(chdir(rundir) < 0) {
+        LOG("run_foreground()","Could not chdir to '%s'",rundir);
+        return RE_ERROR;
+    }
+
+    if(daemon_pidfile_write(pidfile)) return RE_ERROR;
+
+    return RE_SUCCESS;
+}
+
+void daemonize(char *rundir, char *pidfile)
+{
+    int fd;
+    int pid, sid;
+
+    /* NOTE: the old 'if(getppid() == 1) exit(EXIT_FAILURE)' guard used to live
+     * here as an "already daemonized" check. It made '-d' impossible inside a
+     * container, where the entrypoint IS pid 1, so every child has ppid==1 and
+     * the process died silently before writing a single log line. The pid file
+     * lock below is the real single-instance guard. */
+
+    if(daemon_chk_running(pidfile)) exit(EXIT_FAILURE);
+
+    daemon_setup_signals();
 
     /* Fork*/
     pid = fork();
@@ -182,25 +254,11 @@ void daemonize(char *rundir, char *pidfile)
 	}
 
 	/* change running directory */
-    chdir(rundir); 
-
-    /* Ensure only one copy */
-    pidFilehandle = open(pidfile, O_RDWR|O_CREAT, 0600);
-    if(pidFilehandle == -1 ) {
-       LOG("daemonize()","Could not open PID lock file %s, exiting", pidfile);
-       exit(EXIT_FAILURE);
-    }
-
-    /* Try to lock file */
-    if(lockf(pidFilehandle,F_TLOCK,0) == -1) {
-        LOG("daemonize()","Could not lock PID lock file %s, exiting", pidfile);
-        fprintf(stderr,"\nCould not lock PID lock file %s,exiting\n",pidfile);
+    if(chdir(rundir) < 0) {
+        LOG("daemonize()","Could not chdir to '%s'",rundir);
         exit(EXIT_FAILURE);
     }
 
-    /* Get and format PID */
-    sprintf(str,"%d\n",getpid());
-
-    /* write pid to lockfile */
-    write(pidFilehandle, str, strlen(str));    
+    /* Ensure only one copy - pid of the child, after the fork */
+    if(daemon_pidfile_write(pidfile)) exit(EXIT_FAILURE);
 }

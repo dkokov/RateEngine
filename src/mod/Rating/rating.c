@@ -992,7 +992,11 @@ void *RateEngine(void *dt)
 		goto _end;
 	}
 	
-	if((mcfg->daemon_flag)&&((cfg->rating_active_flag) == 'f')) goto _end;
+	/* In service mode (-d/-f) 'active=no' means "don't run the rater at all" -
+	 * re7_starter() already filters on it, this is the module-side backstop.
+	 * A one-shot CLI run ('-r <leg>') must NOT be gated by it: there the flag
+	 * only decides whether rt_loop() repeats (see rt_eng.active below). */
+	if((mcfg->run_mode == RUN_SERVICE)&&((cfg->rating_active_flag) == 'f')) goto _end;
 		
 	if(rt_init() < 0) {
 		LOG("RateEngine","rt_init() returned error!");

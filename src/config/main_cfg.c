@@ -115,15 +115,28 @@ void main_cfg_logs_get(main_cfg_t *cfg)
 	xml_cfg_params_free(cfg->node->params);
 }
 
-/* Read only the core-relevant param from <Rating>: which module runs the
- * offline batch rater. The Rating module still parses the rest of <Rating>
- * (leg, batch limit, pcard/billing options) for its own engine. */
+/* '<param name="active" value="yes|no">' -> 't'/'f'. Anything other than
+ * "yes" counts as disabled, matching the module-side cfg readers. */
+static char main_cfg_active_val(char *value)
+{
+	if((value != NULL)&&(strcmp(value,"yes") == 0)) return 't';
+
+	return 'f';
+}
+
+/* Read only the core-relevant params from <Rating>: which module runs the
+ * offline batch rater and whether the service is active at all. The Rating
+ * module still parses the rest of <Rating> (leg, batch limit, pcard/billing
+ * options) for its own engine. */
 void main_cfg_rating_get(main_cfg_t *cfg)
 {
 	xml_param_t *params = NULL;
 
 	/* default: the Rating module itself does batch rating */
 	strcpy(cfg->rating_module,"rt.so");
+
+	/* no 'active' param -> service is enabled (backward compatible) */
+	cfg->rating_active = 't';
 
 	strcpy(cfg->node->node_name,"Rating");
 
@@ -139,6 +152,61 @@ void main_cfg_rating_get(main_cfg_t *cfg)
 			}
 		}
 
+		if(strcmp(params->name,"active") == 0) {
+			cfg->rating_active = main_cfg_active_val(params->value);
+		}
+
+		params = params->next_param;
+	}
+
+	xml_cfg_params_free(cfg->node->params);
+}
+
+/* Core-relevant param from <CallControl>: is the CC server active. The
+ * CallControl module reads the rest of the section itself (cc_cfg.c). */
+void main_cfg_cc_get(main_cfg_t *cfg)
+{
+	xml_param_t *params = NULL;
+
+	cfg->cc_active = 't';
+
+	strcpy(cfg->node->node_name,"CallControl");
+
+	xml_cfg_params_get(cfg->root,cfg->node);
+
+	params = cfg->node->params;
+
+	while(params != NULL) {
+		if(strcmp(params->name,"active") == 0) {
+			cfg->cc_active = main_cfg_active_val(params->value);
+		}
+
+		params = params->next_param;
+	}
+
+	xml_cfg_params_free(cfg->node->params);
+}
+
+/* Core-relevant param from <CDRMediator>: is CDR fetching active. Note the
+ * per-profile 'active' in config/cdr_profiles/*.xml is a different switch -
+ * this one decides whether the mediator engine is started at all. */
+void main_cfg_cdrm_get(main_cfg_t *cfg)
+{
+	xml_param_t *params = NULL;
+
+	cfg->cdrm_active = 't';
+
+	strcpy(cfg->node->node_name,"CDRMediator");
+
+	xml_cfg_params_get(cfg->root,cfg->node);
+
+	params = cfg->node->params;
+
+	while(params != NULL) {
+		if(strcmp(params->name,"active") == 0) {
+			cfg->cdrm_active = main_cfg_active_val(params->value);
+		}
+
 		params = params->next_param;
 	}
 
@@ -152,6 +220,8 @@ void main_cfg_view(main_cfg_t *cfg)
 		LOG("main_cfg_view()","system dir: %s",cfg->system_dir);
 		LOG("main_cfg_view()","system pid file: %s",cfg->system_pid_file);
 		LOG("main_cfg_view()","dbtype: %s,dbhost: %s",cfg->dbtype,cfg->dbhost);
+		LOG("main_cfg_view()","active: rating='%c'(%s),callcontrol='%c',cdrmediator='%c'",
+			cfg->rating_active,cfg->rating_module,cfg->cc_active,cfg->cdrm_active);
 	}
 }
 
@@ -189,8 +259,12 @@ main_cfg_t *main_cfg_main(char *cfg_filename)
 					/* Logs */
 					main_cfg_logs_get(cfg);
 
-					/* offline batch rating backend selector */
+					/* offline batch rating backend selector + 'active' */
 					main_cfg_rating_get(cfg);
+
+					/* per-service 'active' switches for re7_starter() */
+					main_cfg_cc_get(cfg);
+					main_cfg_cdrm_get(cfg);
 
 					mem_free(cfg->node);
 				}

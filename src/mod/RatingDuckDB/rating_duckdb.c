@@ -126,7 +126,9 @@ void *RateEngine(void *dt)
 		xml_cfg_free_doc(doc);
 	}
 
-	if((mcfg->daemon_flag)&&(active == 'f')) goto _end;
+	/* see the same guard in mod/Rating/rating.c: service mode honours
+	 * 'active=no', a one-shot '-r <leg>' run does not */
+	if((mcfg->run_mode == RUN_SERVICE)&&(active == 'f')) goto _end;
 
 	if(batch_limit <= 0) batch_limit = 5000;
 	if(batch_limit > 50000) batch_limit = 50000;

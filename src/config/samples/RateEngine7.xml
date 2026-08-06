@@ -26,6 +26,9 @@
     <param name="IntervalRetries" value="2" />
  </DB>
  <CallControl>
+    <!-- Start the CallControl server? In service mode (-d/-f) RateEngine starts
+         only the services marked active="yes" here; a missing param means yes.
+         An explicit CLI flag (-2c/-r/-g) overrides this and runs just that one. -->
     <param name="active" value="yes" />
 
     <!-- server sleeping in microseconds -->
@@ -44,6 +47,7 @@
     <param name="LogFileMaxSize" value="40960000" /> -->
  </CallControl>
  <Rating>
+    <!-- Start the offline batch rater? (see <CallControl> active) -->
     <param name="active" value="yes" />
     <!-- Offline batch rating backend module. Default rt.so (the Rating engine).
          Set rt_duckdb.so to use the DuckDB analytical batch rater instead;
@@ -76,6 +80,11 @@
     <param name="KLimitMin" value="0.05" />
  </Rating>
  <CDRMediator>
+    <!-- Start the CDR fetching service? In service mode (-d/-f) only the
+         sections marked active="yes" are started. Missing param = yes.
+         (This is the whole service; each profile in CDRProfilesDIR has its
+         own 'active' switch for its own fetch loop.) -->
+    <param name="active" value="yes" />
     <param name="CDRProfilesDIR" value="config/cdr_profiles/" />
 <!--    <param name="CDRTCPConn" value="5" /> -->
  </CDRMediator>

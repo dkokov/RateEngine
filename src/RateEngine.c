@@ -29,6 +29,8 @@ void help(void)
 			       "  --stop or -k           ,exit from the backgroud mode of the RateEngine(stop demonization);\n"
 			       "  --version or -v        ,show version of the RateEngine;\n"
 			       "  --bg  or -d            ,backgroud mode of the RateEngine(demonization);\n"
+			       "  --fg  or -f            ,foreground mode - same services as '-d' but no fork\n"
+			       "                          (for containers/systemd Type=simple);\n"
 			       "  --debug [0-7]          ,debug log level in 'not fork' mode;\n"
 			       "  --stat                 ,show RateEngine status services and global statistics;\n"
 			       "\n"
@@ -101,7 +103,7 @@ int cli_opts_parser(int arg_num, char *arg_arr[])
 		if((!strcmp(arg_arr[i],"--stat"))) {
 			opt_cli_mem.stat_flag = TRUE;
 			return RE_SUCCESS;
-		}		
+		}
 		
 		if((!strcmp(arg_arr[i],"--debug"))) {
 			opt_cli_mem.debug = atoi(arg_arr[i+1]);
@@ -151,11 +153,19 @@ int cli_opts_parser(int arg_num, char *arg_arr[])
 		if((!strcmp(arg_arr[i],"--ccserver"))||(!strcmp(arg_arr[i],"-2c"))) {
 			call_control_flag = TRUE;
 		}
-		
+
 		if((!strcmp(arg_arr[i],"--bg"))||(!strcmp(arg_arr[i],"-d"))) {
 			opt_cli_mem.daemon_flag = TRUE;
+			run_mode = RUN_SERVICE;
 		}
-		
+
+		/* foreground service mode: same services as '-d' but no fork - the
+		 * process stays attached to the tty/container init and keeps stdio */
+		if((!strcmp(arg_arr[i],"--fg"))||(!strcmp(arg_arr[i],"-f"))) {
+			opt_cli_mem.foreground_flag = TRUE;
+			run_mode = RUN_SERVICE;
+		}
+
 		if((!strcmp(arg_arr[i],"--stop"))||(!strcmp(arg_arr[i],"-k"))) {
 			opt_cli_mem.kill_flag = TRUE;
 		}
@@ -191,10 +201,6 @@ int main(int argc, char *argv[])
 		goto end;
 	}
 
-	if(&opt_cli_mem.debug > 0) {
-		log_debug_level = opt_cli_mem.debug;
-	}
-
 	/* Show RateEngine Status&Statistics */
 	if(opt_cli_mem.stat_flag == TRUE) {
 		re_stat();
@@ -219,8 +225,16 @@ int main(int argc, char *argv[])
 			goto end;
 		}
 		
-		/* Init daemon flag in a 'mcfg' struct */
+		/* Init daemon flag('did we fork') and run mode in a 'mcfg' struct */
 		mcfg->daemon_flag = opt_cli_mem.daemon_flag;
+		mcfg->run_mode    = (unsigned short)run_mode;
+
+		/* Log level: the config value applies to every mode; an explicit
+		 * '--debug N' on the command line overrides it. (The old test here was
+		 * 'if(&opt_cli_mem.debug > 0)' - the address of a struct member, always
+		 * true - so --debug silently forced level 0 in the CLI modes.) */
+		log_debug_level = mcfg->log_debug_level;
+		if(opt_cli_mem.debug > 0) log_debug_level = opt_cli_mem.debug;
 		
 		LOG("RateEngine","The RateEngine configuration is parsed succesful!");
 	} else {
@@ -248,32 +262,43 @@ int main(int argc, char *argv[])
 		goto end;
 	}
 	
-    if((rating_flag == 0)&&(get_cdrs_flag == 0)&&(call_control_flag == 0)) {
+	/* Which mode do we run in?
+	 *
+	 *   -d  : service mode, forked into the background
+	 *   -f  : service mode, stays in the foreground (container/systemd)
+	 *   -g / -r / -2c : one-shot run of that single service
+	 *   -k  : stop a running service
+	 *
+	 * In service mode re7_starter() picks the services to launch from the
+	 * 'active' switches in the config - it no longer forces all three on. */
+	if(run_mode == RUN_SERVICE) {
 		if(opt_cli_mem.daemon_flag) {
-			rating_flag = 1;
-			get_cdrs_flag = 1;
-			call_control_flag =1;
-			
-			log_debug_level = mcfg->log_debug_level;
-			
 			daemonize(mcfg->system_dir, mcfg->system_pid_file);
 			LOG("RateEngine","The RateEngine daemon is starting...");
-			
-			if(stat_init() == 0) LOG("RateEngine","The RateEngine stat is not started (no init SHMEM)!");
-		} else if(opt_cli_mem.kill_flag) {
-			stat_remove();
-			
-			chdir(mcfg->system_dir);
-			stop_daemon(mcfg->system_pid_file);
-			
-			LOG("RateEngine","The RateEngine daemon is stoping...");
-			goto end;	
 		} else {
-			LOG("RateEngine","Don't have option");
-			goto end;
+			if(run_foreground(mcfg->system_dir, mcfg->system_pid_file)) {
+				LOG("RateEngine","The RateEngine foreground mode cannot be started!");
+				goto end;
+			}
+
+			LOG("RateEngine","The RateEngine foreground is starting...");
 		}
+
+		if(stat_init() == 0) LOG("RateEngine","The RateEngine stat is not started (no init SHMEM)!");
+	} else if(opt_cli_mem.kill_flag) {
+		stat_remove();
+
+		if(chdir(mcfg->system_dir) < 0) LOG("RateEngine","Could not chdir to '%s'",mcfg->system_dir);
+		stop_daemon(mcfg->system_pid_file);
+
+		LOG("RateEngine","The RateEngine daemon is stoping...");
+		goto end;
+	} else if((rating_flag == 0)&&(get_cdrs_flag == 0)&&(call_control_flag == 0)) {
+		LOG("RateEngine","Don't have option");
+		goto end;
 	}
-    
+
+
     pthread_mutex_init(&config.sync_bt_thread,NULL);
     
     /* RateEngine starter - get CDRs,rating(offline),CallControl */
@@ -284,8 +309,14 @@ int main(int argc, char *argv[])
 
 	end:
 		if(mcfg != NULL) {
-			chdir(mcfg->system_dir);
-			remove(mcfg->system_pid_file);			
+			/* Only remove the pid file if THIS process created it (service
+			 * mode). Otherwise a plain '-t'/'-r'/'-g' run would delete the pid
+			 * file of the daemon that is actually running and break '-k'. */
+			if(pidFilehandle > 0) {
+				if(chdir(mcfg->system_dir) < 0) LOG("RateEngine","Could not chdir to '%s'",mcfg->system_dir);
+				remove(mcfg->system_pid_file);
+			}
+
 			mem_free(mcfg);
 		}
 						

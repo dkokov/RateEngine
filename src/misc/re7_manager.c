@@ -46,7 +46,10 @@ int get_cdrs(void)
 		return RE_ERROR;
 	}
 	
-	if(opt_cli_mem.daemon_flag == 0) {
+	/* Only a one-shot CLI run (-g) waits here. In service mode (-d/-f) the
+	 * thread runs detached, otherwise this join would block re7_starter() and
+	 * the remaining services would never be started. */
+	if(run_mode == RUN_ONESHOT) {
 		pthread_join(config.thread_cdrstorage_engine,NULL);
 		LOG("CDRMediatorEngine","pthread_join() is join");
 	}
@@ -98,7 +101,8 @@ int rating_action(void)
 		return RE_ERROR;
 	}
 	
-	if(opt_cli_mem.daemon_flag == 0) {
+	/* one-shot '-r <leg>' waits for the rating run to finish; see get_cdrs() */
+	if(run_mode == RUN_ONESHOT) {
 		pthread_join(config.thread_rate_engine,NULL);
 		LOG("RateEngine","pthread_join() is join");
 	}
@@ -135,7 +139,9 @@ int cc_server_action(void)
 		return RE_ERROR;
 	}
 
-	if(opt_cli_mem.daemon_flag == 0) {
+	/* cc_server_main() is only a setup thread - it spawns the detached janitor
+	 * and interface threads and exits, so this join returns quickly either way */
+	if(run_mode == RUN_ONESHOT) {
 		pthread_join(config.thread_cc_server,NULL);
 		LOG("CC","pthread_join() is join");
 	}
@@ -162,9 +168,33 @@ void re5_chk_reload_logfile(time_t res)
 	}
 }
 
+/* In service mode (-d/-f) the set of services to run comes from the
+ * '<param name="active">' switches in RateEngine7.xml. An explicit CLI service
+ * flag (-g/-r/-2c) overrides the config and forces a one-shot run of just that
+ * service, so this is only reached when none of them was given. */
+static void re7_services_from_cfg(void)
+{
+	if(run_mode != RUN_SERVICE) return;
+	if(mcfg == NULL) return;
+
+	get_cdrs_flag     = (mcfg->cdrm_active   == 't') ? 1 : 0;
+	rating_flag       = (mcfg->rating_active == 't') ? 1 : 0;
+	call_control_flag = (mcfg->cc_active     == 't') ? 1 : 0;
+
+	LOG("re7_starter()","services from config: cdrmediator=%c rating=%c callcontrol=%c",
+		mcfg->cdrm_active,mcfg->rating_active,mcfg->cc_active);
+
+	if((get_cdrs_flag == 0)&&(rating_flag == 0)&&(call_control_flag == 0))
+		LOG("re7_starter()","WARNING! No active service in the config - nothing to start!");
+}
+
 int re7_starter(void)
 {
-    if((call_control_flag)) {		
+	/* an explicit CLI service flag means one-shot; otherwise take the config */
+	if((rating_flag == 0)&&(get_cdrs_flag == 0)&&(call_control_flag == 0))
+		re7_services_from_cfg();
+
+    if((call_control_flag)) {
 		if(cc_server_action()) return RE_ERROR;
     }
 

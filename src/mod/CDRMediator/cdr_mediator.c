@@ -125,6 +125,14 @@ void *CDRMediatorEngine(void *dt)
 	cdr_cfg_t *cfg;
     cdr_profile_cfg_t *profiles;
 
+	/* Do any threads outlive this function? If so 'cfg'/'profiles' must NOT be
+	 * freed below - the profile threads keep using them for the whole process
+	 * lifetime. True in service mode (-d/-f) and whenever some profile is
+	 * marked active (that thread loops forever, so it can't be joined).
+	 * This used to be expressed by writing opt_cli_mem.daemon_flag=1 from here,
+	 * which silently changed the core's join behaviour for the other services. */
+	int keep_running = (run_mode == RUN_SERVICE);
+
 	if(cdr_tbl_cpy_ptr == NULL) cdr_tbl_cpy_ptr = cdr_tbl_cpy();
         
     cfg = cdr_cfg_main(mcfg->cfg_filename);
@@ -202,14 +210,14 @@ void *CDRMediatorEngine(void *dt)
 				LOG("CDRMediatorEngine","pthread_join() for profile : %s",profiles[i].profile_name);
 			} else {
 				loop_flag = 't';
-				opt_cli_mem.daemon_flag = 1;
+				keep_running = 1;
 			}
-		}		
+		}
 	} else {
 		LOG("CDRMediatorEngine","A 'cfg' pointer is null!");
 	}
-	
-	if(opt_cli_mem.daemon_flag == 0) {
+
+	if(keep_running == 0) {
 		loop_flag = 'f';
 
 		mcdr_cfg_free(cfg);		
