@@ -1,8 +1,16 @@
 <Interface>
  <config>
-    <!-- MyCC,Diameter Credit Control -->
-    <param name="proto" value="MyCC" />
-    <param name="ip" value="0.0.0.0" />
+    <!-- CallControl session/application protocol. The core loads the module
+         "<CC-proto>.so" and the symbol "<CC-proto>_proto_bind".
+         Was 'proto="MyCC"' (pre-0.7 format), which left CC-proto empty ->
+         cc_server_proto_bind() failed and the interface never started. -->
+    <param name="CC-proto" value="my_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tcp" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
+    <!-- empty = listen on all interfaces (needed in a container) -->
+    <param name="ip" value="" />
     <param name="port" value="9090" />
  </config>
 </Interface>

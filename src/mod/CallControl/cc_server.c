@@ -273,10 +273,16 @@ void *cc_worker_init(void)
 
 void *cc_server_thread_int(void *dt)
 {
-	int ret;
+	/* MUST be initialized: every 'goto _end' below can fire before net_init()
+	 * has run (e.g. an interface whose cc_proto has no matching module, like a
+	 * leftover json_rpc.xml). _end then called net_close(np)/net_free(np) on an
+	 * uninitialized stack value -> glibc "free(): invalid pointer" -> SIGABRT,
+	 * which killed the whole engine, not just this interface thread.
+	 * net_close()/net_free() both handle NULL safely. */
+	int ret = 0;
 	void *func;
 
-	net_t *np;
+	net_t *np = NULL;
 	net_handler_f external_func;
 	cc_cfg_int_t *cc_int = (cc_cfg_int_t *)dt;
 
@@ -573,6 +579,15 @@ void *cc_server_main(void *dt)
 			for(i=0;i<cfg->int_number;i++) {
 				if(strlen(cfg->interfaces[i].cc_proto) > 0) {
 					cc_server_thread_int_run(&cfg->interfaces[i]);
+				} else {
+					/* No 'CC-proto' in the interface file - typically a pre-0.7
+					 * config that still says proto="MyCC". This used to be
+					 * skipped silently, so the interface simply never came up
+					 * with nothing in the log to say why. */
+					LOG("cc_server_main()","WARNING! interface[%d] (%s:%d) has no 'CC-proto' "
+						"param - skipped. Pre-0.7 config? Expected CC-proto=my_cc|jsonrpc_cc "
+						"plus proto=tcp|tls.",
+						i,cfg->interfaces[i].ip,cfg->interfaces[i].port);
 				}
 			}
 
