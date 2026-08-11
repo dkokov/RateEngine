@@ -25,4 +25,20 @@ VALUES
     -- B) per-minute: billsec 90 -> ceil(90/60)=2 blocks -> 2*0.10 = 0.20, billed 120
     (1, 3, 'gold-permin', 0, 0, :'call_ts', 0, '359881000002', '359881999002', 0, 0,  90,  90, 0),
     -- C) two-tier: billsec 150 -> 0.30 + ceil(90/60)*0.10 = 0.50, billed 180
-    (1, 3, 'gold-tier',   0, 0, :'call_ts', 0, '359881000003', '359881999003', 0, 0, 150, 150, 0);
+    (1, 3, 'gold-tier',   0, 0, :'call_ts', 0, '359881000003', '359881999003', 0, 0, 150, 150, 0),
+    -- ---------------------------------------------------------------------
+    -- D) free_billsec (allowance 100s, 0.02/s, account 2). ORDER MATTERS: these
+    --    two are rated by ascending cdrs.id, and the second one's split depends
+    --    on the first having consumed 60s. The regression runs single-threaded
+    --    (RatingThreads unset -> RT_DEFAULT_THREADS = 1), so this is stable.
+    --
+    -- D1) 60s, fully inside the remaining 100s -> wholly free. append_free_billsec
+    --     negates the price as the "was free" marker: -(60*0.02) = -1.20, billed 60.
+    (1, 3, 'gold-free-under', 0, 0, :'call_ts', 0, '359881000004', '359881999004', 0, 0, 60, 60, 0),
+    -- D2) 90s with only 40s of allowance left -> rt_double_rating splits it:
+    --       phase 1 free 40s -> -(40*0.02) = -0.80
+    --       phase 2 paid 50s -> +(50*0.02) = +1.00
+    --     Two rating rows for one CDR; the harness compares the SUM per call_uid,
+    --     so price = 0.20 and billsec = 90. Consumption lands on exactly 100 =
+    --     the allowance, which is the boundary invariant 5 checks for.
+    (1, 3, 'gold-free-split', 0, 0, :'call_ts', 0, '359881000004', '359881999004', 0, 0, 90, 90, 0);

@@ -37,6 +37,7 @@ SCHEMA_SQL="$REPO_SRC/scripts/sql/rt_pgsql_v2.sql"
 FIXTURE_SQL="$HERE/fixture.sql"
 CDRS_SQL="$HERE/cdrs_seed.sql"
 GOLDEN_TSV="$HERE/golden.tsv"
+INVARIANTS="$HERE/check_rating_invariants.sh"
 
 RE_PREFIX=${RE_PREFIX:-/usr/local/RateEngine}
 RE_BIN=${RE_BIN:-$RE_PREFIX/bin/RateEngine}
@@ -242,7 +243,15 @@ run_rating() {
 # capture_results OUTFILE - one line per CDR: call_uid|sum_price|sum_billsec
 # (LEFT JOIN so an unrated CDR shows as 0|0 rather than vanishing).
 capture_results() {
-	q "SELECT c.call_uid||'|'||COALESCE(SUM(r.call_price),0)||'|'||COALESCE(SUM(r.call_billsec),0)
+	# PAID and FREE portions kept SEPARATE - never summed. An allowance-boundary
+	# call yields two rating rows (free = negative price, paid = positive), and
+	# SUM()ing them nets one against the other: two different splits with the same
+	# net would compare equal. Fields: uid|paid_price|free_price|paid_bsec|free_bsec
+	q "SELECT c.call_uid
+	     ||'|'||COALESCE(SUM(r.call_price)   FILTER (WHERE r.call_price > 0),0)
+	     ||'|'||COALESCE(SUM(r.call_price)   FILTER (WHERE r.call_price < 0),0)
+	     ||'|'||COALESCE(SUM(r.call_billsec) FILTER (WHERE r.call_price > 0),0)
+	     ||'|'||COALESCE(SUM(r.call_billsec) FILTER (WHERE r.call_price <= 0),0)
 	     FROM cdrs c LEFT JOIN rating r ON r.call_id = c.id
 	    GROUP BY c.call_uid ORDER BY c.call_uid;" >"$1"
 }
@@ -260,43 +269,88 @@ rate_engine() {
 	re_stop
 }
 
-# res_get FILE UID -> "price|billsec" for that CDR from a results file.
-res_get() { awk -F'|' -v u="$2" '$1==u{print $2"|"$3}' "$1"; }
+# res_get FILE UID -> "paid_price|free_price|paid_bsec|free_bsec" for that CDR.
+res_get() { awk -F'|' -v u="$2" '$1==u{print $2"|"$3"|"$4"|"$5}' "$1"; }
+
+# num_eq A B TOL -> 0 when |A-B| < TOL
+num_eq() { awk -v a="$1" -v b="$2" -v t="$3" 'BEGIN{d=a-b;if(d<0)d=-d;exit (d<t)?0:1}'; }
+
+# check_invariants LABEL - money-correctness assertions on what rating LEFT
+# BEHIND (balance + free_billsec_balance), which golden.tsv cannot see: a
+# free-billsec call is supposed to carry a negative call_price, so the rating
+# rows stayed correct while the balance was charged that negative and the ledger
+# collapsed onto balance_id = 0. Runs against the throwaway TESTDB.
+check_invariants() {
+	local label=$1 line
+	echo "== $label invariants =="
+	if [ ! -x "$INVARIANTS" ]; then
+		note "$INVARIANTS not executable - skipping invariant checks"
+		return
+	fi
+	# Feed each PASS/FAIL back through our own counters so one summary covers
+	# golden, parity and invariants. VERBOSE=1 makes the checker print the
+	# offending rows under a failure (indented); pass those straight through -
+	# without them a FAIL says "1 offending row" and nothing about WHICH row.
+	while IFS= read -r line; do
+		case "$line" in
+			*"  PASS: "*) pass "$label ${line#*PASS: }" ;;
+			*"  FAIL: "*) fail "$label ${line#*FAIL: }" ;;
+			*"  INFO: "*) note "$label ${line#*INFO: }" ;;
+			"         "*) echo "$line" ;;
+		esac
+	done < <(DBHOST="$DBHOST" DBPORT="$DBPORT" DBUSER="$DBUSER" DBPASS="$DBPASS" \
+	         DBNAME="$TESTDB" VERBOSE=1 "$INVARIANTS" 2>&1)
+}
 
 # compare_golden RESULTS_FILE LABEL
+# golden.tsv columns: uid <TAB> paid_price <TAB> free_price <TAB> paid_bsec <TAB> free_bsec
 compare_golden() {
-	local res=$1 label=$2 uid want_price want_bs got got_price got_bs
+	local res=$1 label=$2 uid w_pp w_fp w_pb w_fb got g_pp g_fp g_pb g_fb
 	echo "== $label vs golden =="
-	while IFS=$'\t' read -r uid want_price want_bs; do
+	while IFS=$'\t' read -r uid w_pp w_fp w_pb w_fb; do
 		case "$uid" in ''|\#*) continue ;; esac
 		got=$(res_get "$res" "$uid")
-		got_price="${got%%|*}"; got_bs="${got##*|}"
 		if [ -z "$got" ]; then
 			fail "$label $uid: no result row"
 			continue
 		fi
-		awk -v g="$got_price" -v w="$want_price" 'BEGIN{d=g-w;if(d<0)d=-d;exit (d<0.005)?0:1}' &&
-			pass "$label $uid: price $got_price ~= $want_price" ||
-			fail "$label $uid: price $got_price != $want_price"
-		[ "$got_bs" = "$want_bs" ] &&
-			pass "$label $uid: billsec $got_bs == $want_bs" ||
-			fail "$label $uid: billsec $got_bs != $want_bs"
+		IFS='|' read -r g_pp g_fp g_pb g_fb <<<"$got"
+
+		num_eq "$g_pp" "$w_pp" 0.005 &&
+			pass "$label $uid: paid price $g_pp ~= $w_pp" ||
+			fail "$label $uid: paid price $g_pp != $w_pp"
+		num_eq "$g_fp" "$w_fp" 0.005 &&
+			pass "$label $uid: free price $g_fp ~= $w_fp" ||
+			fail "$label $uid: free price $g_fp != $w_fp"
+		[ "$g_pb" = "$w_pb" ] &&
+			pass "$label $uid: paid billsec $g_pb == $w_pb" ||
+			fail "$label $uid: paid billsec $g_pb != $w_pb"
+		[ "$g_fb" = "$w_fb" ] &&
+			pass "$label $uid: free billsec $g_fb == $w_fb" ||
+			fail "$label $uid: free billsec $g_fb != $w_fb"
 	done <"$GOLDEN_TSV"
 }
 
 # compare_parity FILE_A FILE_B - per-CDR equality between two engines.
 compare_parity() {
-	local a=$1 b=$2 uid pa_price pa_bs pb pb_price pb_bs
+	local a=$1 b=$2 uid a_pp a_fp a_pb a_fb pb b_pp b_fp b_pb b_fb
 	echo "== rt.so vs rt_duckdb.so parity =="
-	while IFS='|' read -r uid pa_price pa_bs; do
+	while IFS='|' read -r uid a_pp a_fp a_pb a_fb; do
 		pb=$(res_get "$b" "$uid")
-		local pb_price="${pb%%|*}" pb_bs="${pb##*|}"
-		awk -v x="$pa_price" -v y="$pb_price" 'BEGIN{d=x-y;if(d<0)d=-d;exit (d<0.005)?0:1}' &&
-			pass "$uid: price parity ($pa_price ~= $pb_price)" ||
-			fail "$uid: price differs (rt=$pa_price duckdb=$pb_price)"
-		[ "$pa_bs" = "$pb_bs" ] &&
-			pass "$uid: billsec parity ($pa_bs)" ||
-			fail "$uid: billsec differs (rt=$pa_bs duckdb=$pb_bs)"
+		IFS='|' read -r b_pp b_fp b_pb b_fb <<<"$pb"
+
+		num_eq "$a_pp" "$b_pp" 0.005 &&
+			pass "$uid: paid price parity ($a_pp)" ||
+			fail "$uid: paid price differs (rt=$a_pp duckdb=$b_pp)"
+		num_eq "$a_fp" "$b_fp" 0.005 &&
+			pass "$uid: free price parity ($a_fp)" ||
+			fail "$uid: free price differs (rt=$a_fp duckdb=$b_fp)"
+		[ "$a_pb" = "$b_pb" ] &&
+			pass "$uid: paid billsec parity ($a_pb)" ||
+			fail "$uid: paid billsec differs (rt=$a_pb duckdb=$b_pb)"
+		[ "$a_fb" = "$b_fb" ] &&
+			pass "$uid: free billsec parity ($a_fb)" ||
+			fail "$uid: free billsec differs (rt=$a_fb duckdb=$b_fb)"
 	done <"$a"
 }
 
@@ -309,10 +363,12 @@ main() {
 
 	rate_engine "rt.so" "$res_rt"
 	compare_golden "$res_rt" "rt.so"
+	check_invariants "rt.so"
 
 	if [ -n "$HAVE_DUCKDB" ]; then
 		rate_engine "rt_duckdb.so" "$res_duck"
 		compare_golden "$res_duck" "rt_duckdb.so"
+		check_invariants "rt_duckdb.so"
 		compare_parity "$res_rt" "$res_duck"
 	else
 		note "duckdb.so / rt_duckdb.so not installed - skipping DuckDB parity pass"

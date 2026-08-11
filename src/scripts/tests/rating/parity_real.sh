@@ -17,6 +17,15 @@
 # SAFETY: the live DB is only read (pg_dump). All resets/rating happen on the
 # throwaway copies, which must differ from SRCDB (asserted). Live data untouched.
 #
+# SCOPE: the copies are valid for PER-CDR billing comparison only. The reset
+# deletes the replay set's 'rating' rows but deliberately leaves 'balance' and
+# 'free_billsec_balance' alone (a balance period usually also covers CDRs
+# outside the replay set, so clearing it would be wrong too). Those tables
+# therefore still hold the charges of the deleted rows AND get charged again by
+# the replay - so do NOT read check_rating_invariants.sh results on these copies
+# as engine defects: invariants 1 and 4 will fail by construction. Run the
+# invariant checker against a fully-rated database instead.
+#
 # Env: SRCDB (default rate_engine), N (default 20000), THREADS (default 4),
 #      TOL (price abs tolerance, default 0.005), DBHOST/DBPORT/DBUSER/DBPASS,
 #      RE_PREFIX/RE_CONF, KEEP=1 to keep copies+workdir.
@@ -175,7 +184,17 @@ rate_and_capture() {
 		sleep 0.5
 	done
 	kill -TERM "$RE_PID" 2>/dev/null; wait "$RE_PID" 2>/dev/null; RE_PID=""
-	q "$db" "SELECT c.call_uid||'|'||COALESCE(SUM(r.call_price),0)||'|'||COALESCE(SUM(r.call_billsec),0)
+	# Capture the PAID and FREE portions SEPARATELY, never their sum. A call that
+	# exhausts the allowance is split into two rating rows - free (negative price,
+	# the "was free" marker) and paid (positive). SUM()ing them nets the negative
+	# against the positive, so two engines that split the same call differently
+	# (say free -0.03/paid +0.15 vs free -0.18/paid +0.02) can produce the same
+	# net and be reported as MATCH while billing completely differently.
+	q "$db" "SELECT c.call_uid
+	           ||'|'||COALESCE(SUM(r.call_price)  FILTER (WHERE r.call_price > 0),0)
+	           ||'|'||COALESCE(SUM(r.call_price)  FILTER (WHERE r.call_price < 0),0)
+	           ||'|'||COALESCE(SUM(r.call_billsec) FILTER (WHERE r.call_price > 0),0)
+	           ||'|'||COALESCE(SUM(r.call_billsec) FILTER (WHERE r.call_price <= 0),0)
 	           FROM cdrs c JOIN _replay_set rs ON rs.id = c.id
 	           LEFT JOIN rating r ON r.call_id = c.id
 	          GROUP BY c.call_uid ORDER BY c.call_uid;" >"$out"
@@ -189,16 +208,31 @@ rate_and_capture "$DBB" "rt_duckdb.so" "$WORKDIR/b.tsv"
 # 4. diff per-CDR billing
 echo
 echo "==================== rt.so vs rt_duckdb.so parity (real data) ===================="
-join -t'|' -a1 -a2 -e MISSING -o '0,1.2,1.3,2.2,2.3' \
-	<(sort "$WORKDIR/a.tsv") <(sort "$WORKDIR/b.tsv") \
-	| awk -F'|' -v tol="$TOL" '
+PARITY_AWK='
 	{
-		uid=$1; ap=$2; ab=$3; bp=$4; bb=$5; total++;
-		if(ap=="MISSING" || bp=="MISSING"){ miss++; if(shown++<20) printf "  MISSING: %s  rt=%s/%s duckdb=%s/%s\n",uid,ap,ab,bp,bb; next }
-		dp=ap-bp; if(dp<0)dp=-dp;
-		if(dp>=tol || ab!=bb){ bad++; if(shown++<20) printf "  DIFF: %s  price rt=%s duckdb=%s  billsec rt=%s duckdb=%s\n",uid,ap,bp,ab,bb }
+		uid=$1;
+		ap=$2; af=$3; abp=$4; abf=$5;      # A: paid price, free price, paid bsec, free bsec
+		bp=$6; bf=$7; bbp=$8; bbf=$9;      # B: same
+		total++;
+		if(ap=="MISSING" || bp=="MISSING"){
+			miss++;
+			if(shown++<20) printf "  MISSING: %s  rt=%s/%s duckdb=%s/%s\n",uid,ap,abp,bp,bbp;
+			next
+		}
+		dpaid=ap-bp; if(dpaid<0)dpaid=-dpaid;
+		dfree=af-bf; if(dfree<0)dfree=-dfree;
+		if(dpaid>=tol || dfree>=tol || abp!=bbp || abf!=bbf){
+			bad++;
+			if(shown++<20)
+				printf "  DIFF: %s\n         paid  rt=%s/%ss  duckdb=%s/%ss\n         free  rt=%s/%ss  duckdb=%s/%ss\n",
+				       uid,ap,abp,bp,bbp,af,abf,bf,bbf
+		}
 		else ok++;
-	}
+	}'
+
+join -t'|' -a1 -a2 -e MISSING -o '0,1.2,1.3,1.4,1.5,2.2,2.3,2.4,2.5' \
+	<(sort "$WORKDIR/a.tsv") <(sort "$WORKDIR/b.tsv") \
+	| awk -F'|' -v tol="$TOL" "$PARITY_AWK"'
 	END{
 		printf "\n  CDRs compared: %d\n", total;
 		printf "  match: %d   price/billsec diff: %d   missing: %d\n", ok+0, bad+0, miss+0;
@@ -208,8 +242,9 @@ join -t'|' -a1 -a2 -e MISSING -o '0,1.2,1.3,2.2,2.3' \
 echo "=================================================================================="
 
 # exit non-zero on any mismatch
-if join -t'|' -a1 -a2 -e MISSING -o '0,1.2,1.3,2.2,2.3' <(sort "$WORKDIR/a.tsv") <(sort "$WORKDIR/b.tsv") \
-	| awk -F'|' -v tol="$TOL" '{ap=$2;ab=$3;bp=$4;bb=$5; if(ap=="MISSING"||bp=="MISSING")exit 1; d=ap-bp;if(d<0)d=-d; if(d>=tol||ab!=bb)exit 1} END{exit 0}'; then
+if join -t'|' -a1 -a2 -e MISSING -o '0,1.2,1.3,1.4,1.5,2.2,2.3,2.4,2.5' \
+	<(sort "$WORKDIR/a.tsv") <(sort "$WORKDIR/b.tsv") \
+	| awk -F'|' -v tol="$TOL" "$PARITY_AWK"'END{exit (bad+0)+(miss+0) ? 1 : 0}'; then
 	exit 0
 else
 	exit 1

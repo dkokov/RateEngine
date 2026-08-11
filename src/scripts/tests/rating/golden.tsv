@@ -1,8 +1,20 @@
 # Golden rating results for the offline-rating regression.
 # Hand-computed from fixture.sql tariffs via calc_cprice_2 (verified by the
 # tariff_pricing.c unit test's reference implementation).
-# Columns:  call_uid <TAB> expected_call_price <TAB> expected_call_billsec
-# (call_price compared with a small tolerance; call_billsec is exact.)
-gold-persec	2.50	125
-gold-permin	0.20	120
-gold-tier	0.50	180
+#
+# Columns:
+#   call_uid <TAB> paid_price <TAB> free_price <TAB> paid_billsec <TAB> free_billsec
+#
+# The PAID and FREE portions are asserted SEPARATELY and never summed. A call
+# that exhausts the free allowance is split into two rating rows - the free part
+# carries a NEGATIVE price (the "was free" marker) and the paid part a positive
+# one. Summing them nets the two against each other, so a wrong split can still
+# produce the right total and pass. Prices use a small tolerance; billsec exact.
+gold-persec	2.50	0	125	0
+gold-permin	0.20	0	120	0
+gold-tier	0.50	0	180	0
+# free_billsec cases (tariff D, allowance 100s at 0.02/s, account e2e_free_sub).
+# gold-free-under: 60s, wholly inside the allowance -> one free row, no paid row.
+# gold-free-split: 90s with 40s left -> free 40s (-0.80) + paid 50s (+1.00).
+gold-free-under	0	-1.20	0	60
+gold-free-split	1.00	-0.80	50	40
