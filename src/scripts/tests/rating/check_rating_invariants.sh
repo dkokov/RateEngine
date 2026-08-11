@@ -174,9 +174,19 @@ check "4. ledger free_billsec == derived consumption" \
 	  WHERE fbb.free_billsec <> d.derived LIMIT $SAMPLE"
 
 # ---------------------------------------------------------------- invariant 5
-# Saturating at exactly the allowance is correct (double_rating splits the call
-# at the boundary); exceeding it means the allowance never depleted.
-check "5. no period over its free allowance" \
+# The allowance CAN legitimately be exceeded, but only by the tier rounding of
+# the single boundary call. V6 rating_double_rating() sets the free portion to
+# the remaining seconds and then re-runs calc_cprice_group() on it, so a
+# remainder shorter than the tariff's first block is billed as a whole block:
+# with "first 30s as one block" and 6s left, the free portion bills 30 and the
+# period ends 24s over. That is by design and rt.so/rt_duckdb both do it.
+# So tolerate up to (first-tier delta - 1) seconds; anything beyond that means
+# the allowance genuinely failed to deplete.
+TIER="(SELECT COALESCE(MAX(cf.delta_time),1) FROM tariff t
+        JOIN calc_function cf ON cf.tariff_id = t.id AND cf.pos = 1
+       WHERE t.free_billsec_id = u.free_billsec_id)"
+
+check "5. no period over its free allowance (beyond one tier block)" \
 	"WITH used AS (
 	   SELECT b.id AS bal_id, r.free_billsec_id, SUM(r.call_billsec) AS secs
 	     FROM balance b JOIN rating r
@@ -184,7 +194,7 @@ check "5. no period over its free allowance" \
 	    WHERE r.call_price < 0 AND r.free_billsec_id > 0
 	    GROUP BY 1,2)
 	 SELECT count(*) FROM used u JOIN free_billsec f ON f.id = u.free_billsec_id
-	  WHERE u.secs > f.free_billsec" \
+	  WHERE u.secs > f.free_billsec + $TIER - 1" \
 	"WITH used AS (
 	   SELECT b.id AS bal_id, b.billing_account_id AS acct, r.free_billsec_id, SUM(r.call_billsec) AS secs
 	     FROM balance b JOIN rating r
@@ -192,9 +202,11 @@ check "5. no period over its free allowance" \
 	    WHERE r.call_price < 0 AND r.free_billsec_id > 0
 	    GROUP BY 1,2,3)
 	 SELECT 'bal '||u.bal_id||' acct '||u.acct||' fbid='||u.free_billsec_id||
-	        ' used='||u.secs||' allowance='||f.free_billsec
+	        ' used='||u.secs||' allowance='||f.free_billsec||
+	        ' excess='||(u.secs - f.free_billsec)||' tier='||$TIER
 	   FROM used u JOIN free_billsec f ON f.id = u.free_billsec_id
-	  WHERE u.secs > f.free_billsec ORDER BY u.secs - f.free_billsec DESC LIMIT $SAMPLE"
+	  WHERE u.secs > f.free_billsec + $TIER - 1
+	  ORDER BY u.secs - f.free_billsec DESC LIMIT $SAMPLE"
 
 # ---------------------------------------------------------------- invariant 6
 check "6a. no duplicate (account,period) balance rows" \

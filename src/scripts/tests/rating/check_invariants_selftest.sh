@@ -87,7 +87,15 @@ CREATE TABLE rating (id serial PRIMARY KEY, call_price numeric, call_billsec int
 CREATE TABLE free_billsec_balance (id serial PRIMARY KEY, balance_id integer,
   tariff_id integer DEFAULT 0, free_billsec integer DEFAULT 0,
   last_update timestamp DEFAULT now(), free_billsec_id integer DEFAULT 0);
+-- tariff + calc_function are needed by invariant 5: the allowance may legally be
+-- exceeded by the tier rounding of the boundary call, so the check tolerates one
+-- first-tier block. delta_time = 1 here -> tolerance 0, keeping the fault strict.
+CREATE TABLE tariff (id integer PRIMARY KEY, free_billsec_id integer DEFAULT 0);
+CREATE TABLE calc_function (id serial PRIMARY KEY, tariff_id integer, pos integer,
+  delta_time integer, fee numeric, iterations integer);
 INSERT INTO free_billsec VALUES (19, 1000);
+INSERT INTO tariff VALUES (1, 19);
+INSERT INTO calc_function (tariff_id,pos,delta_time,fee,iterations) VALUES (1,1,1,0.02,0);
 SELECT setval(pg_get_serial_sequence('balance','id'), 1000);
 SQL
 
