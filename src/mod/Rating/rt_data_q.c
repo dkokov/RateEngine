@@ -351,21 +351,35 @@ int rt_data_q_bal_sql(db_t *dbp,racc_t *rtp,char *time1,char *time2)
 	sprintf(str,"select amount,id from balance "
 				"where billing_account_id = %d and start_date = '%s' and end_date='%s' and active = 't'",rtp->bacc_ptr->id,time1,time2);
 		
+	/* start from a known state: a stale id from a previous lookup must never
+	 * leak into the free_billsec_balance keying below */
+	rtp->bal_ptr->id     = 0;
+	rtp->bal_ptr->amount = 0;
+
 	db_select(dbp,str);
 	db_fetch(dbp);
-				
+
 	if(dbp->conn->result != NULL) {
 		result = (db_sql_result_t *)dbp->conn->result;
 
 		if(result->rows == 1) {
-			rtp->bal_ptr->amount = atof(result->cols_list[0].rows_list[0].row); 					
+			rtp->bal_ptr->amount = atof(result->cols_list[0].rows_list[0].row);
 			rtp->bal_ptr->id  = atoi(result->cols_list[1].rows_list[0].row);
 		}
-						
+
 		db_sql_result_free(result);
 		dbp->conn->result = NULL;
 	}
-	
+
+	/* free_billsec.c keys every free_billsec_balance query off pre->bal_id, but
+	 * only bal_ptr is filled here - the two functions that used to mirror it
+	 * (f_bal_query_2, rt_data_q_bal_id) are both commented out. Without this the
+	 * whole free-billsec ledger collapses onto balance_id = 0. */
+	if(rtp->pre != NULL) {
+		rtp->pre->bal_id  = rtp->bal_ptr->id;
+		rtp->pre->balanse = rtp->bal_ptr->amount;
+	}
+
 	return DB_OK;
 }
 
@@ -432,10 +446,26 @@ int rt_data_q_bal_add_sql(db_t *dbp,racc_t *rtp,char *start,char *end)
 
 		ret = db_update(dbp,str);
 	} else {
-		sprintf(str,"insert into balance (billing_account_id,start_date,end_date,active,amount,last_update) values (%d,'%s','%s','t',%f,'now()')",
+		/* 'returning id' so the brand-new balance row is usable straight away:
+		 * free_billsec_exec() runs right after us and keys its ledger row off
+		 * pre->bal_id. V6 did the same with a follow-up bal_get_balance_id(). */
+		sprintf(str,"insert into balance (billing_account_id,start_date,end_date,active,amount,last_update) values (%d,'%s','%s','t',%f,'now()') returning id",
 				rtp->bacc_ptr->id,start,end,rtp->bal_ptr->amount);
 
-		ret = db_insert(dbp,str);
+		ret = db_query(dbp,str,0);
+		db_fetch(dbp);
+
+		if(dbp->conn->result != NULL) {
+			db_sql_result_t *result = (db_sql_result_t *)dbp->conn->result;
+
+			if(result->rows == 1) {
+				rtp->bal_ptr->id = atoi(result->cols_list[0].rows_list[0].row);
+				if(rtp->pre != NULL) rtp->pre->bal_id = rtp->bal_ptr->id;
+			}
+
+			db_sql_result_free(result);
+			dbp->conn->result = NULL;
+		}
 	}
 
 	return ret;
@@ -522,8 +552,20 @@ int rt_data_q_rating_add_sql(db_t *dbp,racc_t *rtp)
 	if(dbp->t == sql) {
 		db_sql_escape(pre->timestamp,safe_ts,sizeof(safe_ts));
 
-		sprintf(str,"select id from rating where call_id = %d and billing_account_id = %d and rate_id = %d",
-					pre->cdr_id,rtp->bacc_ptr->id,pre->rate_id);
+		/* Idempotency guard: don't rate the same CDR twice if it gets re-fetched.
+		 * call_price AND call_billsec are part of the key because rt_double_rating
+		 * legitimately writes TWO rows for one CDR - the free portion and the paid
+		 * portion - which share call_id, billing_account_id and rate_id and differ
+		 * only in price/seconds. Matching on the triple alone silently swallowed
+		 * phase 2, so every call straddling the free-allowance boundary lost its
+		 * paid remainder and the CDR was then marked leg = -1. The sibling lookup
+		 * rt_data_q_rating_id() already keys on call_price for the same reason.
+		 * Trade-off: a re-rate after a tariff change now inserts a second row
+		 * instead of being suppressed - preferable to dropping revenue on every
+		 * split call. */
+		sprintf(str,"select id from rating where call_id = %d and billing_account_id = %d and rate_id = %d"
+					" and call_price = %f and call_billsec = %d",
+					pre->cdr_id,rtp->bacc_ptr->id,pre->rate_id,pre->cprice,pre->billsec);
 
 		db_select(dbp,str);
 		db_fetch(dbp);
@@ -1204,9 +1246,20 @@ racc_t *rt_data_q_racc(db_t *dbp,rating_t *pre)
 
 	if(dbp->t == sql) {
 		ret = rt_data_q_racc_sql(dbp,rtp);
-		
+
 		if(ret < 0) goto error;
-		else goto success;
+
+		/* A query that ran fine but matched NO subscriber must report "not found",
+		 * i.e. NULL - that is what the caller tests to try its next lookup mode.
+		 * rt_data_q_racc_sql() returns DB_OK regardless of result->rows, so this
+		 * used to hand back a racc with bacc_ptr->id == 0 and every fallback chain
+		 * in rating.c was dead code: only the FIRST mode was ever attempted
+		 * (rt_racc_voip_av_a: clg -> account_code, rt_racc_voip_t_a: acode -> srcc,
+		 * rt_racc_unkn_a: clg -> acode -> srcc -> srctg). Calls whose number is not
+		 * provisioned but whose account_code/context is were silently never rated. */
+		if(rtp->bacc_ptr->id == 0) goto error;
+
+		goto success;
 	} else if(dbp->t == nosql) {
 		rt_data_q_racc_nosql(dbp,rtp);
 		rt_data_q_bacc_nosql(dbp,rtp);

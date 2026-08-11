@@ -155,26 +155,41 @@ void rt_balance_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 	if(rtp->pre == NULL) return;
 	if(rtp->bal_ptr == NULL) return;
 
-	if(rtp->bal_ptr->id > 0) {
-		/* Common path: balance row known. rt_data_q_bal_add now does an ATOMIC
-		 * delta (amount = amount + cprice) in SQL, so NO lock is needed - concurrent
-		 * charges to the same balance serialize on the Postgres row lock, different
-		 * balances run fully in parallel. (Phase 2) */
-		rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
-		rt_data_q_bal_add(dbp,rtp,start,end);
-	} else {
-		/* Rare path: no balance row yet -> create it. Still guarded: two threads
-		 * could otherwise INSERT a duplicate row for the same period (no unique key
-		 * to rely on for an UPSERT). Once the row exists, subsequent CDRs take the
-		 * lock-free atomic-delta path above. */
+	/* Step 1 - make sure the balance row exists, regardless of what the call cost.
+	 * free_billsec_exec() runs straight after us and keys its ledger row off
+	 * pre->bal_id, so a period whose very first call is free must still get its
+	 * balance row here - otherwise the ledger lands on balance_id = 0 again.
+	 * Still guarded: two threads could otherwise INSERT a duplicate row for the
+	 * same period (no unique key to rely on for an UPSERT). Re-checked inside the
+	 * lock, because a peer may have created it while we waited. */
+	if((dbp->t == sql) && (rtp->bal_ptr->id == 0)) {
 		pthread_mutex_lock(&config.sync_bt_thread);
-		int ret = rt_data_q_bal(dbp,rtp,start,end);
-		if(ret == 0) {
-			rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
-			rt_data_q_bal_add(dbp,rtp,start,end);
+
+		rt_data_q_bal(dbp,rtp,start,end);
+
+		if(rtp->bal_ptr->id == 0) {
+			rtp->bal_ptr->amount = 0;
+			rt_data_q_bal_add(dbp,rtp,start,end);	/* INSERT ... returning id */
 		}
+
 		pthread_mutex_unlock(&config.sync_bt_thread);
 	}
+
+	/* Step 2 - a negative cprice is the free-billsec marker set by
+	 * append_free_billsec(): the call was covered by the free allowance, so it must
+	 * not move the money balance. V6 enforced this in SQL - bal_get_cp_sum() summed
+	 * the period with 'and call_price > 0'. V7 charges incrementally, so the filter
+	 * belongs here. The rating row keeps its negative price: that is what the
+	 * free_billsec accounting ('call_price < 0') counts, and what a "missed benefit"
+	 * report sums. Zero is skipped too - it would only cost a pointless UPDATE. */
+	if(rtp->pre->cprice <= 0) return;
+
+	/* Step 3 - charge. With the row guaranteed above, rt_data_q_bal_add does an
+	 * ATOMIC delta (amount = amount + cprice) in SQL, so NO lock is needed:
+	 * concurrent charges to the same balance serialize on the Postgres row lock,
+	 * different balances run fully in parallel. (Phase 2) */
+	rtp->bal_ptr->amount = rtp->bal_ptr->amount + rtp->pre->cprice;
+	rt_data_q_bal_add(dbp,rtp,start,end);
 }
 
 int rt_prerating_process(db_t *dbp,racc_t *rtp)
@@ -294,8 +309,16 @@ int rt_prerating_process(db_t *dbp,racc_t *rtp)
 		rt_data_q_bal(dbp,rtp,card->start,card->end);
 
 		if(pre->free_billsec_limit) {
+			/* free_billsec_balance_v2() derives the seconds already consumed in
+			 * this period straight from 'rating' (call_price < 0), scoped to this
+			 * account - that is the authoritative number. Use it directly for the
+			 * allowance decision instead of re-reading free_billsec_balance via
+			 * f_free_billsec_bal_query_2(): that table is a cache/report, and if it
+			 * ever drifts it must not be able to mis-price a call. Also saves one
+			 * query per rated CDR. */
+			pre->free_billsec = 0;
 			free_billsec_balance_v2(dbp,rtp,card->start,card->end);
-			f_free_billsec_bal_query_2(dbp,pre);
+			pre->free_billsec_sum = pre->free_billsec;
 		}
     } else {
 		LOG("rt_prerating process()","ERROR,no start or end date,bacc: %d,start: %s,end: %s",btp->id,card->start,card->end);
@@ -491,12 +514,20 @@ int rt_double_rating(db_t *dbp,racc_t *rtp,char leg)
 	
 	if(card) {
 		if((strlen(card->start))&&(strlen(card->end))) {
+			/* NB: pre->cprice is still phase 1's value here - phase 2 is priced
+			 * further down, after the label. Phase 1 is the free part, so its price
+			 * is negative and rt_balance_exec() charges nothing; the call is kept
+			 * because it also guarantees the balance row exists, which the
+			 * free_billsec_exec() below needs for its ledger key. The real phase 2
+			 * charge happens via the rt_balance_exec() in rt_rating_exec(). */
 			rt_balance_exec(dbp,rtp,card->start,card->end);
-			
+
+			/* refreshes pre->free_billsec_sum so phase 2 sees the allowance as
+			 * consumed and is NOT marked free by append_free_billsec() */
 			if((pre->free_billsec_limit)) free_billsec_exec(dbp,rtp,card->start,card->end);
 		}
-	}	
-		
+	}
+
 	no_free_billsec:
 	ret_2 = calc_cprice_group(rtp);
 
@@ -707,7 +738,17 @@ void rt_main(db_t *dbp,rating_t *pre,char leg,int t)
 		};
     }
 
-	if(rtp == NULL) return;
+	/* No lookup mode resolved an account. The CDR must STILL be marked processed
+	 * (-1) or cdr_get_cdrs() re-fetches it every cycle forever: rt_exec() used to
+	 * do that for us, because rt_data_q_racc() never returned NULL. Now that a
+	 * clean no-match reports NULL (so the fallback modes actually run), the
+	 * unmatched case terminates here and has to mark the CDR itself. */
+	if(rtp == NULL) {
+		if(cdrm_api != NULL && pre->cdr_id > 0)
+			cdrm_api->update_cdr(dbp,-1,pre->cdr_id,leg,pre->call_uid);
+		return;
+	}
+
 	if(rtp->pre == NULL) return;
 	if(rtp->bacc_ptr == NULL) return;
 

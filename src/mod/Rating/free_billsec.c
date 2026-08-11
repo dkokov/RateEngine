@@ -328,18 +328,24 @@ int free_billsec_exec(db_t *dbp,racc_t *rtp,char *start,char *end)
 	rating_t *pre;
 	
 	pre = rtp->pre;
-	
+
+	pre->free_billsec = 0;
+	pre->free_id      = 0;
+
 	if(free_billsec_balance_v2(dbp,rtp,start,end) < 0) return RE_ERROR;
-    
+
     if(f_free_bal_id_query(dbp,rtp->pre) < 0) return RE_ERROR;
-    
-    if(pre->free_id > 0) { 
+
+    if(pre->free_id > 0) {
 		if(update_free_billsec_balance(dbp,pre) < 0) return RE_ERROR;
-	} else { 
+	} else {
 		if(create_free_billsec_balance(dbp,pre) < 0) return RE_ERROR;
 	}
-    
-    if(f_free_billsec_bal_query_2(dbp,pre) < 0) return RE_ERROR;
+
+    /* the ledger row we just wrote holds exactly pre->free_billsec, so re-reading
+     * it back with f_free_billsec_bal_query_2() only costs a query and reopens the
+     * door to a stale table driving the allowance check (see rt_prerating_process) */
+    pre->free_billsec_sum = pre->free_billsec;
 
 	return RE_SUCCESS;
 }

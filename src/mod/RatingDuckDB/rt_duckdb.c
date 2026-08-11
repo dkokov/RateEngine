@@ -272,6 +272,14 @@ static int rt_build_acct_union(char leg,char *buf,int buflen)
  * Accounts with no active pcard get no balance (as in /Rating). We aggregate
  * SUM(cprice) per (account, period) and UPDATE-or-INSERT balance — incremental,
  * so it stays correct across the per-window batches.
+ *
+ * Free portions must not be CHARGED, but they must still CREATE the period row:
+ * rt_duckdb_free_balance() below keys free_billsec_balance off balance.id, and
+ * /Rating (rt_balance_exec step 1) and V6 (bal_insert_balance) both create the
+ * row for any period with traffic. Filtering is_free rows out here instead of
+ * zeroing their contribution left free-only periods with no balance row at all,
+ * so the ledger rows for them were silently dropped. Hence: keep every rated row
+ * in the grouping, and sum only the paid ones.
  */
 static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 {
@@ -281,11 +289,15 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 	if(rt_duckdb_exec(ctx,
 		"CREATE OR REPLACE TEMP TABLE bal_delta AS "
 		"WITH pc AS ( "
-		"  SELECT rb.cdr_id, rb.bacc_id, rb.cprice, "
+		"  SELECT rb.cdr_id, rb.bacc_id, rb.cprice, rb.is_free, "
 		"         CAST(rb.start_ts_str AS TIMESTAMP) AS cts, "
 		"         COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1) AS bday, "
 		"         p.pcard_type_id, p.start_date AS cstart, p.end_date AS cend, "
-		"         ROW_NUMBER() OVER (PARTITION BY rb.cdr_id ORDER BY p.start_date DESC) AS prn "
+		/* dedupe MULTIPLE PCARDS per portion - partition by (cdr_id,is_free), not
+		 * cdr_id alone: a double-rated call contributes two rows for one cdr_id
+		 * (free + paid), and partitioning by cdr_id would keep only one of them
+		 * and silently drop the paid remainder from the bill. */
+		"         ROW_NUMBER() OVER (PARTITION BY rb.cdr_id, rb.is_free ORDER BY p.start_date DESC) AS prn "
 		"  FROM rated_batch rb "
 		"  JOIN billing_account ba ON ba.id = rb.bacc_id "
 		"  JOIN pcard p ON p.billing_account_id = rb.bacc_id AND p.pcard_status_id = 1 "
@@ -293,10 +305,9 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 		"       OR (p.pcard_type_id = 1 "
 		"           AND TRY_CAST(p.start_date AS DATE) <= CAST(rb.start_ts_str AS DATE) "
 		"           AND TRY_CAST(p.end_date AS DATE) >  CAST(rb.start_ts_str AS DATE)) ) "
-		"  WHERE rb.is_free = FALSE "   /* free portions are not charged to balance */
 		"), "
 		"per AS ( "
-		"  SELECT bacc_id, cprice, pcard_type_id, cstart, cend, "
+		"  SELECT bacc_id, cprice, is_free, pcard_type_id, cstart, cend, "
 		"         CASE WHEN EXTRACT(DAY FROM cts) >= bday "
 		"              THEN (date_trunc('month',cts) + to_days(bday-1))::DATE "
 		"              ELSE (date_trunc('month',cts) - INTERVAL 1 MONTH + to_days(bday-1))::DATE END AS win_start "
@@ -305,7 +316,8 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 		"SELECT bacc_id, "
 		"  CAST(CASE WHEN pcard_type_id = 2 THEN win_start ELSE TRY_CAST(cstart AS DATE) END AS VARCHAR) AS start_date, "
 		"  CAST(CASE WHEN pcard_type_id = 2 THEN (win_start + INTERVAL 1 MONTH)::DATE ELSE TRY_CAST(cend AS DATE) END AS VARCHAR) AS end_date, "
-		"  SUM(cprice) AS amount "
+		/* free portions contribute 0 - they create the period row but are not charged */
+		"  SUM(CASE WHEN is_free THEN 0 ELSE cprice END) AS amount "
 		"FROM per GROUP BY ALL") < 0) {
 		LOG("rt_duckdb_balance()","build bal_delta failed");
 		return;
@@ -347,8 +359,13 @@ static void rt_duckdb_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
  * free_billsec_id) that consumed free seconds this batch, recompute the period
  * total from rating (call_price < 0) and SET it on the period's
  * free_billsec_balance row, keyed by the balance row's id. This is the shared
- * state CallControl / /Rating read for free-allowance subscribers. Only periods
- * with a matching balance row (billing_day window) are written.
+ * state CallControl / /Rating read for free-allowance subscribers.
+ *
+ * The balance id is resolved HERE, on pg_dbp, inside the caller's transaction -
+ * NOT via the 'pg' scanner attachment. The scanner is a separate READ_ONLY
+ * connection, so it cannot see the balance rows rt_duckdb_balance() just
+ * INSERTed in this same uncommitted transaction; resolving the id over there
+ * silently dropped the ledger row for every period created in the current batch.
  */
 static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 {
@@ -357,15 +374,12 @@ static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 
 	if(rt_duckdb_exec(ctx,
 		"CREATE OR REPLACE TEMP TABLE fbb_delta AS "
-		"SELECT d.free_billsec_id, "
+		"SELECT d.bacc_id, d.free_billsec_id, "
+		"  CAST(d.pstart AS VARCHAR) AS pstart, CAST(d.pend AS VARCHAR) AS pend, "
 		"  (SELECT COALESCE(SUM(r.call_billsec),0) FROM pg.rating r "
 		"     WHERE r.call_price < 0 AND r.free_billsec_id = d.free_billsec_id "
 		"       AND r.billing_account_id = d.bacc_id "
-		"       AND CAST(r.call_ts AS DATE) >= d.pstart AND CAST(r.call_ts AS DATE) < d.pend) AS used, "
-		"  (SELECT b.id FROM pg.balance b "
-		"     WHERE b.billing_account_id = d.bacc_id AND b.active = 't' "
-		"       AND b.start_date = CAST(d.pstart AS VARCHAR) AND b.end_date = CAST(d.pend AS VARCHAR) "
-		"     LIMIT 1) AS balance_id "
+		"       AND CAST(r.call_ts AS DATE) >= d.pstart AND CAST(r.call_ts AS DATE) < d.pend) AS used "
 		"FROM ( "
 		"  SELECT DISTINCT rb.bacc_id, rb.free_billsec_id, "
 		"    CASE WHEN EXTRACT(DAY FROM CAST(rb.start_ts_str AS TIMESTAMP)) >= COALESCE(NULLIF(TRY_CAST(ba.billing_day AS INTEGER),0),1) "
@@ -383,23 +397,34 @@ static void rt_duckdb_free_balance(rt_duckdb_t *ctx,db_t *pg_dbp)
 	}
 
 	fd = rt_duckdb_select(ctx,
-		"SELECT balance_id, free_billsec_id, used FROM fbb_delta WHERE balance_id IS NOT NULL");
+		"SELECT bacc_id, free_billsec_id, pstart, pend, used FROM fbb_delta");
 	if(fd == NULL) return;
 
 	for(i = 0; i < fd->rows; i++) {
-		char up[1024];
-		long long bal  = atoll(fd->cols_list[0].rows_list[i].row);
+		char up[2048];
+		long long bacc = atoll(fd->cols_list[0].rows_list[i].row);
 		long long fbid = atoll(fd->cols_list[1].rows_list[i].row);
-		long long used = atoll(fd->cols_list[2].rows_list[i].row);
+		char *s        = fd->cols_list[2].rows_list[i].row;
+		char *e        = fd->cols_list[3].rows_list[i].row;
+		long long used = atoll(fd->cols_list[4].rows_list[i].row);
 
+		/* 'b' resolves the period's balance row on THIS connection, so it sees the
+		 * row rt_duckdb_balance() may have inserted moments ago in this same
+		 * transaction. If the period genuinely has no balance row, b is empty and
+		 * both the UPDATE and the INSERT ... SELECT are no-ops. */
 		snprintf(up,sizeof(up),
-			"WITH upd AS ( "
-			"  UPDATE free_billsec_balance SET free_billsec = %lld, last_update = now() "
-			"  WHERE balance_id = %lld AND free_billsec_id = %lld RETURNING id "
+			"WITH b AS ( "
+			"  SELECT id FROM balance "
+			"   WHERE billing_account_id = %lld AND start_date = '%s' AND end_date = '%s' "
+			"     AND active = 't' LIMIT 1 "
+			"), upd AS ( "
+			"  UPDATE free_billsec_balance f SET free_billsec = %lld, last_update = now() "
+			"    FROM b WHERE f.balance_id = b.id AND f.free_billsec_id = %lld "
+			"  RETURNING f.id "
 			") "
 			"INSERT INTO free_billsec_balance (balance_id,free_billsec_id,free_billsec) "
-			"SELECT %lld,%lld,%lld WHERE NOT EXISTS (SELECT 1 FROM upd)",
-			used,bal,fbid,bal,fbid,used);
+			"SELECT b.id,%lld,%lld FROM b WHERE NOT EXISTS (SELECT 1 FROM upd)",
+			bacc,s,e,used,fbid,fbid,used);
 
 		db_query(pg_dbp,up,1);
 	}
@@ -597,12 +622,68 @@ int rt_duckdb_rate_batch(rt_duckdb_t *ctx,db_t *pg_dbp,char leg,int limit,int *r
 		"    AND r.billing_account_id IN (SELECT DISTINCT bacc_id FROM fb WHERE fbid <> 0 AND fb_limit > 0) "
 		"  GROUP BY 1,2,3 "
 		"), "
+		/*
+		 * eff_walk / eff — the BILLED length of the whole call (the calc_function
+		 * tier walk applied to fb.billsec). The allowance is consumed in BILLED
+		 * seconds, not raw CDR seconds: a tariff whose first tier is "first 30s as
+		 * one block" bills a 4s call as 30, and /Rating + V6 both record that 30 in
+		 * rating.call_billsec, which is what hist.used sums. Drawing down with raw
+		 * fb.billsec under-counted consumption on every short call, so the
+		 * allowance looked larger than it was and the split granted too much free
+		 * time. Same recurrence as price_walk below, over full calls.
+		 */
+		"eff_walk(cdr_id, pos, rem, bsec, done) AS ( "
+		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		"         CAST(cs - charge*d AS BIGINT), CAST(charge*d AS BIGINT), "
+		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
+		"  FROM ( "
+		"    SELECT cdr_id, pos, d, it, cs, u, "
+		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
+		"    FROM ( "
+		"      SELECT f.cdr_id, cf.pos, cf.delta_time AS d, COALESCE(cf.iterations,0) AS it, "
+		"             f.billsec AS cs, "
+		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(f.billsec::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
+		"      FROM fb f JOIN calc_function cf ON cf.tariff_id = f.tariff_id AND cf.pos = 1 "
+		"      WHERE f.fbid <> 0 AND f.fb_limit > 0 "
+		"    ) "
+		"  ) "
+		"  UNION ALL "
+		"  SELECT CAST(cdr_id AS BIGINT), CAST(pos AS INTEGER), "
+		"         CAST(cs - charge*d AS BIGINT), CAST(pbsec + charge*d AS BIGINT), "
+		"         CAST(CASE WHEN it=0 OR d=0 THEN 1 WHEN u=1 THEN 1 ELSE 0 END AS INTEGER) "
+		"  FROM ( "
+		"    SELECT cdr_id, pos, d, it, cs, u, pbsec, "
+		"           CASE WHEN it=0 OR u<=it THEN u ELSE it END AS charge "
+		"    FROM ( "
+		"      SELECT e.cdr_id, cf.pos, cf.delta_time AS d, COALESCE(cf.iterations,0) AS it, "
+		"             e.rem AS cs, e.bsec AS pbsec, "
+		"             CASE WHEN cf.delta_time=0 THEN 1 ELSE CAST(CEIL(e.rem::DOUBLE/cf.delta_time) AS BIGINT) END AS u "
+		"      FROM eff_walk e "
+		"      JOIN fb f2 ON f2.cdr_id = e.cdr_id "
+		"      JOIN calc_function cf ON cf.tariff_id = f2.tariff_id AND cf.pos = e.pos + 1 "
+		"      WHERE e.done = 0 "
+		"    ) "
+		"  ) "
+		"), "
+		"eff AS ( "
+		"  SELECT cdr_id, bsec AS eff_billsec FROM ( "
+		"    SELECT cdr_id, bsec, ROW_NUMBER() OVER (PARTITION BY cdr_id ORDER BY pos DESC) AS ern "
+		"    FROM eff_walk) WHERE ern = 1 "
+		"), "
+		/*
+		 * split — V6 rating_double_rating(): free_sec is the remaining allowance,
+		 * and the paid remainder is (eff - free_sec), i.e. taken off the BILLED
+		 * length, not the raw one. Each portion is then re-walked by price_walk,
+		 * exactly as V6 re-ran calc_cprice_group() per phase.
+		 */
 		"split AS ( "
-		"  SELECT fb.cdr_id, fb.billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.rating_mode_id, fb.tc_id, fb.pcard_id, fb.fbid, "
-		"         GREATEST(0, LEAST(fb.billsec, fb.fb_limit - (COALESCE(h.used,0) "
-		"           + COALESCE(SUM(fb.billsec) OVER (PARTITION BY fb.bacc_id, fb.fbid, fb.pstart "
+		"  SELECT fb.cdr_id, e.eff_billsec AS billsec, fb.start_ts, fb.bacc_id, fb.rate_id, fb.tariff_id, fb.rating_mode_id, fb.tc_id, fb.pcard_id, fb.fbid, "
+		"         GREATEST(0, LEAST(e.eff_billsec, fb.fb_limit - (COALESCE(h.used,0) "
+		"           + COALESCE(SUM(e.eff_billsec) OVER (PARTITION BY fb.bacc_id, fb.fbid, fb.pstart "
 		"               ORDER BY fb.cdr_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0)))) AS free_sec "
-		"  FROM fb LEFT JOIN hist h ON h.bacc_id=fb.bacc_id AND h.fbid=fb.fbid AND h.pstart=fb.pstart "
+		"  FROM fb "
+		"  JOIN eff e ON e.cdr_id = fb.cdr_id "
+		"  LEFT JOIN hist h ON h.bacc_id=fb.bacc_id AND h.fbid=fb.fbid AND h.pstart=fb.pstart "
 		"  WHERE fb.fbid <> 0 AND fb.fb_limit > 0 "
 		"), "
 		"portions AS ( "
