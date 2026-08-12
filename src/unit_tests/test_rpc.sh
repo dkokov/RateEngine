@@ -8,28 +8,28 @@
 declare -a test_arr
 
 desc_arr[0]="Normal 'JSON-RPC 2.0' request"
-test_arr[0]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"35924119998\",\"cld\":\"0886893345\"},\"id\":111}'"
+test_arr[0]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"359200001\",\"cld\":\"359111\"},\"id\":111}'"
 		
 desc_arr[1]="'params' are different format from the model"
 test_arr[1]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"maxsec\":3600},\"id\":111}'"
 
 desc_arr[2]="Version is 1.0 instead 2.0"
-test_arr[2]=" recv '{\"jsonrpc\":\"1.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"35924119998\",\"cld\":\"0886893345\"},\"id\":111}'"
+test_arr[2]=" recv '{\"jsonrpc\":\"1.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"359200001\",\"cld\":\"359111\"},\"id\":111}'"
 		
 desc_arr[3]="'jsonr' instead 'jsonrpc' element - not 'JSON-RPC 2.0' format"
-test_arr[3]=" recv '{\"jsonr\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"35924119998\",\"cld\":\"0886893345\"},\"id\":111}'"
+test_arr[3]=" recv '{\"jsonr\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"359200001\",\"cld\":\"359111\"},\"id\":111}'"
 		
 desc_arr[4]="Method is not exist as 'proto-type'" 
-test_arr[4]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec222\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"35924119998\",\"cld\":\"0886893345\"},\"id\":111}'"
+test_arr[4]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec222\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"359200001\",\"cld\":\"359111\"},\"id\":111}'"
 		
 desc_arr[5]="Without 'id' element" 
-test_arr[5]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"35924119998\",\"cld\":\"0886893345\"}}'"
+test_arr[5]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"call-uid\":\"1234\",\"clg\":\"359200001\",\"cld\":\"359111\"}}'"
 		
 desc_arr[6]="Without 'params' element"
 test_arr[6]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"id\":111}'"
 
 desc_arr[7]="With some 'params',not full elements"		
-test_arr[7]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"clg\":\"35924119998\",\"cld\":\"0886893345\"},\"id\":111}'"
+test_arr[7]=" recv '{\"jsonrpc\":\"2.0\",\"method\":\"maxsec\",\"params\":{\"clg\":\"359200001\",\"cld\":\"359111\"},\"id\":111}'"
 
 desc_arr[8]="No 'JSON-RPC' format string (no JSON format)"
 test_arr[8]=" recv 'test Dimitar Kokov]}'"
