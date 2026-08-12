@@ -16,7 +16,40 @@ The example ports below follow the shipped sample interface configs:
 | `my_cc_tls.xml`      | my_cc      | tls | 9093 |
 
 Example values used throughout: `cdr_server_id=42`, calling number
-`clg=35929998877`, called number `cld=359887654321`, `call-uid=2222`.
+`clg=359200001`, called number `cld=359111`, `call-uid=2222`.
+
+---
+
+## Console clients
+
+The examples below use the universal `nc` (plain TCP) and `openssl s_client`
+(TLS) — always available, nothing to build. The repo also ships two minimal
+purpose-built clients in `src/clients/my_cc/`, which the test harnesses use
+(`cc_loadtest.sh` drives `2cclient`; the e2e harness builds `tls_client`). Both
+are transport-level, so each carries either payload (my_cc CSV *or* jsonrpc_cc
+JSON) — pass the request as a single quoted argument:
+
+* **`2cclient`** — plain TCP. Build `gcc -o 2cclient src/clients/my_cc/2cclient.c`;
+  usage `./2cclient <host> <port> '<request>'`:
+
+  ```sh
+  ./2cclient 127.0.0.1 9090 42,1,maxsec,1234,359200001,359111,2222
+  ./2cclient 127.0.0.1 9091 '{"jsonrpc":"2.0","method":"maxsec","params":{"cdr_server_id":42,"call-uid":"2222","clg":"359200001","cld":"359111"},"id":3}'
+  ```
+
+* **`tls_client`** — the TLS mirror of `2cclient` (+ optional mutual TLS). Build
+  `gcc -o tls_client src/clients/my_cc/tls_client.c -lssl -lcrypto`; usage
+  `./tls_client <host> <port> '<request>' [client_cert client_key ca_cert]`:
+
+  ```sh
+  # server-side TLS (no client cert)
+  ./tls_client 127.0.0.1 9092 '{"jsonrpc":"2.0","method":"state","params":{"cdr_server_id":42},"id":62}'
+  # mutual TLS: present a client cert/key and verify the server against the CA
+  ./tls_client 127.0.0.1 9092 '<request>' client.crt client.key ca.crt
+  ```
+
+The `nc`/`openssl` forms and these clients are interchangeable — use whichever is
+handy.
 
 ---
 
