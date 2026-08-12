@@ -39,7 +39,7 @@ batch path, so `rt.so` must be loaded whenever CallControl is active.
 Negative `maxsec` values are decision codes (e.g. no billing account, no pcard,
 no credit, or `-6` = concurrent-call / shared-pcard restriction).
 
-## Transports (codecs)
+## Transports
 
 The wire protocol is chosen per interface (config in `IntConfigDIR`), decoupled
 from the transport (`tcp`, ...):
@@ -57,6 +57,9 @@ optionally, mutual TLS via `verify-client="yes"` + a `ca` bundle — each interf
 has its own certificate and verify policy. See [cc_int_prof.md](cc_int_prof.md) for
 the params; generate a test PKI with `src/scripts/gen_tls_cert.sh`.
 
+
+See [cc_commands.md](cc_commands.md) for the console command reference (my_cc and
+jsonrpc_cc request/response formats, plus the TLS variants).
 
 See more information for some CallControl integrations :
 

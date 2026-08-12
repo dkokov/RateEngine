@@ -1,0 +1,22 @@
+<Interface>
+ <config>
+    <!-- CallControl session/application protocol.
+         The value must match the module base name: cc_server resolves
+         "<CC-proto>.so" and the symbol "<CC-proto>_proto_bind".
+         jsonrpc_cc -> jsonrpc_cc.so / jsonrpc_cc_proto_bind
+
+         NOTE: there is no 'json_rpc' module - src/config/samples/cc_int has a
+         legacy json_rpc.xml with CC-proto="json_rpc" on this same port 9091.
+         It is deliberately NOT shipped here: the module does not exist
+         (src/mod/jsonrpc_cc is the real one) and two interfaces on 9091 would
+         collide on bind. -->
+    <param name="CC-proto" value="jsonrpc_cc" />
+    <!-- Network transport: udp, tcp, tls, sctp -->
+    <param name="proto" value="tcp" />
+    <!-- IP version: IPv4, IPv6 -->
+    <param name="ip-version" value="IPv4" />
+    <!-- empty = listen on all interfaces (needed in a container) -->
+    <param name="ip" value="" />
+    <param name="port" value="9091" />
+ </config>
+</Interface>
