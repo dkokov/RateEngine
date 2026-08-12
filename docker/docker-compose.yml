@@ -1,7 +1,7 @@
 # RateEngine7 Docker containers
 # author: Dimitar Kokov
-# version: 0.2
-# date: 2026-06-11
+# version: 0.3
+# date: 2026-08-12
 
 # docker-compose up --build -d
 # docker-compose down -v
@@ -19,7 +19,7 @@ services:
     networks:
       - re7_network
     volumes:
-       - re7_pgdata:/var/lib/postgresql/data
+#       - re7_pgdata:/var/lib/postgresql/data
        # load the canonical schema on first init (empty data dir). v2 inserts a
        # 'version' row, so re7-core's own init sees the DB ready and skips its
        # (older) schema load — no double-load.
@@ -43,13 +43,15 @@ services:
         dockerfile: docker/re7-core/Dockerfile
     ports:
       - "9090:9090"
+      - "9091:9091"
       - "9092:9092"
       - "9093:9093"
     networks:
       - re7_network
     volumes:
-      - re7_conf:/usr/local/RateEngine/config/
-      - re7_logs:/usr/local/RateEngine/logs/
+      - /var/lib/rate_engine/volumes/conf:/usr/local/RateEngine/config/
+      - /var/lib/rate_engine/volumes/logs:/usr/local/RateEngine/logs/
+      - /usr/src/test/RateEngine/:/usr/src/RateEngine/
     hostname: re7-core
     container_name: re7-core
     depends_on:
@@ -67,8 +69,6 @@ services:
       - "8443:8443"
     networks:
       - re7_network
-    volumes:
-      - re7_api_data:/app/data
     hostname: re7-api-server
     container_name: re7-api-server
     depends_on:
@@ -91,8 +91,3 @@ networks:
   re7_network:
     driver: bridge
 
-volumes:
-  re7_pgdata:
-  re7_conf:
-  re7_logs:
-  re7_api_data:

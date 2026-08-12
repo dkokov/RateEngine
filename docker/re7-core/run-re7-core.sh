@@ -3,8 +3,12 @@
 APP_DIR="/usr/local/RateEngine"
 CLI="$APP_DIR/bin/RateEngine"
 CONF="$APP_DIR/config/RateEngine7.xml"
-SQL="$APP_DIR/scripts/sql/rate_engine_0.6.13.sql"
 PSQL=/usr/bin/psql
+CERT_DIR="$APP_DIR/config/certs"
+GEN_CERT="$APP_DIR/scripts/gen_tls_cert.sh"
+
+# How long to wait for re7-db to finish initdb before giving up (seconds).
+DB_WAIT_SECS=60
 
 # first run: install + init db
 if [ ! -f /root/.pgpass ]; then
@@ -23,33 +27,67 @@ if [ ! -f /root/.pgpass ]; then
         mv "$tmp" "$f"
     done
 
-    # wait for db
-    echo "waiting for re7-db ..."
-    sleep 5
+fi
 
-    # init schema if empty
-    _RES=$($PSQL -h re7-db -U re_admin rate_engine -c "select date from version;" -A -t 2>/dev/null)
-    if [ "$_RES" == "" ]; then
-        if [ -f "$SQL" ]; then
-            echo "creating db schema ..."
-            $PSQL -h re7-db -U re_admin rate_engine -f $SQL
-        else
-            echo "WARNING: sql schema file not found: $SQL"
+# TLS credentials for the CallControl 'tls' interfaces (cc_int/*_tls.xml).
+#
+# Those interfaces need cert/key to exist or they fail to bind, and the tls
+# module uses ONE process-wide SSL_CTX, so a single server.crt/key pair covers
+# every TLS interface. Generated only when missing, so a real cert mounted (or
+# dropped into the bind-mounted config/certs/) is never overwritten.
+#
+# SELF-SIGNED - test/dev only. gen_tls_cert.sh also emits ca.crt + client.crt,
+# which is what you need for mutual TLS (verify-client=yes in the interface xml)
+# and for src/clients/my_cc/tls_client.c.
+if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
+    if [ -x "$GEN_CERT" ]; then
+        echo "no TLS cert in $CERT_DIR - generating a self-signed test pair (CN=re7-core) ..."
+        echo "WARNING: self-signed, for testing only. Mount a real cert for production."
+        # CN=re7-core so in-network clients can verify by container hostname.
+        if ! "$GEN_CERT" "$CERT_DIR" re7-core 825; then
+            echo "WARNING: gen_tls_cert.sh failed - the cc_int/*_tls.xml interfaces will not start."
         fi
     else
-        echo "db already initialized"
+        echo "WARNING: $GEN_CERT not found/executable - cannot generate TLS certs."
+        echo "         The cc_int/*_tls.xml interfaces will fail to bind."
     fi
 fi
 
+# Wait for re7-db to be initialized - NOT just reachable.
+#
+# The schema is loaded exactly once, by re7-db itself: docker-compose mounts
+# rt_pgsql_v2.sql into /docker-entrypoint-initdb.d/, which runs on an empty data
+# dir and ends with an INSERT into 'version'. re7-core used to psql -f its own
+# (older) rt_pgsql.sql here as a fallback, guarded by this same 'version' probe -
+# dead code in the compose setup, since the probe always found the row.
+#
+# What is NOT optional is waiting. The postgres entrypoint runs the initdb
+# scripts with the server on the unix socket only, so TCP is refused for the
+# whole init window: a fixed 'sleep 5' could expire mid-init, and psql's stderr
+# has to be discarded to probe cleanly, which makes "connection refused"
+# indistinguishable from "no version row". Previously that ended with the engine
+# starting against a schema-less DB. Now it is a hard failure instead - this is a
+# billing engine, a missing schema must not look like a healthy start.
+#
+# This runs on every start, not only the first: on a container restart the
+# .pgpass guard above is skipped, but re7-db may still be coming up.
+echo "waiting for re7-db schema (up to ${DB_WAIT_SECS}s) ..."
+
+_RES=""
+for _i in $(seq 1 "$DB_WAIT_SECS"); do
+    _RES=$($PSQL -h re7-db -U re_admin rate_engine -c "select date from version;" -A -t 2>/dev/null)
+    [ -n "$_RES" ] && break
+    sleep 1
+done
+
+if [ -z "$_RES" ]; then
+    echo "ERROR: re7-db is not reachable or has no schema after ${DB_WAIT_SECS}s."
+    echo "       Check the re7-db container and its /docker-entrypoint-initdb.d mount."
+    echo "       Refusing to start the engine against an uninitialized database."
+    exit 1
+fi
+
+echo "db initialized (version.date = $_RES)"
 echo "starting RateEngine7 ..."
 
-# Follow the log in the background so 'docker logs' shows it (the engine writes
-# to the file, not stdout). -F survives the log rollover done by re7_manager().
-touch "$APP_DIR/logs/rate_engine.log"
-tail -F "$APP_DIR/logs/rate_engine.log" &
-
-# Foreground mode: RateEngine becomes pid 1 of the container, so SIGTERM from
-# 'docker stop' reaches it (clean shutdown) and the container exit status is the
-# engine's. '-d' cannot be used here: it forks away and the container would look
-# healthy with nothing running.
 exec $CLI -c $CONF -f

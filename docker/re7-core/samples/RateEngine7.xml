@@ -1,15 +1,64 @@
-<RateEngine version="0.7.1" >
+<RateEngine version="0.7.6" >
+<!--
+     Container variant of src/config/samples/RateEngine7.xml.
+     Synced from that file; keep the two in step when either changes.
+
+     What is deliberately DIFFERENT here (do not "fix" back to the src sample):
+       - <DB> points at the 're7-db' compose service with the real db/user, and
+         dbpass is the literal '__RE7_DB_PASS__' placeholder that
+         run-re7-core.sh substitutes from $RE7_DB_PASS at first start.
+       - IntConfigDIR / CDRProfilesDIR are absolute, as they have always been
+         in the container.
+       - Rating tuning (BatchLimit, RatingThreads, CacheDimensions) keeps the
+         values tuned for this container, not the src sample's defaults.
+       - ALL THREE SERVICES ARE ACTIVE and every buildable module is loaded, so
+         this one container exercises every variant:
+             get_cdrs     -> CDRMediator (cdrm.so), profiles in cdr_profiles/
+             rating       -> rt_duckdb.so (offline analytical batch rater)
+             call_control -> cc.so + my_cc/jsonrpc_cc over tcp and tls,
+                             4 interfaces on 9090-9093 (all published in
+                             docker-compose.yml)
+         rt.so stays loaded regardless: CallControl always binds it for online
+         charging, no matter what RatingModule selects for the offline batch.
+         The TLS interfaces need config/certs/server.{crt,key}; run-re7-core.sh
+         generates a self-signed test pair on first start if they are missing.
+-->
  <System>
     <param name="DIR" value="/usr/local/RateEngine/" />
     <param name="PIDFile" value="logs/rate_engine.pid" />
  </System>
  <LoadModules>
+    <!-- Only list modules that are actually built+installed (see config.md):
+         a missing .so logs a dlopen error at every start, and if a service
+         below is active="yes" while its module is absent, startup FAILS. -->
+    <!-- db + core services -->
     <param name="module" value="pgsql.so" />
     <param name="module" value="cdrm.so" />
     <param name="module" value="rt.so" />
+    <!-- RatingDuckDB: analytical batch rater, selected by <Rating>
+         RatingModule below. duckdb.so is its db backend and must come with it.
+         rt.so above stays loaded - CallControl binds it for online charging. -->
+    <param name="module" value="duckdb.so" />
+    <param name="module" value="rt_duckdb.so" />
+    <!-- CallControl (online charging): the server, both session protocols and
+         both transports named by config/cc_int/*.xml. All four must be present
+         or the interfaces using them fail to bind. -->
+    <param name="module" value="cc.so" />
+    <param name="module" value="my_cc.so" />
+    <param name="module" value="jsonrpc_cc.so" />
+    <param name="module" value="tcp.so" />
+    <param name="module" value="tls.so" />
+    <!-- NOT built by 'make modules' - commented out in src/config.md. Loading
+         any of these logs a dlopen error at every start:
+           mysql.so redis.so mongodb.so udp.so sctp.so jsonrpc_rt.so -->
+    <!-- <param name="module" value="mysql.so" /> -->
+    <!-- <param name="module" value="redis.so" /> -->
  </LoadModules>
  <DB>
+    <!-- pgsql,mysql,redis -->
     <param name="dbtype" value="pgsql" />
+    <!-- the 're7-db' compose service; the dbpass placeholder is filled in at
+         first container start by run-re7-core.sh from $RE7_DB_PASS -->
     <param name="dbhost" value="re7-db" />
     <param name="dbname" value="rate_engine" />
     <param name="dbuser" value="re_admin" />
@@ -20,44 +69,101 @@
     <param name="IntervalRetries" value="2" />
  </DB>
  <CallControl>
-    <param name="active" value="no" />
+    <!-- Start the CallControl server? In service mode (-d/-f) RateEngine starts
+         only the services marked active="yes" here; a missing param means yes.
+         An explicit CLI flag (-2c/-r/-g) overrides this and runs just that one.
+         Default 'no': enabling it REQUIRES uncommenting cc.so + a protocol
+         module + the transports in <LoadModules> above, otherwise startup
+         fails with "The module 'cc.so' is not find!" - all of them are loaded
+         here, so this is safe to leave on. -->
+    <param name="active" value="yes" />
+
+    <!-- server sleeping in microseconds -->
     <param name="CCServerMicroSleep" value="60000" />
+
+    <!-- maxsec per call in seconds -->
     <param name="CallMaxsecLimit" value="3600" />
+
+    <!-- Sim calls -->
     <param name="SimCalls" value="150" />
+
+    <!-- Worker threads in the CallControl pool (0/unset -> CC_WORKERS = 8,
+         see mod/CallControl/cc_server.h). This is the pool that took CC from
+         54 to 514 calls/s on 0.7.5. -->
+    <param name="CCWorkers" value="8" />
+
+    <!-- Interface Configuration Directory - config per protocol/interface.
+         NOTE: every *.xml in here becomes a listening interface, so keep only
+         the ones whose ports are published in docker-compose.yml. -->
     <param name="IntConfigDIR" value="/usr/local/RateEngine/config/cc_int/" />
+
+<!--    <param name="LogFile" value="logs/ccserver.log" />
+    <param name="LogFileMaxSize" value="40960000" /> -->
  </CallControl>
  <Rating>
+    <!-- Start the offline batch rater? (see <CallControl> active) -->
     <param name="active" value="yes" />
+    <!-- Offline batch rating backend module. Default rt.so (the Rating engine).
+         rt_duckdb.so is the DuckDB analytical batch rater, selected here;
+         CallControl always binds rt.so for online charging regardless. The
+         chosen module must be listed in <LoadModules> above.
+         Comment this out to fall back to rt.so (e.g. to reproduce the
+         make rating-regression baselines, which run against rt.so). -->
+    <param name="RatingModule" value="rt_duckdb.so" />
     <param name="leg" value="a" />
+    <!-- <param name="NoPrefixRating" value="&" /> -->
+    <!-- in seconds -->
     <param name="RatingInterval" value="300" />
-    <param name="waitRatingInterval" value="500" />
-    <!-- DuckDB module: CDRs rated per cycle (1..50000). Tune to find the best
-         throughput/latency ratio for your data + DB. -->
+    <!-- in micro seconds.
+         NOTE: this was spelled 'waitRatingInterval' here until the 0.7.6 sync.
+         Nothing matches the lowercase form - rt_cfg.c and rating_duckdb.c both
+         compare against "WaitRatingInterval" - so the value was silently
+         ignored and the built-in default applied. -->
+    <param name="WaitRatingInterval" value="500" />
+    <!-- CDRs fetched/rated per cycle. Honored by BOTH engines: rt.so passes it
+         to the CDRMediator fetch, rt_duckdb.so uses it as its window LIMIT.
+         Empty/unset -> 1000 (rt.so) / 5000 (rt_duckdb.so). -->
     <param name="BatchLimit" value="5000" />
-    <!-- DuckDB worker threads (server load control). 0 = all CPU cores. -->
+    <!-- Rating worker threads (server load control). 0 = all CPU cores.
+         Read by rt.so (rt_cfg.c) as well as rt_duckdb.so - not DuckDB-only. -->
     <param name="RatingThreads" value="4" />
-    <!-- DuckDB dimension cache (memory vs speed):
+    <!-- rt_duckdb.so only - dimension cache (memory vs speed):
          all    = cache every lookup table (fastest, most RAM)
          static = cache only small config tables; subscriber/account tables live
          none   = nothing cached (least RAM, slowest) -->
     <param name="CacheDimensions" value="all" />
+    <!-- When you want to use pcard for all subscribers,
+         set this param with 'yes' -->
     <param name="UsePCard" value="no" />
+    <!-- 'start_date' or 'end_date' -->
     <param name="PCardSortKey" value="start_date" />
+    <!-- 'desc' or 'asc' -->
     <param name="PCardSortMode" value="desc" />
+    <!-- When you want to use only one billing day(one billing cycle),
+         insert a billing day here.If it's empty,
+         then will use 'billing_day' from the 'billing_account' table -->
     <param name="BillingDay" value="01" />
     <param name="DayOfPayment" value="10" />
+    <!-- k limit min = (limit/amount) when have more from 1 rating account per billing account -->
     <param name="KLimitMin" value="0.05" />
  </Rating>
  <CDRMediator>
     <!-- Start the CDR fetching service? In service mode (-d/-f) only the
-         sections marked active="yes" are started. Missing param = yes. -->
+         sections marked active="yes" are started. Missing param = yes.
+         (This is the whole service; each profile in CDRProfilesDIR has its
+         own 'active' switch for its own fetch loop.) -->
     <param name="active" value="yes" />
     <param name="CDRProfilesDIR" value="/usr/local/RateEngine/config/cdr_profiles/" />
+<!--    <param name="CDRTCPConn" value="5" /> -->
  </CDRMediator>
  <Logs>
+    <!-- <param name="active" value="yes" /> -->
     <param name="LogFile" value="logs/rate_engine.log" />
     <param name="LogMaxFileSize" value="40960000" />
     <param name="LogSeparator" value="|" />
+    <!-- 1,INFO ; 2,WARN ; 3,DEBUG ; 4,DEBUG + TIMING ;
+         NOTE: level 3 rolls a 40MB file roughly every 2 minutes under load,
+         into the bind-mounted logs/ dir. Drop to 1 for long runs. -->
     <param name="LogDebugLevel" value="3" />
  </Logs>
 </RateEngine>
